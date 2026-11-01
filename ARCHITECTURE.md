@@ -38,10 +38,10 @@ The codebase enforces strict decoupling between user-interface presentations and
 src/
 ├── app/               # Presentation layer (App Router pages, layouts, error boundaries)
 ├── components/        # Reusable UI controls (Atomic buttons, Dropzone, Banners, Cards)
-│   ├── common/        # General-purpose reusable UI primitives
-│   ├── layout/        # Global header, footer, navigation, and module shells
+│   ├── common/        # General-purpose reusable UI primitives (Breadcrumb, SearchBar, ToolCard, EmptyState)
+│   ├── layout/        # Global header, mobile drawer, footer, navigation, and module shells
 │   └── dashboard/     # Home view cards, category grids, highlights
-├── constants/         # Static configuration, card dimensions, DPI values, privacy rules
+├── constants/         # Static configuration, card dimensions, DPI values, privacy rules, tools catalog
 ├── hooks/             # Custom React lifecycle hooks (Memory management, notifications)
 ├── lib/               # Pure business & processing logic (No UI dependencies)
 │   ├── ai/            # Local browser AI inference interfaces
@@ -83,9 +83,40 @@ Handling high-resolution user photos (300/600 DPI) and multi-page PDFs can cause
 
 ---
 
-## 4. Architectural Rules & Invariants
+## 4. UI Shell, Client Navigation & State Architecture (Phase 01)
+
+### 4.1. Server & Client Component Segregation
+- **Server Component Default:** Static layout presentation, informational pages (`/about`, `/privacy`, `/terms`, `/contact`), and base document shells execute as Server Components for zero-bundle rendering and instant Time-to-First-Byte (TTFB).
+- **Client Component Boundary:** Interactive navigation state (`Header.tsx` drawer, search query synchronization in `src/app/tools/page.tsx`, and in-memory dropzone inspect stages) isolates `"use client"` directives to the exact interactive leaf components.
+
+### 4.2. Tool Catalog & Dual-Taxonomy Categorization (`src/constants/tools.ts`)
+- All 8 utilities are registered in a single source of truth (`TOOLS`).
+- Each tool implements both a primary `category` (`photo`, `document`, `pdf`, `resume`) and an array of cross-cutting `categories` (e.g., PAN Card Crop is a `document` tool that also operates on `pdf` files).
+- The `/tools` index dynamically resolves filters and live counts across this taxonomy with URL search parameter hydration (`?category=...`).
+
+### 4.3. Accessible Navigation & Mobile Drawer
+- Global navigation is rendered with accessible ARIA semantics (`aria-label="Main Navigation"`, `aria-label="Breadcrumb"`, `aria-expanded`, `aria-controls`).
+- Mobile menu drawer locks viewport scroll while open and binds keyboard escape listeners for accessible modal dismissal.
+
+---
+
+## 5. Shared Browser Image Processing Engine Architecture (Phase 02)
+
+### 5.1. Multi-Stage Pipeline Isolation
+The image processing engine strictly decouples presentation components from byte transformations:
+- **Input Validation (`src/lib/image/validator.ts`):** Evaluates MIME type, extension, size, magic byte signatures, and duplicates before committing resources to memory.
+- **Native Decoding (`src/lib/image/decoder.ts`):** Utilizes `createImageBitmap()` with `{ imageOrientation: "from-image" }` to respect EXIF rotation data off the main DOM thread, with an offscreen `HTMLImageElement` fallback.
+- **Pure Transformations (`src/lib/image/transform.ts`):** Pure mathematical calculations (`computeResizeDimensions`, `validateAndClampCrop`, `computeRotatedBounds`) combined into a single canvas matrix draw call with high-quality bicubic interpolation.
+- **Background Worker Offloading (`src/workers/image-engine.worker.ts` & `src/lib/image/worker-client.ts`):** Offloads heavy canvas operations to `OffscreenCanvas` in background Web Workers with typed message protocols, job tracking, and main-thread fallback.
+- **Multi-Format Export (`src/lib/image/exporter.ts`):** Encodes to PNG, JPEG (with background fill for transparency flattening), and WebP, synthesizing ephemeral Blobs and initiating direct disk downloads.
+- **Interactive Viewport Preview (`src/components/image-engine/ImagePreview.tsx`):** Independent preview viewport supporting responsive fit-to-screen, interactive zoom (10%-500%), and click-drag panning without downsampling master export resolution.
+
+---
+
+## 6. Architectural Rules & Invariants
 
 1. **Zero API Routes:** The `/app/api` directory is intentionally absent. No server endpoints exist to receive file buffers.
 2. **Unoptimized Static Next.js Images:** Next.js is configured with `images: { unoptimized: true }` so images are never proxied through a Node.js image optimization endpoint.
 3. **No Storage Persistence:** Neither `localStorage` nor `IndexedDB` may be used to store user document blobs or decrypted credentials.
 4. **Independent Modules:** Each of the 8 utility modules operates as an isolated feature pipeline with dedicated types and configurations.
+5. **Decoupled Resolution Invariant:** Preview scaling and viewport pan/zoom transformations must never modify or downsample the master source image buffer used for exports.

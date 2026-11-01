@@ -22,6 +22,12 @@ Browser Utility Studio solves this problem fundamentally by **moving all computa
 | **Local Persistence** | No Permanent Caching | User files, extracted images, and decrypted PDF passwords are never saved to `localStorage`, `sessionStorage`, or `IndexedDB`. |
 | **Analytics & Telemetry** | Zero Trackers | No Google Analytics, Facebook Pixel, Mixpanel, or third-party advertising SDKs are installed. |
 
+### 2.1. Shared Image Processing Engine Lifecycle (Phase 02)
+- **Zero In-Transit Decryption:** Image decoding (`createImageBitmap`), transformations (crop, rotate, resize, flip), and canvas pixel manipulation run inside ephemeral client memory or sandboxed Web Workers.
+- **Deterministic Resource Revocation:** Object URLs generated for preview rendering or download triggers are tracked in-memory and revoked via `URL.revokeObjectURL()`.
+- **Immediate Bitmap Disposal:** Master and intermediate `ImageBitmap` buffers are closed via `bitmap.close()` when transformations complete or components unmount.
+- **No Base64 Payload Sprawl:** Canvas outputs are converted directly to ephemeral Blobs without creating massive base64 string allocations that could persist in memory dumps.
+
 ---
 
 ## 3. Verification Protocol for Users and Auditors
