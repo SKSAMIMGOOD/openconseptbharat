@@ -264,3 +264,275 @@ The limiting axis identifies whether width or height constraints govern the prin
 - **Physical Dimensions:** Must be finite numbers $> 0$, with minimum $1\text{ mm}$ and safety cap $1000\text{ mm}$ (1 meter).
 - **DPI Values:** Must be positive numbers, minimum $30\text{ DPI}$, maximum $2400\text{ DPI}$ (preventing memory exhaustion).
 - **Zero & Negative Protection:** All zero, negative, NaN, and Infinity inputs are strictly rejected with typed field error messages.
+
+---
+
+## 9. Passport Photo Presets & Interactive Crop Editor Subsystem (Phase 03C)
+
+The **Passport Photo Presets & Interactive Crop Editor** (`src/lib/crop/crop-geometry.ts` and `src/lib/crop/unit-converter.ts`) provides an isolated, pure mathematical coordinate transformation engine, multi-unit conversions, 8-handle directional boundary resizing, aspect-ratio constraint snapping, studio background composition, and real-time canvas crop rendering.
+
+### 9.1. Photo Size Preset Schema
+
+Photo presets are strictly decoupled from UI presentation components (`src/types/crop-preset.ts` and `src/constants/crop-presets.ts`):
+
+```ts
+export type DimensionUnit = "mm" | "cm" | "inch";
+
+export interface PhotoPreset {
+  readonly id: string;
+  readonly name: string;
+  readonly width: number;
+  readonly height: number;
+  readonly unit: DimensionUnit;
+  readonly aspectRatio: number; // width / height
+  readonly description: string;
+  readonly category?: PresetCategory;
+  readonly isOfficial: boolean;
+  readonly officialSource?: string;
+  readonly countryOrStandard?: string;
+}
+```
+
+#### Initial Standard Presets
+
+1. **Passport-style photo (35 × 45 mm):** Aspect ratio $35 / 45 \approx 0.7778$ (7:9). International standard proportion.
+2. **Portrait photo (40 × 50 mm):** Aspect ratio $40 / 50 = 0.8$ (4:5). Standard civil ID and administrative form size.
+3. **Square photo (2 × 2 inches):** $50.8 \times 50.8\text{ mm}$. Aspect ratio $1.0$ (1:1). Standard format for US Visa / Passport / OCI.
+4. **Custom dimensions:** User-specified width, height, and unit (mm, cm, inch) with live aspect-ratio calculation.
+
+> [!IMPORTANT]
+> **Advisory Disclaimer Invariant:** Preset definitions and UI components never claim to satisfy every country's official passport or visa requirements. Requirements vary widely by consulate; presets are only marked official (`isOfficial: true`) when verified against an authoritative government standard.
+
+### 9.2. Unit Conversions & Decimal Precision Mathematics
+
+Physical dimensions support three international units (`mm`, `cm`, `inch`) with exact mathematical conversion constants:
+
+- $1\text{ inch} = 25.4\text{ mm}$ (exact, 1959 international yard and pound agreement).
+- $1\text{ cm} = 10\text{ mm}$ (exact).
+- $1\text{ inch} = 2.54\text{ cm}$ (exact).
+
+$$\text{value}_{\text{mm}} = \begin{cases} \text{value} & \text{if unit is mm} \\ \text{value} \times 10 & \text{if unit is cm} \\ \text{value} \times 25.4 & \text{if unit is inch} \end{cases}$$
+
+$$\text{value}_{\text{target}} = \begin{cases} \text{value}_{\text{mm}} & \text{if target is mm} \\ \text{value}_{\text{mm}} / 10 & \text{if target is cm} \\ \text{value}_{\text{mm}} / 25.4 & \text{if target is inch} \end{cases}$$
+
+Validation enforces positive finite numbers within $1\text{ mm} \le \text{dimension}_{\text{mm}} \le 1000\text{ mm}$ with full floating-point decimal support (e.g. $50.8\text{ mm}$, $2.0\text{ in}$, $3.5\text{ cm}$).
+
+### 9.3. Intrinsic Crop Coordinate System & Viewport Projection
+
+To maintain maximum print fidelity and resolution decoupling, crop coordinates are **always stored in intrinsic source image pixels**:
+
+$$C = \{ x, y, \text{width}, \text{height} \} \quad \text{where } 0 \le x \le W_{\text{src}} - \text{width}, \; 0 \le y \le H_{\text{src}} - \text{height}$$
+
+When rendered in the interactive workspace viewport, screen coordinates are projected via display scale and pan offset:
+
+$$\text{scale} = \text{fitScale} \times \text{zoom}$$
+$$\text{screenX} = \text{originX} + x \times \text{scale}$$
+$$\text{screenY} = \text{originY} + y \times \text{scale}$$
+$$\text{screenWidth} = \text{width} \times \text{scale}$$
+$$\text{screenHeight} = \text{height} \times \text{scale}$$
+
+Interactive pointer deltas $(\Delta X_{\text{screen}}, \Delta Y_{\text{screen}})$ map inversely to intrinsic source pixels:
+
+$$\Delta X_{\text{source}} = \frac{\Delta X_{\text{screen}}}{\text{scale}}, \quad \Delta Y_{\text{source}} = \frac{\Delta Y_{\text{screen}}}{\text{scale}}$$
+
+### 9.4. Image Transformation & Positioning Behavior
+
+- **Non-Destructive Invariant:** The master source image buffer and original dimensions remain untouched in browser RAM.
+- **Preset Switching Adaptation (`recalculateCropForAspectRatio`):** When the user selects a new preset, the crop box adapts its aspect ratio around the current crop center $(c_x, c_y)$ without resetting or reloading the uploaded image.
+- **8-Directional Resizing (`resizeCropFromHandle`):**
+  - **Corner Handles (NW, NE, SE, SW):** Anchor against the diagonally opposite corner, projecting candidate deltas onto the aspect ratio line $W = H \times R$.
+  - **Edge Handles (N, S, E, W):** Symmetrically expand/contract perpendicular dimensions around the center axis when aspect ratio is locked.
+- **Boundary Clamping (`clampCropToBounds`):** Prevents negative coordinates, zero dimensions, NaNs, and out-of-bounds overflows, enforcing a minimum crop threshold of $24\text{ px}$.
+- **Framing Controls:**
+  - `centerCropInImage`: Shifts crop frame to $([W_{\text{src}} - W_{\text{crop}}]/2, [H_{\text{src}} - H_{\text{crop}}]/2)$.
+  - `fitCropToImage`: Maximizes crop frame area within image bounds while preserving aspect ratio.
+  - `CropMode` toggle: Seamlessly switches between Fixed Aspect Ratio (locked) and Free Crop (unlocked).
+
+### 9.5. Studio Background Composition & Transparency
+
+- Supported options: **Transparent** (alpha preservation), **Studio White** (`#FFFFFF`), **Light Blue** (`#D0E8FF`), **Light Grey** (`#F3F4F6`), and **Custom Hex Color**.
+- When rendering crop composition:
+  - If `backgroundColor === "transparent"`, canvas buffer clears and native PNG/WebP alpha transparency is preserved with a checkerboard preview.
+  - If a solid color is selected, the color is painted underneath transparent pixels.
+- **Scope Distinction:** Studio background color applies behind transparent pixels or letterbox padding only. It does not perform automatic subject segmentation or remove existing solid photograph backgrounds (which belongs to the upcoming Phase 04 AI Background Remover).
+
+### 9.6. Known Limitations
+
+1. **Facial Biometric Anchoring:** The crop editor provides visual rule-of-thirds grid lines, but does not yet perform automatic facial landmark detection (chin-to-crown distance calculation). The user positions the crop frame manually.
+2. **GPU Texture Memory Bounds:** In accordance with Phase 02 invariants, maximum canvas dimension is safely constrained to $16,384\text{ px}$ to prevent mobile WebGL context resets.
+3. **Solid Background Separation:** Modifying the studio backdrop color only affects transparent pixels; existing solid backgrounds in photos require the AI Background Remover tool.
+
+---
+
+## 10. Multiple Photo Print Sheet Engine Subsystem (Phase 03D & Phase 03E)
+
+The **Multiple Photo Print Sheet Engine** (`src/lib/photo-studio/sheet-calculator.ts`, `src/lib/photo-studio/sheet-renderer.ts`, and `src/lib/photo-studio/sheet-exporter.ts`) synthesizes print-ready multi-photo layout sheets directly in browser memory. It provides mathematical grid positioning, capacity calculations, orientation switching, cutting guides, high-resolution rasterization, and physical PostScript PDF vector assembly without server assistance.
+
+### 10.1. Paper Format Specifications & Physical Geometry
+
+The engine unifies standard ISO 216 **A4 paper** and standard **4 × 6 inch (10 × 15 cm)** photo card stock under a single layout and export pipeline:
+
+| Dimension Attribute | ISO 216 A4 Paper (Phase 03E) | 4 × 6 Inch Photo Card (Phase 03D) | Standard Constant Definition |
+|---|---|---|---|
+| **Short Edge (mm)** | $210.0\text{ mm}$ | $101.6\text{ mm}$ ($4.0\text{ in} \times 25.4$) | `SHEET_A4_SHORT_EDGE_MM` / `SHEET_4X6_SHORT_EDGE_MM` |
+| **Long Edge (mm)** | $297.0\text{ mm}$ | $152.4\text{ mm}$ ($6.0\text{ in} \times 25.4$) | `SHEET_A4_LONG_EDGE_MM` / `SHEET_4X6_LONG_EDGE_MM` |
+| **Short Edge (inches)** | $\approx 8.2677165\text{ in}$ | $4.0000000\text{ in}$ | `millimeters / 25.4` |
+| **Long Edge (inches)** | $\approx 11.6929134\text{ in}$ | $6.0000000\text{ in}$ | `millimeters / 25.4` |
+| **PostScript PDF Short Edge** | **$595.2756\text{ pt}$** | **$288.0000\text{ pt}$** | `(shortMm / 25.4) * 72` |
+| **PostScript PDF Long Edge** | **$841.8898\text{ pt}$** | **$432.0000\text{ pt}$** | `(longMm / 25.4) * 72` |
+| **Default Outer Margins** | $6.0\text{ mm}$ (safe for desktop printers) | $4.0\text{ mm}$ (compact photo stock) | `DEFAULT_A4_SHEET_MARGINS` / `DEFAULT_SHEET_MARGINS` |
+| **Default Photo Spacing** | $2.0\text{ mm}$ horizontal / $2.0\text{ mm}$ vertical | $2.0\text{ mm}$ horizontal / $2.0\text{ mm}$ vertical | `horizontalSpacingMm` / `verticalSpacingMm` |
+
+#### Orientation Rules
+- **Portrait Orientation:** Width is mapped to the Short Edge; Height is mapped to the Long Edge:
+  - A4 Portrait: $210.0 \times 297.0\text{ mm}$ ($595.2756 \times 841.8898\text{ pt}$).
+  - 4×6 Portrait: $101.6 \times 152.4\text{ mm}$ ($288.0000 \times 432.0000\text{ pt}$).
+- **Landscape Orientation:** Width is mapped to the Long Edge; Height is mapped to the Short Edge:
+  - A4 Landscape: $297.0 \times 210.0\text{ mm}$ ($841.8898 \times 595.2756\text{ pt}$).
+  - 4×6 Landscape: $152.4 \times 101.6\text{ mm}$ ($432.0000 \times 288.0000\text{ pt}$).
+
+---
+
+### 10.2. Pixel Grid Formulations & Rounding Strategy
+
+Raster canvas pixel dimensions are calculated strictly using the international standard formula with round-to-nearest-integer rounding:
+
+$$\text{pixels} = \text{Math.round}\left(\frac{\text{millimeters}}{25.4} \times \text{DPI}\right)$$
+
+#### Standard A4 Output Grids Across Supported DPI Presets
+
+| DPI Preset | Portrait Dimensions (W × H px) | Landscape Dimensions (W × H px) | Total Megapixels | Optimal Use Case |
+|---|---|---|---|---|
+| **150 DPI** | $1240 \times 1754\text{ px}$ | $1754 \times 1240\text{ px}$ | $\approx 2.18\text{ MP}$ | Fast test proofs, draft previews, low-bandwidth workflows |
+| **200 DPI** | $1654 \times 2339\text{ px}$ | $2339 \times 1654\text{ px}$ | $\approx 3.87\text{ MP}$ | Office laser printers and standard document copies |
+| **300 DPI** | $2480 \times 3508\text{ px}$ | $3508 \times 2480\text{ px}$ | $\approx 8.70\text{ MP}$ | Commercial photo lab standard (crisp continuous tone) |
+| **600 DPI** | $4961 \times 7016\text{ px}$ | $7016 \times 4961\text{ px}$ | $\approx 34.81\text{ MP}$ | High-end archival fine-art and biometric security printing |
+| **Custom DPI** | Validated $30 \le \text{DPI} \le 2400$ | Validated $30 \le \text{DPI} \le 2400$ | Calculated dynamically | Calibrated RIP drivers and non-standard print workflows |
+
+---
+
+### 10.3. Unified Layout Grid & Placement Mathematics
+
+Both A4 and 4×6 layouts share the exact same pure placement math (`calculatePhotoSheetLayout`):
+
+#### 1. Available Usable Space Calculation
+$$\begin{aligned}
+W_{\text{usable}} &= W_{\text{sheet}} - (M_{\text{left}} + M_{\text{right}}) \\
+H_{\text{usable}} &= H_{\text{sheet}} - (M_{\text{top}} + M_{\text{bottom}})
+\end{aligned}$$
+If $W_{\text{usable}} < W_{\text{photo}}$ or $H_{\text{usable}} < H_{\text{photo}}$, available capacity evaluates to $0$ and placement is aborted to prevent boundary clipping.
+
+#### 2. Automatic Capacity Derivation
+$$\begin{aligned}
+C_{\text{max}} &= \left\lfloor \frac{W_{\text{usable}} + S_{\text{col}}}{W_{\text{photo}} + S_{\text{col}}} \right\rfloor \\
+R_{\text{max}} &= \left\lfloor \frac{H_{\text{usable}} + S_{\text{row}}}{H_{\text{photo}} + S_{\text{row}}} \right\rfloor \\
+N_{\text{capacity}} &= C_{\text{max}} \times R_{\text{max}}
+\end{aligned}$$
+
+#### 3. Standard Capacity Benchmarks on A4 Paper (with 6 mm margins & 2 mm spacing)
+- **Standard Passport (35 × 45 mm):**
+  - Portrait ($210 \times 297\text{ mm}$): fits **30 photos** (5 columns × 6 rows).
+  - Landscape ($297 \times 210\text{ mm}$): fits **28 photos** (7 columns × 4 rows).
+- **US Visa / Square (50.8 × 50.8 mm / 2 × 2″):**
+  - Portrait: fits **15 photos** (3 columns × 5 rows).
+  - Landscape: fits **15 photos** (5 columns × 3 rows).
+- **Portrait Photo (40 × 50 mm):**
+  - Portrait: fits **20 photos** (4 columns × 5 rows).
+  - Landscape: fits **18 photos** (6 columns × 3 rows).
+
+#### 4. Automatic vs. Manual Grid Columns and Rows
+- **Automatic Arrangement:** $C = C_{\text{max}}$ and $R = R_{\text{max}}$.
+- **Manual Mode:** The user may select fewer columns $C_{\text{user}} \le C_{\text{max}}$ or rows $R_{\text{user}} \le R_{\text{max}}$ to leave open writing/signing areas on the sheet.
+
+#### 5. Center-Aligned Grid Placement
+When center alignment is enabled (default `true`), leftover usable space is distributed symmetrically:
+$$\begin{aligned}
+W_{\text{grid}} &= C \times W_{\text{photo}} + (C - 1) \times S_{\text{col}} \\
+H_{\text{grid}} &= R \times H_{\text{photo}} + (R - 1) \times S_{\text{row}} \\
+X_0 &= M_{\text{left}} + \frac{W_{\text{usable}} - W_{\text{grid}}}{2} \\
+Y_0 &= M_{\text{top}} + \frac{H_{\text{usable}} - H_{\text{grid}}}{2}
+\end{aligned}$$
+
+Each photo copy $i \in [0, N_{\text{placed}} - 1]$ is assigned grid index $(\text{row} = \lfloor i / C \rfloor, \text{col} = i \pmod C)$:
+$$\begin{aligned}
+X_i &= X_0 + \text{col} \times (W_{\text{photo}} + S_{\text{col}}) \\
+Y_i &= Y_0 + \text{row} \times (H_{\text{photo}} + S_{\text{row}})
+\end{aligned}$$
+
+---
+
+### 10.4. Copy Count Invariant: Zero Silent Reduction
+
+A core architectural invariant of Browser Utility Studio is **never to silently discard user configuration**:
+
+- The user-requested copy count (`config.copies`) is permanently preserved in state.
+- If $\text{requestedCopies} > N_{\text{capacity}}$:
+  - The engine sets `copiesExceedCapacity: true` and calculates `exceededByCount = requested - capacity`.
+  - The rendered sheet displays the maximum possible photos ($N_{\text{placed}} = \min(\text{requested}, N_{\text{capacity}})$).
+  - A persistent, high-visibility amber warning banner appears across the controls panel and preview HUD informing the user:
+    > *"Sheet capacity reached: Placing [placed] of [requested] requested photos on this sheet ([overflow] photos exceed single-sheet capacity). Adjust margins, spacing, or print an additional sheet."*
+- If $\text{requestedCopies} \le N_{\text{capacity}}$:
+  - Exactly $N_{\text{placed}} = \text{requestedCopies}$ are placed in reading order (top-left to bottom-right), leaving trailing cells cleanly unprinted.
+
+---
+
+### 10.5. Cutting Guides & Separation Lines
+
+To facilitate post-print manual trimming with guillotine cutters or scissors, the engine renders configurable cutting guides:
+
+1. **Crop Marks (Corner Markers):**
+   - Precise crosshairs or L-bracket corner marks rendered just outside the photo perimeter ($0.5\text{ mm}$ offset with $2.5\text{ mm}$ arm length).
+   - Keeps marks entirely outside photo content so no black ink encroaches on the cropped face.
+2. **Separation Grid Lines:**
+   - Continuous dashed or solid divider lines through horizontal and vertical photo gutters.
+   - Dash pattern: $[4\text{ px}, 4\text{ px}]$ scaled to output resolution.
+3. **Configurable Style & Color:**
+   - Color picker with presets: Light Gray (`#D1D5DB`), Mid Gray (`#9CA3AF`), Dark Charcoal (`#374151`), or Solid Black (`#000000`).
+   - Line thickness options: Fine ($0.5\text{ mm}$), Standard ($1.0\text{ mm}$), Bold ($1.5\text{ mm}$).
+   - Toggleable switch: Allows 1-click preview and export with or without cutting guides.
+
+---
+
+### 10.6. Print-Ready PDF Point Precision Standard
+
+PDF files use a device-independent coordinate system where $1\text{ point} = \frac{1}{72}\text{ inch} = \frac{25.4}{72}\text{ mm} \approx 0.352778\text{ mm}$.
+
+> [!CRITICAL]
+> **PDF Dimension Invariant:** PDF page dimensions MUST NEVER be derived from rounded raster pixel dimensions. Deriving PDF page points by dividing rounded pixels by DPI ($\frac{\text{pixels}}{\text{DPI}} \times 72$) introduces floating-point truncation errors that accumulate into noticeable physical sizing discrepancies when sent to printing presses.
+
+Instead, PDF documents generated by `exportSheetToPdf()` use exact physical conversion formulas:
+$$\begin{aligned}
+\text{pageWidthPt}_{\text{A4 Portrait}} &= \frac{210.0\text{ mm}}{25.4\text{ mm/in}} \times 72\text{ pt/in} = \mathbf{595.2756\text{ pt}} \\
+\text{pageHeightPt}_{\text{A4 Portrait}} &= \frac{297.0\text{ mm}}{25.4\text{ mm/in}} \times 72\text{ pt/in} = \mathbf{841.8898\text{ pt}}
+\end{aligned}$$
+
+In PostScript PDF standard, origin $(0, 0)$ is at the **bottom-left** corner. The exporter inverts vertical coordinates so photos align with screen layout:
+$$\begin{aligned}
+X_{\text{pdf}} &= \frac{X_{\text{mm}}}{25.4} \times 72 \\
+Y_{\text{pdf}} &= \text{pageHeightPt} - \left(\frac{Y_{\text{mm}} + H_{\text{photoMm}}}{25.4} \times 72\right)
+\end{aligned}$$
+
+---
+
+### 10.7. Live Preview Scaled Canvas Performance
+
+To maintain 60 FPS UI responsiveness on low-power laptops and mobile devices, interactive controls decouple live preview rendering from export rasterization:
+- **Preview Canvas:** Scaled dynamically to fit container boundaries (typically $300\text{ px}$ to $1200\text{ px}$ wide), preventing costly multi-megapixel redraws on every margin slider step.
+- **Export Canvas:** Synthesized on-demand upon clicking "Download" at full physical target resolution ($2480 \times 3508\text{ px}$ at 300 DPI or $4961 \times 7016\text{ px}$ at 600 DPI).
+- **Buffer Cleanup:** Master export canvas buffers and temporary Blobs are immediately disposed via `releaseCanvasBuffer()` and `revokeObjectUrlSafely()`.
+
+---
+
+### 10.8. Physical Printing Accuracy & Hardware Limitations
+
+When printing generated A4 and 4×6 photo sheets, software accuracy must be paired with correct operating system print dialog configurations:
+
+1. **Scale Setting — 100% / Actual Size:**
+   - In the system print dialog (Chrome, Acrobat, Windows Photo Viewer, macOS Preview), the user **MUST** select **"Actual Size"** or **"100%"**.
+   - **Disable "Fit to Printable Area", "Scale to Fit", or "Shrink oversized pages"**: Enabling automatic scaling reduces the physical photo dimensions (e.g. shrinking a $35 \times 45\text{ mm}$ photo down to $33 \times 42\text{ mm}$), causing biometric passport rejection at consulates.
+2. **Paper Size Selection:**
+   - Select **A4 ($210 \times 297\text{ mm}$)** in printer properties. Do not select US Letter ($8.5 \times 11\text{ in} = 215.9 \times 279.4\text{ mm}$).
+3. **Hardware Non-Printable Margin Limitations:**
+   - Standard consumer inkjet and laser printers possess physical mechanical paper grab rollers that require non-printable margins (typically $3.0\text{ mm}$ to $6.0\text{ mm}$ on leading/trailing edges).
+   - Our default A4 margin is preset to $6.0\text{ mm}$ to ensure all photo content and corner marks remain within printable mechanical boundaries.
+   - True borderless printing requires dedicated photo printers with overspray ink absorbers; borderless modes may introduce minor edge expansion zoom ($1\% - 2\%$). Users requiring exact caliper-grade physical accuracy should print with margins enabled at $100\%$ scale.

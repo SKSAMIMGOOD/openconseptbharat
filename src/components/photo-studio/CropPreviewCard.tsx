@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useCallback } from "react";
 import {
   Maximize2,
   Sparkles,
@@ -9,18 +9,25 @@ import {
   AlertTriangle,
   Layers,
   ZoomIn,
+  Printer,
+  ArrowRight,
+  Download,
+  RefreshCw,
+  FileImage,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import type { PhotoPreset } from "@/types/crop-preset";
 import type { CropCoordinates } from "@/types/crop";
 import type { ImageDimensions } from "@/types/image-engine";
 import { renderCropCanvas } from "@/lib/crop/crop-geometry";
-import { formatDimension } from "@/lib/crop/unit-converter";
+import { formatDimension, unitToMm } from "@/lib/crop/unit-converter";
 import {
   calculatePixelDimensions,
   assessResolutionQuality,
   getFriendlyAspectRatioName,
 } from "@/lib/photo-studio/dpi-calculator";
+import { exportCanvasToBlob } from "@/lib/image/exporter";
+import { createTrackedObjectURL, revokeObjectUrlSafely } from "@/lib/utils/memory";
 
 export interface CropPreviewCardProps {
   imageElement: HTMLImageElement | ImageBitmap | null;
@@ -31,6 +38,7 @@ export interface CropPreviewCardProps {
   originalDimensions?: ImageDimensions | null;
   currentZoom: number;
   cropMode: "fixed" | "free";
+  onNavigateToSheet?: () => void;
   className?: string;
 }
 
@@ -43,25 +51,18 @@ export const CropPreviewCard: React.FC<CropPreviewCardProps> = ({
   originalDimensions,
   currentZoom,
   cropMode,
+  onNavigateToSheet,
   className,
 }) => {
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const [renderError, setRenderError] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [exportFeedback, setExportFeedback] = useState<string | null>(null);
+  const [exportFormat, setExportFormat] = useState<"image/png" | "image/jpeg">("image/png");
 
-  // Physical dimensions & Target print pixels calculation
-  const targetWidthMm =
-    preset.unit === "inch"
-      ? preset.width * 25.4
-      : preset.unit === "cm"
-      ? preset.width * 10
-      : preset.width;
-
-  const targetHeightMm =
-    preset.unit === "inch"
-      ? preset.height * 25.4
-      : preset.unit === "cm"
-      ? preset.height * 10
-      : preset.height;
+  // Physical dimensions in mm
+  const targetWidthMm = unitToMm(preset.width, preset.unit);
+  const targetHeightMm = unitToMm(preset.height, preset.unit);
 
   const targetCalculation = calculatePixelDimensions({
     widthMm: targetWidthMm,
@@ -127,6 +128,57 @@ export const CropPreviewCard: React.FC<CropPreviewCardProps> = ({
       );
     }
   }, [imageElement, crop, backgroundColor]);
+
+  // Export cropped photo at exact calculated pixel dimensions
+  const handleExportCroppedPhoto = useCallback(async () => {
+    if (!imageElement || !targetCalculation.isValid) return;
+
+    setIsExporting(true);
+    setExportFeedback(null);
+    try {
+      const outW = targetCalculation.widthPx;
+      const outH = targetCalculation.heightPx;
+
+      // Render at exact target pixel dimensions without stretching or distortion
+      const exportCanvas = renderCropCanvas(
+        imageElement,
+        crop,
+        outW,
+        outH,
+        backgroundColor
+      );
+
+      const blob = await exportCanvasToBlob(exportCanvas, {
+        format: exportFormat,
+        quality: 0.95,
+        backgroundColor: backgroundColor !== "transparent" ? backgroundColor : "#ffffff",
+      });
+
+      const cleanUnit = preset.unit === "inch" ? "in" : preset.unit;
+      const fileName = `photo-${preset.width}${cleanUnit}x${preset.height}${cleanUnit}-${dpi}dpi-${outW}x${outH}px${
+        exportFormat === "image/png" ? ".png" : ".jpg"
+      }`;
+
+      const blobUrl = createTrackedObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      setTimeout(() => {
+        revokeObjectUrlSafely(blobUrl);
+      }, 1500);
+
+      setExportFeedback(`Exported: ${outW} × ${outH} px @ ${dpi} DPI`);
+      setTimeout(() => setExportFeedback(null), 4000);
+    } catch (err) {
+      setRenderError(err instanceof Error ? err.message : "Export failed.");
+    } finally {
+      setIsExporting(false);
+    }
+  }, [imageElement, targetCalculation, crop, backgroundColor, preset, dpi, exportFormat]);
 
   const activeAspectRatio = crop.width / Math.max(1, crop.height);
   const friendlyRatio = getFriendlyAspectRatioName(activeAspectRatio);
@@ -287,6 +339,76 @@ export const CropPreviewCard: React.FC<CropPreviewCardProps> = ({
             </p>
           </div>
         </div>
+      )}
+
+      {/* Export Cropped Photo Actions (Phase 03G Requirement 4) */}
+      {imageElement && (
+        <div className="space-y-3 pt-1">
+          <div className="flex items-center gap-2">
+            <div className="flex-1 flex items-center p-1 bg-surface-100 rounded-xl border border-surface-200 text-xs">
+              <button
+                type="button"
+                onClick={() => setExportFormat("image/png")}
+                className={cn(
+                  "flex-1 py-1 px-2 rounded-lg font-semibold transition-all text-center",
+                  exportFormat === "image/png"
+                    ? "bg-white text-surface-900 shadow-xs font-bold"
+                    : "text-surface-600 hover:text-surface-900"
+                )}
+              >
+                PNG (Lossless)
+              </button>
+              <button
+                type="button"
+                onClick={() => setExportFormat("image/jpeg")}
+                className={cn(
+                  "flex-1 py-1 px-2 rounded-lg font-semibold transition-all text-center",
+                  exportFormat === "image/jpeg"
+                    ? "bg-white text-surface-900 shadow-xs font-bold"
+                    : "text-surface-600 hover:text-surface-900"
+                )}
+              >
+                JPEG
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleExportCroppedPhoto}
+              disabled={isExporting || !targetCalculation.isValid}
+              className="py-2.5 px-4 rounded-xl bg-surface-900 hover:bg-black text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50 shrink-0"
+              title="Download cropped photo at exact calculated pixel dimensions"
+            >
+              {isExporting ? (
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Download className="w-3.5 h-3.5" />
+              )}
+              <span>
+                Download Photo ({targetCalculation.widthPx} × {targetCalculation.heightPx} px)
+              </span>
+            </button>
+          </div>
+
+          {exportFeedback && (
+            <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2 animate-in fade-in">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{exportFeedback}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Action CTA: Move to Print Sheet Generator */}
+      {onNavigateToSheet && imageElement && (
+        <button
+          type="button"
+          onClick={onNavigateToSheet}
+          className="w-full py-3.5 px-4 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md shadow-brand-600/20 transition-all hover:scale-[1.01] active:scale-[0.99]"
+        >
+          <Printer className="w-4 h-4" />
+          <span>Arrange on Print Sheet (A4 & 4×6″) →</span>
+        </button>
       )}
 
       {/* Memory Integrity Note */}

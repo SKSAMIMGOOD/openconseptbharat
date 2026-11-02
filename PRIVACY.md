@@ -28,6 +28,12 @@ Browser Utility Studio solves this problem fundamentally by **moving all computa
 - **Immediate Bitmap Disposal:** Master and intermediate `ImageBitmap` buffers are closed via `bitmap.close()` when transformations complete or components unmount.
 - **No Base64 Payload Sprawl:** Canvas outputs are converted directly to ephemeral Blobs without creating massive base64 string allocations that could persist in memory dumps.
 
+### 2.2. Photo Studio & A4 Print Sheet Engine Privacy Guarantees (Phase 03D & Phase 03E)
+- **Zero Server Uploads for Sheet Composition:** All multi-photo tiling, margin spacing, cutting guide calculations, and high-resolution rasterization (150–600 DPI) occur 100% inside local browser canvas contexts.
+- **In-Memory PDF Generation:** Vector PDF documents for A4 ($595.2756 \times 841.8898\text{ pt}$) and 4×6″ ($288 \times 432\text{ pt}$) are assembled entirely in JavaScript via `pdf-lib` in client RAM. Neither intermediate images nor final PDF binary bytes are ever transmitted over the network.
+- **No Disk or Database Caching:** Uploaded passport photographs, cropped compositions, and generated sheets are never saved to browser `localStorage`, `sessionStorage`, or `IndexedDB`. When the browser tab is closed or navigated away, all allocated canvas buffers and object references are cleared from RAM.
+- **Direct-to-Disk Client Export:** Downloads are triggered through ephemeral in-memory `blob:` URLs that are revoked immediately after the browser registers the file save dialog.
+
 ---
 
 ## 3. Verification Protocol for Users and Auditors

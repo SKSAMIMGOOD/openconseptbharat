@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { ModuleLayout } from "@/components/layout/ModuleLayout";
 import { TOOLS } from "@/constants/tools";
 import { useImageEngine } from "@/hooks/useImageEngine";
@@ -11,6 +11,7 @@ import { PhotoDimensionsPanel } from "@/components/photo-studio/PhotoDimensionsP
 import { InteractiveCropEditor } from "@/components/photo-studio/InteractiveCropEditor";
 import { PhotoPresetSelector } from "@/components/photo-studio/PhotoPresetSelector";
 import { CropPreviewCard } from "@/components/photo-studio/CropPreviewCard";
+import { PhotoSheetWorkspace } from "@/components/photo-studio/sheet/PhotoSheetWorkspace";
 import { ValidatedImageFile } from "@/types/image-engine";
 import type { PhotoPreset, CustomDimensionsInput, CropMode } from "@/types/crop-preset";
 import type { CropCoordinates } from "@/types/crop";
@@ -21,8 +22,11 @@ import {
   recalculateCropForAspectRatio,
   centerCropInImage,
   fitCropToImage,
+  renderCropCanvas,
 } from "@/lib/crop/crop-geometry";
 import { unitToMm } from "@/lib/crop/unit-converter";
+import { consumeTransferredImage } from "@/lib/utils/image-transfer";
+import { cn } from "@/lib/utils/cn";
 import {
   Camera,
   ShieldCheck,
@@ -31,6 +35,8 @@ import {
   CheckCircle2,
   RefreshCw,
   Crop,
+  Printer,
+  Layers,
 } from "lucide-react";
 
 export type PhotoStudioWorkspaceState =
@@ -68,8 +74,57 @@ export default function PhotoStudioPage() {
     height: 450,
   });
 
+  // Active Studio Mode: Step 1 (Crop & Framing) vs Step 2 (A4 Print Sheet) vs Step 3 (4×6″ Print Sheet)
+  const [activeTab, setActiveTab] = useState<"crop" | "sheet_a4" | "sheet_4x6">("crop");
+
+  // Read URL search parameter on initial mount (?tab=sheet, ?tab=a4, ?tab=4x6)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab");
+      if (tabParam === "sheet" || tabParam === "a4" || tabParam === "sheet_a4") {
+        setActiveTab("sheet_a4");
+      } else if (tabParam === "4x6" || tabParam === "sheet_4x6") {
+        setActiveTab("sheet_4x6");
+      }
+    }
+  }, []);
+
   // Cached HTMLImageElement for canvas rendering in crop editor and preview
   const [imageElement, setImageElement] = useState<HTMLImageElement | null>(null);
+
+  // Physical photo dimensions in millimeters
+  const photoDimensionsMm = useMemo(() => {
+    let widthMm: number;
+    let heightMm: number;
+    if (selectedPreset.id === "custom") {
+      widthMm = unitToMm(customDimensions.width, customDimensions.unit);
+      heightMm = unitToMm(customDimensions.height, customDimensions.unit);
+    } else {
+      widthMm = unitToMm(selectedPreset.width, selectedPreset.unit);
+      heightMm = unitToMm(selectedPreset.height, selectedPreset.unit);
+    }
+    return {
+      width: Number(widthMm.toFixed(2)),
+      height: Number(heightMm.toFixed(2)),
+    };
+  }, [selectedPreset, customDimensions]);
+
+  // Master cropped canvas preserving full optical resolution
+  const croppedPhotoCanvas = useMemo(() => {
+    if (!imageElement) return null;
+    try {
+      return renderCropCanvas(
+        imageElement,
+        crop,
+        crop.width,
+        crop.height,
+        backgroundColor
+      ) as HTMLCanvasElement;
+    } catch {
+      return null;
+    }
+  }, [imageElement, crop, backgroundColor]);
 
   // Synchronize error from image engine hook
   useEffect(() => {
@@ -138,6 +193,38 @@ export default function PhotoStudioPage() {
     },
     [engine]
   );
+
+  // Check for ephemeral image handed off from AI Background Remover in RAM
+  useEffect(() => {
+    const transferred = consumeTransferredImage();
+    if (transferred) {
+      (async () => {
+        try {
+          const { decodeImage } = await import("@/lib/image/decoder");
+          const { createTrackedObjectURL } = await import("@/lib/utils/memory");
+          const decoded = await decodeImage(transferred);
+          const validated: ValidatedImageFile = {
+            id: `img-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            file: transferred,
+            name: transferred.name,
+            size: transferred.size,
+            type: (transferred.type as any) || "image/png",
+            dimensions: {
+              width: decoded.width,
+              height: decoded.height,
+              aspectRatio: decoded.aspectRatio,
+            },
+            previewUrl: createTrackedObjectURL(transferred),
+            createdAt: Date.now(),
+          };
+          decoded.close();
+          handleImageLoaded(validated);
+        } catch (err) {
+          console.error("Failed to ingest transferred photo:", err);
+        }
+      })();
+    }
+  }, [handleImageLoaded]);
 
   // Handle upload validation error (unsupported format, oversized, etc.)
   const handleUploadError = useCallback((errorStr: string) => {
@@ -235,39 +322,54 @@ export default function PhotoStudioPage() {
   const handlePresetChange = useCallback(
     (preset: PhotoPreset) => {
       setSelectedPreset(preset);
+      if (preset.id === "custom") {
+        setCustomDimensions((prev) => ({
+          ...prev,
+          width: preset.width,
+          height: preset.height,
+          unit: preset.unit,
+        }));
+      }
 
       if (engine.dimensions) {
         const newRatio = cropMode === "fixed" ? preset.aspectRatio : null;
-        const updated = recalculateCropForAspectRatio(
-          crop,
-          engine.dimensions.width,
-          engine.dimensions.height,
-          newRatio
-        );
-        setCrop(updated);
-        engine.updateCrop(updated);
+        setCrop((prevCrop) => {
+          const updated = recalculateCropForAspectRatio(
+            prevCrop,
+            engine.dimensions!.width,
+            engine.dimensions!.height,
+            newRatio
+          );
+          engine.updateCrop(updated);
+          return updated;
+        });
       }
     },
-    [crop, cropMode, engine]
+    [cropMode, engine]
   );
 
   // Handle Custom Dimensions Change
   const handleCustomDimensionsChange = useCallback(
     (custom: CustomDimensionsInput) => {
       setCustomDimensions(custom);
+      if (custom.dpi && custom.dpi !== dpi) {
+        setDpi(custom.dpi);
+      }
       if (engine.dimensions && cropMode === "fixed") {
         const ratio = custom.width / Math.max(0.001, custom.height);
-        const updated = recalculateCropForAspectRatio(
-          crop,
-          engine.dimensions.width,
-          engine.dimensions.height,
-          ratio
-        );
-        setCrop(updated);
-        engine.updateCrop(updated);
+        setCrop((prevCrop) => {
+          const updated = recalculateCropForAspectRatio(
+            prevCrop,
+            engine.dimensions!.width,
+            engine.dimensions!.height,
+            ratio
+          );
+          engine.updateCrop(updated);
+          return updated;
+        });
       }
     },
-    [crop, cropMode, engine]
+    [cropMode, engine, dpi]
   );
 
   // Handle Crop Mode Toggle (Fixed Aspect vs Free Crop)
@@ -314,8 +416,8 @@ export default function PhotoStudioPage() {
           <div className="space-y-1">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-bold uppercase tracking-wider text-brand-600 flex items-center gap-1.5">
-                <Crop className="w-3.5 h-3.5" />
-                <span>Phase 03C: Passport Photo Presets & Crop Editor</span>
+                <Printer className="w-3.5 h-3.5" />
+                <span>Phase 03D: Photo Studio & 4×6″ Sheet Generator</span>
               </span>
               <span className="text-surface-300">•</span>
               <span
@@ -335,7 +437,7 @@ export default function PhotoStudioPage() {
                 {workspaceState === "ready" && (
                   <>
                     <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                    <span>Interactive Crop Active</span>
+                    <span>Photo Studio Active</span>
                   </>
                 )}
                 {workspaceState === "decoding" && (
@@ -358,10 +460,10 @@ export default function PhotoStudioPage() {
               </span>
             </div>
             <h2 className="text-xl sm:text-2xl font-extrabold text-surface-900 tracking-tight">
-              Passport Photo Presets & Interactive Crop Editor
+              Professional Photo Studio & Print Sheet Generator
             </h2>
             <p className="text-xs sm:text-sm text-surface-500 max-w-2xl">
-              Configurable photo presets, interactive aspect-ratio locked crop frame, zoom/pan controls, custom background tints, and 100% in-browser privacy.
+              Crop passport photos with standard presets, calibrate print DPI, and arrange multiple copies on standard A4 or 4×6″ sheets with 100% in-browser privacy.
             </p>
           </div>
 
@@ -377,6 +479,54 @@ export default function PhotoStudioPage() {
               </span>
             </div>
           </div>
+        </div>
+
+        {/* Step Navigation Tabs */}
+        <div className="flex flex-wrap items-center gap-2 p-1.5 bg-surface-100 rounded-2xl border border-surface-200 max-w-2xl">
+          <button
+            type="button"
+            onClick={() => setActiveTab("crop")}
+            className={cn(
+              "flex-1 min-w-[130px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all",
+              activeTab === "crop"
+                ? "bg-white text-surface-900 shadow-sm border border-surface-200"
+                : "text-surface-600 hover:text-surface-900"
+            )}
+          >
+            <Crop className="w-4 h-4 text-brand-600" />
+            <span>Step 1: Crop & Framing</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("sheet_a4")}
+            className={cn(
+              "flex-1 min-w-[130px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all",
+              activeTab === "sheet_a4"
+                ? "bg-white text-surface-900 shadow-sm border border-surface-200"
+                : "text-surface-600 hover:text-surface-900"
+            )}
+          >
+            <Printer className="w-4 h-4 text-brand-600" />
+            <span>Step 2: A4 Sheet</span>
+            {engine.currentFile && (
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("sheet_4x6")}
+            className={cn(
+              "flex-1 min-w-[130px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all",
+              activeTab === "sheet_4x6"
+                ? "bg-white text-surface-900 shadow-sm border border-surface-200"
+                : "text-surface-600 hover:text-surface-900"
+            )}
+          >
+            <Layers className="w-4 h-4 text-brand-600" />
+            <span>Step 3: 4×6″ Sheet</span>
+          </button>
         </div>
 
         {/* Global Error Banner */}
@@ -405,6 +555,20 @@ export default function PhotoStudioPage() {
         {!engine.currentFile ? (
           /* Empty State: Ingestion dropzone + Standalone Physical Calculator Preview */
           <div className="space-y-10 max-w-5xl mx-auto">
+            {(activeTab === "sheet_a4" || activeTab === "sheet_4x6") && (
+              <div className="p-4 rounded-2xl bg-brand-50/70 border border-brand-200 text-brand-900 text-xs flex items-center gap-3">
+                <Printer className="w-5 h-5 text-brand-600 shrink-0" />
+                <div>
+                  <strong className="block text-brand-950">
+                    Step 1 Required Before Sheet Arrangement
+                  </strong>
+                  <span>
+                    Upload and frame your portrait photo below. It will automatically populate the print sheet once cropped.
+                  </span>
+                </div>
+              </div>
+            )}
+
             <PhotoStudioUpload
               onImageLoaded={handleImageLoaded}
               onError={handleUploadError}
@@ -425,8 +589,18 @@ export default function PhotoStudioPage() {
               <PhotoDimensionsPanel />
             </div>
           </div>
+        ) : activeTab === "sheet_a4" || activeTab === "sheet_4x6" ? (
+          /* Active Tab: A4 or 4x6 Print Sheet Workspace */
+          <PhotoSheetWorkspace
+            croppedCanvas={croppedPhotoCanvas}
+            presetName={selectedPreset.name}
+            photoDimensionsMm={photoDimensionsMm}
+            initialPaperSize={activeTab === "sheet_4x6" ? "4x6" : "a4"}
+            initialDpi={dpi}
+            onNavigateToCrop={() => setActiveTab("crop")}
+          />
         ) : (
-          /* Ready State: Interactive Crop Workspace, Controls & Live Preview */
+          /* Active Tab: Interactive Crop Workspace, Controls & Live Preview */
           <div className="space-y-6">
             {/* Top Workspace Controls Bar */}
             <PhotoStudioControls
@@ -465,6 +639,7 @@ export default function PhotoStudioPage() {
                   originalDimensions={engine.dimensions}
                   currentZoom={1}
                   cropMode={cropMode}
+                  onNavigateToSheet={() => setActiveTab("sheet_a4")}
                 />
 
                 {/* 3. Original File Technical Metadata */}

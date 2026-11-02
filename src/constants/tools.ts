@@ -84,7 +84,7 @@ export const TOOLS: ToolMetadata[] = [
     shortDescription: "Remove image backgrounds automatically using local in-browser AI processing.",
     description: "Isolate subjects and eliminate backgrounds with high precision using browser-compiled AI neural networks without sending any image bytes across the web.",
     route: "/tools/background-remover",
-    status: "planned",
+    status: "ready",
     badge: "Local AI",
     iconName: "Scissors",
     features: [
@@ -94,7 +94,7 @@ export const TOOLS: ToolMetadata[] = [
       "Zero API fees, zero upload latency",
     ],
     fileAccept: ["image/jpeg", "image/png", "image/webp"],
-    maxFileSizeMB: 15,
+    maxFileSizeMB: 25,
   },
   {
     id: "photo-editor",

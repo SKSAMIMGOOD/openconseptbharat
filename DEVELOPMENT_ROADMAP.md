@@ -163,7 +163,7 @@ This multi-phase roadmap outlines the step-by-step engineering progression for B
 - [x] Technical image metadata HUD (intrinsic pixels, aspect ratio, format, file size).
 - [x] 100% in-browser privacy guarantee (zero server uploads, master retained in RAM).
 
-### 🔹 Phase 03B — DPI & Physical Photo Size Calculator ✅ [CURRENT PHASE COMPLETED]
+### 🔹 Phase 03B — DPI & Physical Photo Size Calculator ✅ [COMPLETED]
 - [x] **Core Calculation Engine (`src/lib/photo-studio/dpi-calculator.ts`):**
   - Pure, independently testable mathematical formula: $\text{pixels} = (\text{mm} / 25.4) \times \text{DPI}$.
   - Documented nearest whole pixel rounding strategy (`Math.round`).
@@ -191,29 +191,209 @@ This multi-phase roadmap outlines the step-by-step engineering progression for B
   - 29 tests across 13 suites covering 35×45mm at 300/600 DPI, 40×50mm, custom dimensions, decimals, rejections, DPI boundaries, aspect ratio locks, quality tiers, aspect mismatch, effective DPI, and rounding precision.
   - 100% test pass rate across 82 total platform unit tests.
 
-### 🔹 Phase 03C — Face Alignment, Borders & Background Replacement [UPCOMING]
-- [ ] Face alignment guides and chin/crown boundary overlays.
-- [ ] Custom border widths and solid studio background replacement (white, light blue, grey).
-- [ ] Name and date of photo (DOP) text imprint generator.
+### 🔹 Phase 03C — Passport Photo Presets & Interactive Crop Editor ✅ [CURRENT PHASE COMPLETED]
+- [x] **Reusable Photo Presets Architecture (`src/types/crop-preset.ts` & `src/constants/crop-presets.ts`):**
+  - Strongly typed `PhotoPreset` contract separating preset definitions from UI components.
+  - 4 initial standard presets:
+    1. Passport-style photo: 35 × 45 mm (aspect ratio 35:45 ~0.7778).
+    2. Portrait photo: 40 × 50 mm (aspect ratio 4:5 = 0.8).
+    3. Square photo: 2 × 2 inches (50.8 × 50.8 mm, aspect ratio 1:1 = 1.0).
+    4. Custom dimensions: Fully user-definable width, height, and unit.
+  - Extended country-specific preset catalog with configurable standards (Canada 50×70mm, Indian PAN 25×35mm, Stamp 20×25mm, Schengen Visa).
+  - Explicit official standards advisory notice: presets never claim universal compliance; marked official only when verified against authoritative government standards.
+- [x] **Custom Dimensions & Unit Conversion Subsystem (`src/lib/crop/unit-converter.ts`):**
+  - Automatic bidirectional conversion across `mm`, `cm`, and `inch` (1 in = 25.4 mm, 1 cm = 10 mm).
+  - Strict input validation rejecting <= 0, non-numeric, < 1 mm, and > 1000 mm.
+  - Decimal support for fractional dimensions (e.g. 50.8 mm, 2.0 in, 3.5 cm).
+  - Live aspect-ratio calculation and friendly ratio identification.
+  - Integration with DPI calculator for target pixel projection.
+- [x] **Interactive Crop Editor Engine (`src/lib/crop/crop-geometry.ts` & `src/components/photo-studio/InteractiveCropEditor.tsx`):**
+  - Pure mathematical crop coordinate calculations separated from React components.
+  - Intrinsic image coordinate system ($W_{\text{src}} \times H_{\text{src}}$) ensuring resolution-independent accuracy.
+  - Adjustable crop frame with 8 directional resize handles (NW, N, NE, E, SE, S, SW, W).
+  - Large touch targets (32px minimum hit-box) for smooth mobile touch dragging.
+  - Fixed aspect-ratio crop mode with opposite-point anchor projections.
+  - Free crop mode allowing unconstrained boundary adjustments.
+  - Crop boundary clamping preventing negative coordinates, NaN values, and container overflows.
+  - Preset switching adaptation: smoothly adapts aspect ratio around current center without resetting the uploaded photo.
+  - Desktop mouse dragging and mobile touch dragging with pointer capture.
+  - Alignment and framing controls: Center Crop, Fit to Image, Reset Position.
+  - Viewport zoom (20% to 500%), mouse wheel zoom, 100% actual pixels, and fit to screen.
+  - Viewport pan tool and toggleable rule-of-thirds composition grid.
+  - Darkened SVG cutout overlay with crisp white border and real-time dimension HUD.
+- [x] **Studio Background Color Options (`src/constants/background-options.ts`):**
+  - 5 options: Transparent, Studio White (`#FFFFFF`), Light Blue (`#D0E8FF`), Light Grey (`#F3F4F6`), and Custom Hex Picker.
+  - Preserves alpha transparency for PNG/WebP cutouts.
+  - Clear transparency advisory: changes background behind transparent pixels or letterbox margins; does not remove solid photo backgrounds (reserved for Phase 04).
+- [x] **Live Composition Preview Card (`src/components/photo-studio/CropPreviewCard.tsx`):**
+  - Real-time canvas render of the exact cropped composition with background color fill.
+  - Selected preset name, physical dimensions with unit, aspect ratio, crop pixel dimensions, target resolution at selected DPI, original image dimensions, viewport zoom percentage, and optical print resolution quality tier.
+  - Memory integrity assurance: master photo remains 100% unmodified in browser RAM.
+- [x] **Automated Test Suite (`tests/crop-editor.test.mjs`):**
+  - 40 new automated unit tests across 12 suites covering all predefined presets, custom dimensions, unit conversions, decimal precision, aspect ratio math, boundary clamping, image repositioning, 8-handle resizing (fixed & free), preset switching without reset, transparent image handling, studio backgrounds, high-resolution 12MP cropping, and memory cleanup.
+  - 100% test pass rate across 122 total platform unit tests.
+- [x] **Zero-Upload Privacy Architecture:**
+  - 100% in-browser processing via HTML5 Canvas and native JavaScript math. Zero backend servers or persistent storage.
 
-### 🔹 Phase 03D — Multiple Photo Print Sheet Engine [UPCOMING]
-- [ ] Multiple photo sheet arrangements: A4, 4 × 6 inch (10 × 15 cm), 5 × 7 inch.
-- [ ] Configurable photo grid density, margins, and cutting line markers.
-- [ ] High-resolution (300 / 600 DPI) PDF export for commercial photo printers.
+### 🔹 Phase 03D — 4×6 Inch Photo Sheet Generator ✅ [COMPLETED]
+- [x] **Core Sheet Calculation Architecture (`src/lib/photo-studio/sheet-calculator.ts`):**
+  - Standard physical 4×6″ card dimensions: $101.6 \times 152.4\text{ mm}$ ($4.0 \times 6.0\text{ in}$).
+  - Portrait ($101.6 \times 152.4\text{ mm}$) and Landscape ($152.4 \times 101.6\text{ mm}$) orientation switching.
+  - Pixel dimensions across DPI presets: 150 DPI ($600 \times 900$ / $900 \times 600$), 200 DPI ($800 \times 1200$ / $1200 \times 800$), 300 DPI ($1200 \times 1800$ / $1800 \times 1200$), 600 DPI ($2400 \times 3600$ / $3600 \times 2400$).
+  - Exact PDF PostScript dimensions: $288.0000 \times 432.0000\text{ pt}$ (Portrait) and $432.0000 \times 288.0000\text{ pt}$ (Landscape).
+  - Configurable outer margins (default 4 mm) and photo spacing (default 2 mm).
+  - Center-aligned grid placement algorithm.
+- [x] **Canvas Rasterization & PDF Vector Synthesis (`src/lib/photo-studio/sheet-renderer.ts` & `src/lib/photo-studio/sheet-exporter.ts`):**
+  - High-quality bicubic canvas rasterization at full DPI target resolution.
+  - Multi-format export: PNG (lossless), JPEG (with solid white background flattening), and PDF.
+  - Direct PDF page synthesis via `pdf-lib` with exact physical points and bottom-left coordinate inversion.
+  - Toggleable cutting guides: corner crop marks and dashed separation grid lines.
+- [x] **Automated Test Suite (`tests/photo-sheet.test.mjs`):**
+  - 33 automated tests covering dimensions, capacities, custom rows/cols, margins, cutting guides, overlap prevention, PNG/JPEG rendering, and exact PDF points.
+
+### 🔹 Phase 03E — A4 Photo Sheet Generator ✅ [CURRENT PHASE COMPLETED]
+- [x] **ISO 216 Standard A4 Paper Configuration:**
+  - Physical dimensions: $210.0 \times 297.0\text{ mm}$ ($8.2677165 \times 11.6929134\text{ in}$).
+  - Portrait orientation ($210 \times 297\text{ mm}$) and Landscape orientation ($297 \times 210\text{ mm}$).
+  - Standard DPI presets: 150 DPI ($1240 \times 1754\text{ px}$), 200 DPI ($1654 \times 2339\text{ px}$), 300 DPI ($2480 \times 3508\text{ px}$), 600 DPI ($4961 \times 7016\text{ px}$).
+  - Custom DPI input support with strict validation ($30 \le \text{DPI} \le 2400$).
+  - Exact PostScript PDF page dimensions: **$595.2756 \times 841.8898\text{ pt}$** for Portrait and **$841.8898 \times 595.2756\text{ pt}$** for Landscape (never derived from rounded pixels).
+- [x] **Complete Reuse of Layout & Composition Engine:**
+  - Zero duplicated layout math or independent sheet engines; unified `calculatePhotoSheetLayout` parameterized by `paperSize: "a4" | "4x6"`.
+  - Automatic capacity derivation and manual row/column grid selection.
+  - 35×45mm passport capacity: **30 photos** (5 cols × 6 rows) on Portrait, **28 photos** (7 cols × 4 rows) on Landscape.
+  - 50.8×50.8mm (2×2″) US Visa capacity: **15 photos** (3 cols × 5 rows) on Portrait, **15 photos** (5 cols × 3 rows) on Landscape.
+  - 40×50mm portrait capacity: **20 photos** (4 cols × 5 rows) on Portrait, **18 photos** (6 cols × 3 rows) on Landscape.
+  - Inherits cropped photo composition from Phase 03C without distortion or stretching.
+- [x] **Copy Count Invariant (Zero Silent Reduction):**
+  - Strictly preserves requested copy count in state (`config.copies`).
+  - High-visibility warning banner showing requested count, sheet capacity, placed count, and overflow count when requested copies exceed sheet capacity.
+- [x] **Cutting Guides & Alignment:**
+  - Corner crop marks with customizable offset and arm length.
+  - Dashed separation lines in horizontal and vertical photo gutters.
+  - Configurable line color and stroke thickness (0.5 mm to 2.0 mm).
+  - 1-click toggle to export with or without cutting guides.
+- [x] **Interactive Workspace & Scaled Preview:**
+  - Responsive two-column workspace (`SheetControlsPanel` and `SheetPreviewPanel`).
+  - Paper format switcher: 1-click toggle between Standard A4 ($210 \times 297\text{ mm}$) and 4×6″ ($101.6 \times 152.4\text{ mm}$).
+  - Live HUD displaying paper size, orientation, photo count, physical photo dimensions, output resolution, margins, and spacing.
+  - Interactive preview zoom (10% to 500%), reset zoom, and "Fit to Screen" auto-scaling.
+  - Scaled preview canvas rendering preventing lag during control adjustments.
+  - Step tabs in Photo Studio: `Step 1: Crop & Framing`, `Step 2: A4 Sheet`, `Step 3: 4×6″ Sheet` with URL parameter synchronization (`?tab=sheet-a4`, `?tab=sheet-4x6`).
+- [x] **Print-Ready Export Pipeline:**
+  - Multi-format client-side export: PNG (lossless), JPEG (white background fill, configurable quality), and PDF.
+  - Exact PostScript PDF dimensions ($595.2756 \times 841.8898\text{ pt}$) with bottom-left coordinate inversion.
+  - Documented physical print guidelines: Actual Size (100%), uncheck "Fit to Page", select A4 paper, account for mechanical printer margins.
+- [x] **Automated Test Suite (`tests/a4-photo-sheet.test.mjs`):**
+  - 36 new automated tests verifying all 17 requirements of Phase 03E specification plus cross-engine comparative parity between A4 and 4×6.
+  - **191 total unit tests** passing with 0 failures across 6 test suites (`image-engine`, `photo-studio`, `dpi-calculator`, `crop-editor`, `photo-sheet`, `a4-photo-sheet`).
+- [x] **Zero-Upload Privacy Invariant:**
+  - 100% in-browser generation. Zero server uploads, zero cloud APIs, zero persistent storage.
+
+### 🎯 Phase 03F — Multiple Photo Maker ✨ [COMPLETED]
+- [x] **Multi-Photo Upload Interface (`src/components/multiple-photo-maker/MultiPhotoDropzone.tsx` & `UploadedPhotoGallery.tsx`):**
+  - Multi-image dropzone supporting JPG, JPEG, PNG, and WebP up to 20 MB.
+  - Add more images anytime without removing existing ones.
+  - Interactive thumbnails displaying filename, pixel dimensions, file size, and sequential badge.
+  - Per-photo print copy counter controls (+ / - buttons and direct numeric input).
+  - Quick-set bulk copies for all photos (1×, 2×, 3×, 4×, 6×, 8×).
+  - Safe individual removal and "Clear All" with deterministic object URL memory revocation.
+- [x] **Configurable Photo Dimensions & Unit Conversion Subsystem (`src/lib/multiple-photo/multiple-photo-engine.ts`):**
+  - Default physical photo dimensions: 1.1 × 1.35 inches (27.94 × 34.29 mm).
+  - Measurement units: Inch, Centimeter, Millimeter with lossless unit conversion.
+  - Aspect-ratio safe center-cropping (`calculateCenterCrop`) guaranteeing photos are never stretched or distorted.
+- [x] **DPI Calibration Engine (150, 200, 300, 600 DPI):**
+  - Pure mathematical formula: $\text{pixels} = \text{Math.round}((\text{mm} / 25.4) \times \text{DPI})$.
+  - Verified default at 300 DPI: $1.1\text{ in} \to 330\text{ px}$, $1.35\text{ in} \to 405\text{ px}$.
+- [x] **Print Sheet Grid & Sequential Arrangement Engine (`src/lib/photo-studio/sheet-calculator.ts` & `sheet-renderer.ts`):**
+  - Complete reuse of layout engine with parameterization for 4×6″ and A4 paper.
+  - Top-aligned photo placement without vertical centering.
+  - Strict maximum four photographs per row constraint (`maxColumnLimit = 4`).
+  - Predictable sequential ordering: Photo A (3), Photo B (3), Photo C (3) produces A A A / B B B / C C C.
+  - Automatic capacity derivation and overflow boundary protection.
+- [x] **Live Scaled Preview & HUD Viewport (`src/components/multiple-photo-maker/MultiplePhotoPreviewPanel.tsx`):**
+  - Real-time scaled preview canvas with zoom (40% to 300%) and pan controls.
+  - Informative HUD strip: paper dimensions, photo dimensions, DPI, placed copies, max capacity.
+  - Capacity limit warning alert when requested copies exceed sheet boundaries without silent loss.
+- [x] **Print-Ready Multi-Format Export Pipeline:**
+  - Download 4×6 PDF and Download A4 PDF with exact physical PostScript points ($288 \times 432\text{ pt}$ and $595.2756 \times 841.8898\text{ pt}$).
+  - Download high-res lossless PNG and solid-white-backed JPEG at selected DPI.
+- [x] **Automated Test Suite (`tests/multiple-photo-maker.test.mjs`):**
+  - 41 new unit tests covering all 10 core requirements of Phase 03F.
+  - **227 total unit tests** passing with 0 failures across 7 test suites (`image-engine`, `photo-studio`, `dpi-calculator`, `crop-editor`, `photo-sheet`, `a4-photo-sheet`, `multiple-photo-maker`).
+- [x] **100% In-Browser Privacy Invariant:**
+  - Zero server uploads, zero remote APIs, zero permanent storage, complete deterministic memory cleanup.
+
+### 🎯 Phase 03G - Custom Photo Dimensions ✅ [COMPLETED]
+- [x] **Custom Dimensions Controls & Unit Conversion Subsystem (`src/lib/crop/unit-converter.ts` & `src/components/photo-studio/PhotoPresetSelector.tsx`):**
+  - Physical measurement unit support across millimeters (`mm`), centimeters (`cm`), and inches (`in`).
+  - Pure mathematical conversion using standard constants: $1\text{ inch} = 25.4\text{ mm}$, $1\text{ cm} = 10\text{ mm}$.
+  - Target pixel calculation: $\text{Pixels} = (\text{dimension in mm} / 25.4) \times \text{DPI}$ (nearest whole integer via `Math.round`).
+  - Unit switching without changing physical dimensions (lossless conversion).
+  - Print resolution controls: default 300 DPI, quick presets (150, 200, 300, 600), and custom numeric input ($30 \le \text{DPI} \le 2400$).
+- [x] **Live Dimensions & Pixel Preview HUD:**
+  - Real-time updates of physical size and calculated pixel dimensions on any change.
+  - Live aspect ratio derivation with friendly name formatting.
+  - Bi-directional proportional aspect lock toggle for independent or proportional width/height adjustments.
+- [x] **Crop Editor & Framing Integration (`src/app/tools/photo-studio/page.tsx` & `src/components/photo-studio/CropPreviewCard.tsx`):**
+  - Dynamic crop frame updates to match custom aspect ratio without distortion or stretching.
+  - Full repositioning and zooming within natural image bounds.
+  - 1-click single cropped photo export (PNG / JPEG) at exact calculated pixel dimensions.
+- [x] **Photo Sheet Integration (`src/components/photo-studio/sheet/PhotoSheetWorkspace.tsx` & `src/components/photo-studio/sheet/SheetControlsPanel.tsx`):**
+  - Custom photo sizing available across both 4×6 inch and A4 photo sheets.
+  - Mathematical capacity calculation, top-aligned layout, spacing, and zero-overlap invariants.
+  - Clear capacity display and navigation back to crop editor.
+- [x] **Browser Crash Protection & Validation (`src/lib/crop/unit-converter.ts`):**
+  - Validates empty / NaN values, non-positive numbers, out-of-range DPI, physical limits ($1\text{ mm}$ to $1000\text{ mm}$).
+  - Enforces canvas memory allocation safety caps (maximum 10,000 px per side, 50 megapixels total).
+- [x] **Automated Test Suite (`tests/custom-dimensions.test.mjs`):**
+  - 23 new unit tests covering all 7 test cases specified in Phase 03G.
+  - **284 total unit tests** passing with 0 failures across 9 test suites.
 
 ---
 
-## 📌 Phase 04 — Client-Side AI Background Remover
+## 📌 Phase 05 — AI Background Remover ✅ [COMPLETED]
 
 **Target Module:** Background Remover
 
-- [ ] **In-Browser Model Deployment:**
-  - Integration of lightweight quantized neural network weights (e.g. RMBG-1.4 or BiRefNet).
-  - Execution runtime via Transformers.js / ONNX Runtime Web.
-  - Hardware acceleration support: WebGPU with graceful WebGL/WASM fallback.
-- [ ] **Mask Refinement & Edge Smoothing:**
-  - Client-side alpha matting for hair and fine boundary details.
-  - Instant background replacement: Solid studio backdrop or custom scene.
+- [x] **In-Browser Model Deployment & Runtime Architecture:**
+  - Integrated Microsoft ONNX Runtime Web (`onnxruntime-web`) executing 100% locally in browser memory.
+  - Multi-tier hardware acceleration: WebGPU with graceful WebGL and WebAssembly (WASM) fallbacks.
+  - Single-thread WASM configuration avoiding `SharedArrayBuffer` security header (COOP/COEP) limitations.
+  - Offloaded neural network execution via dedicated Web Worker (`src/workers/background-remover.worker.ts`) preventing main UI thread blocking.
+  - Seamless automatic fallback to asynchronous main-thread execution when Web Workers or `OffscreenCanvas` are unavailable.
+- [x] **Model Presets & Transparent Weight Ingestion:**
+  - Primary Recommended Model: **BRIA RMBG-1.4** (Quantized ONNX, ~43.9 MB) with $1024 \times 1024$ input resolution for studio-grade hair and fabric boundary detail.
+  - Fast & Lightweight Model: **U2NetP** (~4.7 MB) with $320 \times 320$ input resolution and ImageNet normalization for low-bandwidth connections.
+  - User-provided custom `.onnx` model upload option for air-gapped / offline enterprise use.
+  - Transparent model metadata HUD disclosing pretrained weights sources (Hugging Face) and download sizes.
+  - Byte-level stream progress reporting during initial weight downloads.
+  - Native browser `CacheStorage` caching (`browser-utility-studio-ai-models-v1`) ensuring weights download once and run offline indefinitely.
+- [x] **Tensor Preprocessing & Mask Refinement:**
+  - NCHW tensor construction and model-specific channel normalization.
+  - Continuous alpha mask extraction with min-max logit normalization.
+  - Hardware-accelerated canvas bicubic interpolation scaling masks back to original master photo resolution without pixelation.
+  - Alpha matting composite strictly preserving 100% of original foreground RGB color data.
+- [x] **Studio Background Backdrop Selection:**
+  - 7 standard options: Lossless Transparent, Studio White (`#FFFFFF`), Passport Light Blue (`#D0E8FF`), Navy Dark Blue (`#1E3A8A`), Vibrant Red (`#DC2626`), Studio Green (`#16A34A`), and Custom Hex Color Picker.
+  - Instantaneous in-memory background switching without requiring neural network re-inference.
+- [x] **High-Fidelity Interactive Preview Viewport:**
+  - 4 view modes: Interactive Before/After Split Slider with draggable divider, Side-by-Side comparison, Processed Cutout only, and Original Photo only.
+  - Checkerboard transparency background rendering.
+  - Interactive Zoom In (+25%), Zoom Out (-25%), 100% Actual Size, Fit to Screen, and Pan dragging.
+  - Real-time technical metadata HUD (dimensions, aspect ratio, zoom level, background status).
+- [x] **Multi-Format Export Pipeline:**
+  - Download Transparent PNG with intact alpha channel.
+  - Download PNG composited with selected background backdrop.
+  - Download high-quality JPEG (with automatic solid white substitution when transparent was active).
+  - Semantic, timestamped download naming: `bg-removed-[name]-[backdrop]-[timestamp].[ext]`.
+- [x] **Photo Studio In-Memory Handoff:**
+  - One-click "Send to Professional Photo Studio" handoff.
+  - Ephemeral RAM transfer service (`src/lib/utils/image-transfer.ts`) passing files across client routes.
+  - 100% zero persistence: no localStorage, sessionStorage, IndexedDB, or server transmission.
+- [x] **Automated Test Suite (`tests/background-remover.test.mjs`):**
+  - 27 automated tests across 10 suites covering model specifications, tensor normalization math, alpha scaling, RGB preservation, background presets, export naming, in-memory handoff, magic byte validation, and zero-upload privacy.
+  - **254 total unit tests** passing with 0 failures across 8 test suites.
 
 ---
 

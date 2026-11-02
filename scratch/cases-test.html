@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>A4 Photo Sheet Grid Layout - Cases 1, 2, 3 & Controls</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 30px;
+    }
+    .header {
+      margin-bottom: 25px;
+      border-bottom: 1px solid #334155;
+      padding-bottom: 15px;
+    }
+    .header h1 {
+      font-size: 22px;
+      font-weight: 800;
+      color: #38bdf8;
+    }
+    .header p {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-top: 5px;
+    }
+    .cases-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+    .card {
+      background: #1e293b;
+      border-radius: 14px;
+      padding: 16px;
+      border: 1px solid #334155;
+    }
+    .card h3 {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: #f1f5f9;
+    }
+    .desc {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-bottom: 12px;
+      min-height: 32px;
+    }
+    .sheet-wrapper {
+      background: #334155;
+      padding: 12px;
+      border-radius: 10px;
+      display: flex;
+      justify-content: center;
+    }
+    canvas {
+      background: #ffffff;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+    .pill {
+      margin-top: 10px;
+      font-size: 10px;
+      font-family: monospace;
+      padding: 6px 10px;
+      background: #0f172a;
+      border-radius: 6px;
+      border: 1px solid #334155;
+      color: #34d399;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>A4 Photo Sheet Grid Layout Test Cases</h1>
+    <p>Top-aligned, strict maximum 4 columns per row, and default 1.5 mm spacing.</p>
+  </div>
+
+  <div class="cases-grid">
+    <!-- CASE 1: 4 Photos -->
+    <div class="card">
+      <h3>Case 1: 4 Photos (1 Row)</h3>
+      <p class="desc">Row 1: Photo 1, 2, 3, 4. Top-aligned at 6mm margin, 1.5mm horizontal gap.</p>
+      <div class="sheet-wrapper">
+        <canvas id="c-4" width="280" height="396"></canvas>
+      </div>
+      <div class="pill">Row 1: 4 photos (cols 0, 1, 2, 3) • 0 rows below</div>
+    </div>
+
+    <!-- CASE 3: 6 Photos -->
+    <div class="card">
+      <h3>Case 3: 6 Photos (2 Rows)</h3>
+      <p class="desc">Row 1: Photo 1..4 | Row 2: Photo 5, 6. Incomplete row does not stretch.</p>
+      <div class="sheet-wrapper">
+        <canvas id="c-6" width="280" height="396"></canvas>
+      </div>
+      <div class="pill">Row 1: 4 photos • Row 2: 2 photos (left-aligned)</div>
+    </div>
+
+    <!-- CASE 2: 8 Photos -->
+    <div class="card">
+      <h3>Case 2: 8 Photos (2 Rows)</h3>
+      <p class="desc">Row 1: Photo 1..4 | Row 2: Photo 5..8. Strict 4-column column-to-column alignment.</p>
+      <div class="sheet-wrapper">
+        <canvas id="c-8" width="280" height="396"></canvas>
+      </div>
+      <div class="pill">Row 1: 4 photos • Row 2: 4 photos (perfect grid)</div>
+    </div>
+  </div>
+
+  <script>
+    const MM_SCALE = 280 / 210.0;
+
+    function renderSheet(canvasId, totalPhotos) {
+      const c = document.getElementById(canvasId);
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, c.width, c.height);
+
+      const photoW = 35 * MM_SCALE;
+      const photoH = 45 * MM_SCALE;
+      const hGap = 1.5 * MM_SCALE;
+      const vGap = 1.5 * MM_SCALE;
+
+      const startX = 6 * MM_SCALE;
+      const startY = 6 * MM_SCALE;
+
+      // Draw margins guide
+      ctx.strokeStyle = "#e2e8f0";
+      ctx.strokeRect(startX, startY, (210 - 12) * MM_SCALE, (297 - 12) * MM_SCALE);
+
+      for (let i = 0; i < totalPhotos; i++) {
+        const row = Math.floor(i / 4);
+        const col = i % 4;
+
+        const x = startX + col * (photoW + hGap);
+        const y = startY + row * (photoH + vGap);
+
+        // Photo card
+        ctx.fillStyle = "#eff6ff";
+        ctx.fillRect(x, y, photoW, photoH);
+        ctx.strokeStyle = "#93c5fd";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x, y, photoW, photoH);
+
+        // Avatar silhouette
+        ctx.fillStyle = "#bfdbfe";
+        ctx.beginPath();
+        ctx.arc(x + photoW / 2, y + photoH * 0.38, photoW * 0.22, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.ellipse(x + photoW / 2, y + photoH * 0.85, photoW * 0.36, photoH * 0.25, 0, Math.PI, 0);
+        ctx.fill();
+
+        // Label
+        ctx.fillStyle = "#1e40af";
+        ctx.font = "bold 8px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText("P" + (i + 1), x + photoW / 2, y + 10);
+      }
+    }
+
+    renderSheet("c-4", 4);
+    renderSheet("c-6", 6);
+    renderSheet("c-8", 8);
+  </script>
+</body>
+</html>

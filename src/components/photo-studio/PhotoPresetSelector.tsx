@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useId, useCallback, useEffect } from "react";
+import React, { useState, useId, useCallback, useEffect, useMemo } from "react";
 import {
   Ruler,
   Maximize2,
   Lock,
   Unlock,
   AlertTriangle,
+  AlertCircle,
   Info,
   Check,
   ChevronDown,
@@ -15,6 +16,7 @@ import {
   Palette,
   ShieldCheck,
   RotateCcw,
+  Printer,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import type {
@@ -38,8 +40,16 @@ import {
   validateCustomDimensions,
   calculateAspectRatio,
   formatDimension,
+  calculateCustomPhotoPixels,
+  MIN_DPI,
+  MAX_DPI,
+  DEFAULT_CUSTOM_DPI,
+  MIN_DIMENSION_MM,
+  MAX_DIMENSION_MM,
 } from "@/lib/crop/unit-converter";
 import { getFriendlyAspectRatioName } from "@/lib/photo-studio/dpi-calculator";
+
+export const DPI_QUICK_PRESETS: readonly number[] = [150, 200, 300, 600];
 
 export interface PhotoPresetSelectorProps {
   selectedPreset: PhotoPreset;
@@ -69,6 +79,7 @@ export const PhotoPresetSelector: React.FC<PhotoPresetSelectorProps> = ({
   const widthInputId = useId();
   const heightInputId = useId();
   const unitSelectId = useId();
+  const dpiInputId = useId();
   const customColorInputId = useId();
 
   // Custom Dimensions local state
@@ -77,6 +88,8 @@ export const PhotoPresetSelector: React.FC<PhotoPresetSelectorProps> = ({
   const [customUnit, setCustomUnit] = useState<DimensionUnit>(selectedPreset.unit);
   const [widthStr, setWidthStr] = useState<string>(String(selectedPreset.width));
   const [heightStr, setHeightStr] = useState<string>(String(selectedPreset.height));
+  const [dpiStr, setDpiStr] = useState<string>(String(dpi || DEFAULT_CUSTOM_DPI));
+  const [isAspectLocked, setIsAspectLocked] = useState<boolean>(true);
   const [showExtendedPresets, setShowExtendedPresets] = useState<boolean>(false);
   const [customHexColor, setCustomHexColor] = useState<string>("#3B82F6");
 
@@ -91,15 +104,61 @@ export const PhotoPresetSelector: React.FC<PhotoPresetSelectorProps> = ({
     }
   }, [selectedPreset]);
 
-  // Validation
-  const validation = validateCustomDimensions(customWidth, customHeight, customUnit);
-  const liveRatio = calculateAspectRatio(customWidth, customHeight);
-  const friendlyRatio = getFriendlyAspectRatioName(liveRatio);
+  // Keep DPI string synced if external DPI changes
+  useEffect(() => {
+    setDpiStr(String(dpi || DEFAULT_CUSTOM_DPI));
+  }, [dpi]);
+
+  // Parse numeric values from string inputs for validation
+  const parsedWidth = parseFloat(widthStr);
+  const parsedHeight = parseFloat(heightStr);
+  const parsedDpi = parseInt(dpiStr, 10);
+
+  // Live validation
+  const validation = useMemo(() => {
+    return validateCustomDimensions(parsedWidth, parsedHeight, customUnit, parsedDpi);
+  }, [parsedWidth, parsedHeight, customUnit, parsedDpi]);
+
+  // Live pixel dimensions and friendly ratio calculation
+  const liveCalculation = useMemo(() => {
+    const validW = !isNaN(parsedWidth) && parsedWidth > 0 ? parsedWidth : customWidth;
+    const validH = !isNaN(parsedHeight) && parsedHeight > 0 ? parsedHeight : customHeight;
+    const validDpi = !isNaN(parsedDpi) && parsedDpi > 0 ? parsedDpi : dpi;
+    return calculateCustomPhotoPixels(validW, validH, customUnit, validDpi);
+  }, [parsedWidth, parsedHeight, customWidth, customHeight, customUnit, parsedDpi, dpi]);
+
+  // Notify parent of updated custom preset
+  const updateCustomPreset = useCallback(
+    (w: number, h: number, u: DimensionUnit, d: number) => {
+      const ratio = calculateAspectRatio(w, h);
+      const customPreset: PhotoPreset = {
+        id: "custom",
+        name: `Custom (${formatDimension(w, u)} × ${formatDimension(h, u)})`,
+        width: w,
+        height: h,
+        unit: u,
+        aspectRatio: ratio,
+        description: "User-defined custom width, height, and unit.",
+        category: "custom",
+        isOfficial: false,
+      };
+      onPresetChange(customPreset);
+      onCustomDimensionsChange({
+        width: w,
+        height: h,
+        unit: u,
+        dpi: d,
+      });
+    },
+    [onPresetChange, onCustomDimensionsChange]
+  );
 
   // Handle Preset Button Click
   const handleSelectPreset = (preset: PhotoPreset) => {
-    onPresetChange(preset);
-    if (preset.id !== "custom") {
+    if (preset.id === "custom") {
+      updateCustomPreset(customWidth, customHeight, customUnit, dpi);
+    } else {
+      onPresetChange(preset);
       setCustomWidth(preset.width);
       setCustomHeight(preset.height);
       setCustomUnit(preset.unit);
@@ -108,11 +167,11 @@ export const PhotoPresetSelector: React.FC<PhotoPresetSelectorProps> = ({
     }
   };
 
-  // Handle Unit Change with automatic unit conversion
+  // Handle Unit Change with automatic lossless conversion
   const handleUnitChange = (newUnit: DimensionUnit) => {
     if (newUnit === customUnit) return;
 
-    // Automatic unit conversion
+    // Convert dimension numbers accurately without changing actual physical dimensions
     const convertedW = convertUnit(customWidth, customUnit, newUnit, 2);
     const convertedH = convertUnit(customHeight, customUnit, newUnit, 2);
 
@@ -122,21 +181,7 @@ export const PhotoPresetSelector: React.FC<PhotoPresetSelectorProps> = ({
     setWidthStr(String(convertedW));
     setHeightStr(String(convertedH));
 
-    if (selectedPreset.id === "custom") {
-      const updatedPreset: PhotoPreset = {
-        ...selectedPreset,
-        width: convertedW,
-        height: convertedH,
-        unit: newUnit,
-        aspectRatio: convertedW / convertedH,
-      };
-      onPresetChange(updatedPreset);
-      onCustomDimensionsChange({
-        width: convertedW,
-        height: convertedH,
-        unit: newUnit,
-      });
-    }
+    updateCustomPreset(convertedW, convertedH, newUnit, dpi);
   };
 
   // Handle Width Input Change
@@ -145,27 +190,16 @@ export const PhotoPresetSelector: React.FC<PhotoPresetSelectorProps> = ({
     const parsed = parseFloat(valStr);
     if (!isNaN(parsed) && parsed > 0) {
       setCustomWidth(parsed);
-      const newRatio = parsed / (customHeight || 1);
-      const customPreset: PhotoPreset = {
-        id: "custom",
-        name: `Custom (${formatDimension(parsed, customUnit)} × ${formatDimension(
-          customHeight,
-          customUnit
-        )})`,
-        width: parsed,
-        height: customHeight,
-        unit: customUnit,
-        aspectRatio: newRatio,
-        description: "User-defined custom width and height.",
-        category: "custom",
-        isOfficial: false,
-      };
-      onPresetChange(customPreset);
-      onCustomDimensionsChange({
-        width: parsed,
-        height: customHeight,
-        unit: customUnit,
-      });
+
+      let targetHeight = customHeight;
+      if (isAspectLocked && customWidth > 0 && customHeight > 0) {
+        const currentRatio = customWidth / customHeight;
+        targetHeight = Number((parsed / currentRatio).toFixed(2));
+        setCustomHeight(targetHeight);
+        setHeightStr(String(targetHeight));
+      }
+
+      updateCustomPreset(parsed, targetHeight, customUnit, dpi);
     }
   };
 
@@ -175,29 +209,51 @@ export const PhotoPresetSelector: React.FC<PhotoPresetSelectorProps> = ({
     const parsed = parseFloat(valStr);
     if (!isNaN(parsed) && parsed > 0) {
       setCustomHeight(parsed);
-      const newRatio = (customWidth || 1) / parsed;
-      const customPreset: PhotoPreset = {
-        id: "custom",
-        name: `Custom (${formatDimension(customWidth, customUnit)} × ${formatDimension(
-          parsed,
-          customUnit
-        )})`,
-        width: customWidth,
-        height: parsed,
-        unit: customUnit,
-        aspectRatio: newRatio,
-        description: "User-defined custom width and height.",
-        category: "custom",
-        isOfficial: false,
-      };
-      onPresetChange(customPreset);
+
+      let targetWidth = customWidth;
+      if (isAspectLocked && customWidth > 0 && customHeight > 0) {
+        const currentRatio = customWidth / customHeight;
+        targetWidth = Number((parsed * currentRatio).toFixed(2));
+        setCustomWidth(targetWidth);
+        setWidthStr(String(targetWidth));
+      }
+
+      updateCustomPreset(targetWidth, parsed, customUnit, dpi);
+    }
+  };
+
+  // Handle DPI Preset Selection
+  const handleDpiSelect = (newDpi: number) => {
+    setDpiStr(String(newDpi));
+    onDpiChange(newDpi);
+    if (selectedPreset.id === "custom") {
       onCustomDimensionsChange({
         width: customWidth,
-        height: parsed,
+        height: customHeight,
         unit: customUnit,
+        dpi: newDpi,
       });
     }
   };
+
+  // Handle Custom DPI numeric input change
+  const handleDpiInputChange = (valStr: string) => {
+    setDpiStr(valStr);
+    const parsed = parseInt(valStr, 10);
+    if (!isNaN(parsed) && parsed >= MIN_DPI && parsed <= MAX_DPI) {
+      onDpiChange(parsed);
+      if (selectedPreset.id === "custom") {
+        onCustomDimensionsChange({
+          width: customWidth,
+          height: customHeight,
+          unit: customUnit,
+          dpi: parsed,
+        });
+      }
+    }
+  };
+
+  const isCustomActive = selectedPreset.id === "custom";
 
   return (
     <div
@@ -251,7 +307,7 @@ export const PhotoPresetSelector: React.FC<PhotoPresetSelectorProps> = ({
         </button>
       </div>
 
-      {/* 1. Initial Standard Presets Grid */}
+      {/* 1. Standard Photo Dimension Presets */}
       <div className="space-y-3">
         <label className="text-xs font-bold uppercase tracking-wider text-surface-600">
           Standard Photo Dimensions
@@ -259,6 +315,12 @@ export const PhotoPresetSelector: React.FC<PhotoPresetSelectorProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           {INITIAL_PHOTO_PRESETS.map((preset) => {
             const isSelected = selectedPreset.id === preset.id;
+            const displayW = preset.id === "custom" ? customWidth : preset.width;
+            const displayH = preset.id === "custom" ? customHeight : preset.height;
+            const displayU = preset.id === "custom" ? customUnit : preset.unit;
+            const displayRatio =
+              preset.id === "custom" ? liveCalculation.aspectRatio : preset.aspectRatio;
+
             return (
               <button
                 key={preset.id}
@@ -273,7 +335,7 @@ export const PhotoPresetSelector: React.FC<PhotoPresetSelectorProps> = ({
               >
                 <div className="flex items-start justify-between gap-2">
                   <span className="text-xs font-bold text-surface-900 leading-snug">
-                    {preset.name}
+                    {preset.id === "custom" ? "Custom Dimensions" : preset.name}
                   </span>
                   {isSelected && (
                     <span className="p-0.5 rounded-full bg-brand-600 text-white shrink-0 mt-0.5">
@@ -283,11 +345,11 @@ export const PhotoPresetSelector: React.FC<PhotoPresetSelectorProps> = ({
                 </div>
                 <div className="flex items-center gap-2 text-[11px] font-mono text-surface-500">
                   <span className="font-semibold text-surface-700">
-                    {formatDimension(preset.width, preset.unit)} ×{" "}
-                    {formatDimension(preset.height, preset.unit)}
+                    {formatDimension(displayW, displayU)} ×{" "}
+                    {formatDimension(displayH, displayU)}
                   </span>
                   <span>•</span>
-                  <span>{getFriendlyAspectRatioName(preset.aspectRatio)}</span>
+                  <span>{getFriendlyAspectRatioName(displayRatio)}</span>
                 </div>
               </button>
             );
@@ -341,26 +403,66 @@ export const PhotoPresetSelector: React.FC<PhotoPresetSelectorProps> = ({
         )}
       </div>
 
-      {/* 3. Custom Dimensions Form */}
-      <div className="bg-surface-50 rounded-2xl p-4 border border-surface-200/80 space-y-4">
+      {/* 3. Custom Dimensions & DPI Controls (Phase 03G Core) */}
+      <div
+        className={cn(
+          "rounded-2xl p-4 border space-y-4 transition-all",
+          isCustomActive
+            ? "bg-brand-50/40 border-brand-300 ring-1 ring-brand-300/40"
+            : "bg-surface-50 border-surface-200/80"
+        )}
+      >
         <div className="flex items-center justify-between">
           <label className="text-xs font-bold uppercase tracking-wider text-surface-700 flex items-center gap-1.5">
             <Sliders className="w-3.5 h-3.5 text-brand-600" />
-            <span>Custom Dimensions & Unit</span>
+            <span>Custom Dimensions & DPI</span>
           </label>
-          <span className="text-[11px] font-mono text-brand-700 font-semibold">
-            Ratio: {friendlyRatio}
-          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsAspectLocked(!isAspectLocked)}
+              className={cn(
+                "px-2 py-0.5 rounded-lg text-[10px] font-semibold border flex items-center gap-1 transition-all",
+                isAspectLocked
+                  ? "bg-white text-brand-700 border-brand-300 shadow-xs"
+                  : "bg-surface-100 text-surface-500 border-surface-200"
+              )}
+              title={
+                isAspectLocked
+                  ? "Aspect ratio is locked: width & height adjust proportionally"
+                  : "Aspect ratio unlocked: width & height can change independently"
+              }
+            >
+              {isAspectLocked ? (
+                <>
+                  <Lock className="w-2.5 h-2.5" />
+                  <span>Proportional</span>
+                </>
+              ) : (
+                <>
+                  <Unlock className="w-2.5 h-2.5" />
+                  <span>Independent</span>
+                </>
+              )}
+            </button>
+            <span className="text-[11px] font-mono text-brand-700 font-semibold">
+              {liveCalculation.friendlyAspectRatio}
+            </span>
+          </div>
         </div>
 
+        {/* Dimensions Inputs Grid (Width, Height, Unit) */}
         <div className="grid grid-cols-3 gap-3">
           {/* Width Input */}
           <div className="space-y-1">
             <label
               htmlFor={widthInputId}
-              className="text-[11px] font-semibold text-surface-600"
+              className="text-[11px] font-semibold text-surface-600 flex items-center justify-between"
             >
-              Width
+              <span>Width</span>
+              <span className="font-mono text-[10px] text-surface-400">
+                {customUnit}
+              </span>
             </label>
             <input
               id={widthInputId}
@@ -373,10 +475,11 @@ export const PhotoPresetSelector: React.FC<PhotoPresetSelectorProps> = ({
               className={cn(
                 "w-full px-3 py-2 text-xs font-mono font-semibold rounded-xl border bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all",
                 validation.errors.width
-                  ? "border-rose-300 text-rose-900 focus:border-rose-500"
+                  ? "border-rose-300 text-rose-900 focus:border-rose-500 bg-rose-50/40"
                   : "border-surface-200 text-surface-900 focus:border-brand-500"
               )}
-              placeholder="Width"
+              placeholder="e.g. 35"
+              aria-label="Custom width"
             />
           </div>
 
@@ -384,9 +487,12 @@ export const PhotoPresetSelector: React.FC<PhotoPresetSelectorProps> = ({
           <div className="space-y-1">
             <label
               htmlFor={heightInputId}
-              className="text-[11px] font-semibold text-surface-600"
+              className="text-[11px] font-semibold text-surface-600 flex items-center justify-between"
             >
-              Height
+              <span>Height</span>
+              <span className="font-mono text-[10px] text-surface-400">
+                {customUnit}
+              </span>
             </label>
             <input
               id={heightInputId}
@@ -399,10 +505,11 @@ export const PhotoPresetSelector: React.FC<PhotoPresetSelectorProps> = ({
               className={cn(
                 "w-full px-3 py-2 text-xs font-mono font-semibold rounded-xl border bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all",
                 validation.errors.height
-                  ? "border-rose-300 text-rose-900 focus:border-rose-500"
+                  ? "border-rose-300 text-rose-900 focus:border-rose-500 bg-rose-50/40"
                   : "border-surface-200 text-surface-900 focus:border-brand-500"
               )}
-              placeholder="Height"
+              placeholder="e.g. 45"
+              aria-label="Custom height"
             />
           </div>
 
@@ -418,20 +525,107 @@ export const PhotoPresetSelector: React.FC<PhotoPresetSelectorProps> = ({
               id={unitSelectId}
               value={customUnit}
               onChange={(e) => handleUnitChange(e.target.value as DimensionUnit)}
-              className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-surface-200 bg-white text-surface-900 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all cursor-pointer"
+              className="w-full px-2.5 py-2 text-xs font-semibold rounded-xl border border-surface-200 bg-white text-surface-900 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all cursor-pointer"
             >
-              <option value="mm">mm</option>
-              <option value="cm">cm</option>
-              <option value="inch">inches</option>
+              <option value="mm">mm (Millimeters)</option>
+              <option value="cm">cm (Centimeters)</option>
+              <option value="inch">inches (in)</option>
             </select>
           </div>
         </div>
 
-        {/* Validation Errors */}
-        {(validation.errors.width || validation.errors.height) && (
-          <div className="text-[11px] text-rose-600 font-medium space-y-0.5">
+        {/* DPI Controls (Default 300) */}
+        <div className="space-y-2 pt-1 border-t border-surface-200/60">
+          <div className="flex items-center justify-between">
+            <label
+              htmlFor={dpiInputId}
+              className="text-[11px] font-semibold text-surface-700 flex items-center gap-1.5"
+            >
+              <Printer className="w-3.5 h-3.5 text-brand-600" />
+              <span>Print Resolution (DPI)</span>
+            </label>
+            <span className="text-[11px] font-mono font-bold text-brand-700">
+              {dpi} DPI
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {DPI_QUICK_PRESETS.map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => handleDpiSelect(p)}
+                className={cn(
+                  "px-2.5 py-1 rounded-lg text-xs font-mono font-semibold border transition-all",
+                  dpi === p
+                    ? "bg-brand-600 text-white border-brand-600 shadow-xs"
+                    : "bg-white text-surface-700 border-surface-200 hover:bg-surface-100"
+                )}
+              >
+                {p} {p === 300 && "(Default)"}
+              </button>
+            ))}
+
+            <div className="flex items-center gap-1 ml-auto">
+              <span className="text-[10px] text-surface-400">Custom:</span>
+              <input
+                id={dpiInputId}
+                type="number"
+                min={MIN_DPI}
+                max={MAX_DPI}
+                value={dpiStr}
+                onChange={(e) => handleDpiInputChange(e.target.value)}
+                className={cn(
+                  "w-16 px-2 py-0.5 text-xs font-mono rounded-lg border bg-white focus:outline-none focus:ring-1 focus:ring-brand-500",
+                  validation.errors.dpi
+                    ? "border-rose-300 text-rose-900 bg-rose-50/40"
+                    : "border-surface-200"
+                )}
+                placeholder="300"
+                aria-label="Custom DPI"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Live Dimensions & Pixel Preview HUD */}
+        <div className="p-3 rounded-xl bg-white border border-surface-200/90 shadow-xs space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-[11px] font-medium text-surface-500">
+              Physical Dimensions:
+            </span>
+            <span className="font-mono font-bold text-surface-900">
+              {formatDimension(customWidth, customUnit)} ×{" "}
+              {formatDimension(customHeight, customUnit)}
+              {customUnit !== "mm" && (
+                <span className="text-surface-400 font-normal ml-1">
+                  ({liveCalculation.widthMm} × {liveCalculation.heightMm} mm)
+                </span>
+              )}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between text-xs pt-1 border-t border-surface-100">
+            <span className="text-[11px] font-medium text-surface-500">
+              Target Pixel Dimensions:
+            </span>
+            <span className="font-mono font-extrabold text-brand-700 bg-brand-50 px-2 py-0.5 rounded-lg border border-brand-200">
+              {liveCalculation.widthPx} × {liveCalculation.heightPx} px @ {dpi} DPI
+            </span>
+          </div>
+        </div>
+
+        {/* Validation Errors Alert Box */}
+        {!validation.isValid && (
+          <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs space-y-1 animate-in fade-in">
+            <div className="flex items-center gap-1.5 font-bold text-rose-900">
+              <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+              <span>Invalid Custom Dimensions</span>
+            </div>
             {validation.errors.width && <p>• {validation.errors.width}</p>}
             {validation.errors.height && <p>• {validation.errors.height}</p>}
+            {validation.errors.dpi && <p>• {validation.errors.dpi}</p>}
+            {validation.errors.general && <p>• {validation.errors.general}</p>}
           </div>
         )}
       </div>

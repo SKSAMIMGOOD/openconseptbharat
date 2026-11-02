@@ -8,12 +8,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node --experimental-strip-types --test tests/image-engine.test.mjs tests/photo-studio.test.mjs tests/dpi-calculator.test.mjs tests/crop-editor.test.mjs"
+    "test": "node --experimental-strip-types --test tests/image-engine.test.mjs tests/photo-studio.test.mjs tests/dpi-calculator.test.mjs tests/crop-editor.test.mjs tests/photo-sheet.test.mjs tests/a4-photo-sheet.test.mjs tests/multiple-photo-maker.test.mjs tests/background-remover.test.mjs tests/custom-dimensions.test.mjs"
   },
   "dependencies": {
     "clsx": "^2.1.1",
     "lucide-react": "^0.475.0",
     "next": "^14.2.24",
+    "onnxruntime-web": "^1.31.1",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^3.11.174",
     "react": "^18.3.1",

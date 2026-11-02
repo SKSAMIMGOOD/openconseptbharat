@@ -1,167 +1,221 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { ModuleLayout } from "@/components/layout/ModuleLayout";
-import { FileDropzone } from "@/components/common/FileDropzone";
 import { TOOLS } from "@/constants/tools";
+import { useBackgroundRemover } from "@/hooks/useBackgroundRemover";
+import { BackgroundRemoverUpload } from "@/components/background-remover/BackgroundRemoverUpload";
+import { ModelSettingsCard } from "@/components/background-remover/ModelSettingsCard";
+import { BackgroundColorPicker } from "@/components/background-remover/BackgroundColorPicker";
+import { BackgroundRemoverPreview } from "@/components/background-remover/BackgroundRemoverPreview";
+import { BackgroundRemoverExport } from "@/components/background-remover/BackgroundRemoverExport";
 import {
   Scissors,
   Cpu,
-  Check,
   ShieldCheck,
   Sparkles,
-  Layers,
-  Image as ImageIcon,
+  AlertCircle,
+  HardDrive,
+  Info,
+  CheckCircle2,
+  Lock,
 } from "lucide-react";
 
 export default function BackgroundRemoverPage() {
   const tool = TOOLS.find((t) => t.id === "background-remover")!;
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [backdropType, setBackdropType] = useState<"transparent" | "white" | "blue">("transparent");
+  const {
+    originalFile,
+    originalPreviewUrl,
+    dimensions,
+    selectedModel,
+    isModelCachedState,
+    modelLoadingProgress,
+    isModelLoaded,
+    isInferring,
+    inferenceProgress,
+    hasResult,
+    selectedBackground,
+    customColorHex,
+    compositeCanvas,
+    viewMode,
+    sliderPosition,
+    zoom,
+    pan,
+    error,
+    handleFileSelect,
+    removeImage,
+    selectModel,
+    handleCustomModelUpload,
+    processBackgroundRemoval,
+    selectBackground,
+    updateCustomHex,
+    setViewMode,
+    setSliderPosition,
+    zoomIn,
+    zoomOut,
+    resetZoom,
+    fitToScreen,
+    setPan,
+    exportFile,
+    transferToPhotoStudio,
+    clearError,
+  } = useBackgroundRemover();
 
   return (
     <ModuleLayout tool={tool}>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Workspace: File Ingestion & AI Stage */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-2xl border border-surface-200 p-6 sm:p-8 shadow-card">
-            <h3 className="text-base font-bold text-surface-900 mb-4 flex items-center gap-2">
-              <Scissors className="w-5 h-5 text-brand-600" />
-              <span>Step 1: Ingest Image for Local AI Background Removal</span>
-            </h3>
-
-            <FileDropzone
-              acceptTypes={tool.fileAccept}
-              maxSizeMB={tool.maxFileSizeMB}
-              label="Select image to isolate subject"
-              hint="Works entirely in browser memory. Transparent PNG or solid backdrop export."
-              onFileSelect={(file) => setSelectedFile(file)}
-            />
-
-            {selectedFile && (
-              <div className="mt-4 p-4 rounded-xl bg-surface-50 border border-surface-200 flex items-center justify-between">
-                <div>
-                  <h4 className="text-sm font-semibold text-surface-900">{selectedFile.name}</h4>
-                  <p className="text-xs text-surface-500 mt-0.5">
-                    {(selectedFile.size / 1024).toFixed(1)} KB • In-Memory Buffer
-                  </p>
-                </div>
-                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 flex items-center gap-1">
-                  <Check className="w-3.5 h-3.5" />
-                  Staged for AI Inference
-                </span>
-              </div>
-            )}
+      <div className="space-y-8 max-w-7xl mx-auto">
+        {/* Workspace Sub-Header & Live Privacy Status Bar */}
+        <div className="bg-white rounded-3xl border border-surface-200 p-5 sm:p-6 shadow-card flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold uppercase tracking-wider text-brand-600 flex items-center gap-1.5">
+                <Scissors className="w-3.5 h-3.5" />
+                <span>Phase 05: Client-Side AI Background Remover</span>
+              </span>
+              <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                Zero-Upload Client Inference
+              </span>
+            </div>
+            <h2 className="text-lg sm:text-xl font-black text-surface-900 tracking-tight">
+              AI Subject Segmentation & Studio Cutout Workspace
+            </h2>
+            <p className="text-xs text-surface-500 max-w-2xl leading-relaxed">
+              Remove backgrounds with quantized neural networks running directly inside your browser tab. Replace backgrounds with studio colors or transparent PNGs without cloud APIs.
+            </p>
           </div>
 
-          {/* AI Canvas Stage Placeholder */}
-          <div className="bg-white rounded-2xl border border-surface-200 p-6 sm:p-8 shadow-subtle">
-            <h3 className="text-base font-bold text-surface-900 mb-2 flex items-center gap-2">
-              <Layers className="w-5 h-5 text-surface-600" />
-              <span>Step 2: AI Masking Stage & Backdrop Preview</span>
-            </h3>
-            <p className="text-xs text-surface-600 mb-6 leading-relaxed">
-              In Phase 03, quantized local neural networks (ONNX Runtime Web / Transformers.js) will execute directly inside your browser tab to generate precise segmentation masks.
-            </p>
-
-            {/* Backdrop preset tabs */}
-            <div className="flex items-center gap-2 mb-6">
-              <button
-                type="button"
-                onClick={() => setBackdropType("transparent")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  backdropType === "transparent"
-                    ? "bg-brand-600 text-white shadow-sm"
-                    : "bg-surface-100 text-surface-700 hover:bg-surface-200"
-                }`}
-              >
-                Transparent Alpha PNG
-              </button>
-              <button
-                type="button"
-                onClick={() => setBackdropType("white")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  backdropType === "white"
-                    ? "bg-brand-600 text-white shadow-sm"
-                    : "bg-surface-100 text-surface-700 hover:bg-surface-200"
-                }`}
-              >
-                Solid White Backdrop
-              </button>
-              <button
-                type="button"
-                onClick={() => setBackdropType("blue")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  backdropType === "blue"
-                    ? "bg-brand-600 text-white shadow-sm"
-                    : "bg-surface-100 text-surface-700 hover:bg-surface-200"
-                }`}
-              >
-                Studio Passport Blue
-              </button>
-            </div>
-
-            {/* Checkerboard Stage Mockup */}
-            <div className="h-48 rounded-xl border border-surface-200 bg-[linear-gradient(45deg,#f1f5f9_25%,transparent_25%),linear-gradient(-45deg,#f1f5f9_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#f1f5f9_75%),linear-gradient(-45deg,transparent_75%,#f1f5f9_75%)] [background-size:20px_20px] [background-position:0_0,0_10px,10px_-10px,-10px_0px] flex flex-col items-center justify-center p-6 text-center">
-              <div className="w-12 h-12 rounded-xl bg-white/90 backdrop-blur-sm border border-surface-200 flex items-center justify-center text-surface-500 mb-2 shadow-sm">
-                <ImageIcon className="w-6 h-6 text-brand-600" />
-              </div>
-              <span className="text-xs font-semibold text-surface-800">
-                Interactive Segmentation Canvas
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="p-3 rounded-2xl bg-surface-50 border border-surface-200 text-right">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-surface-400 block">
+                Inference Runtime
               </span>
-              <span className="text-[11px] text-surface-500 mt-0.5">
-                Upload a portrait or product photo to initialize the WebGPU/WASM pipeline
+              <span className="text-xs font-mono font-bold text-surface-800 flex items-center gap-1.5">
+                <Cpu className="w-3.5 h-3.5 text-brand-600" />
+                ONNX WebAssembly / WebGPU
               </span>
             </div>
           </div>
         </div>
 
-        {/* Sidebar Controls & Model Specifications */}
-        <div className="space-y-6">
-          <div className="bg-white rounded-2xl border border-surface-200 p-6 shadow-subtle">
-            <h4 className="text-sm font-bold text-surface-900 mb-3 flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-brand-600" />
-              <span>AI Pipeline Specifications</span>
-            </h4>
-            <ul className="text-xs text-surface-600 space-y-2.5">
-              {tool.features.map((feature, idx) => (
-                <li key={idx} className="flex items-start gap-2">
-                  <Check className="w-3.5 h-3.5 text-brand-600 shrink-0 mt-0.5" />
-                  <span>{feature}</span>
-                </li>
-              ))}
-            </ul>
+        {/* Global Error Banner */}
+        {error && (
+          <div className="p-4 sm:p-5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 flex items-start justify-between gap-3 shadow-sm animate-in fade-in">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+              <div>
+                <strong className="block text-xs font-bold text-rose-950">
+                  Processing Notice
+                </strong>
+                <p className="text-xs text-rose-800 leading-relaxed mt-0.5">{error}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={clearError}
+              className="text-xs font-semibold text-rose-700 hover:text-rose-950 px-2 py-1 rounded-lg hover:bg-rose-100 transition-colors"
+            >
+              Dismiss
+            </button>
           </div>
+        )}
 
-          <div className="bg-white rounded-2xl border border-surface-200 p-6 shadow-subtle">
-            <h4 className="text-sm font-bold text-surface-900 mb-2 flex items-center gap-2">
-              <Cpu className="w-4 h-4 text-surface-600" />
-              <span>Client-Side Inference Runtime</span>
-            </h4>
-            <div className="p-3.5 rounded-xl bg-surface-50 border border-surface-200 text-xs text-surface-700 space-y-2 font-mono">
-              <div className="flex justify-between">
-                <span className="text-surface-500 font-sans">Execution Engine:</span>
-                <span className="font-semibold text-surface-900">Browser WASM / WebGPU</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-surface-500 font-sans">Remote Cloud APIs:</span>
-                <span className="font-semibold text-emerald-700">0 (Zero)</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-surface-500 font-sans">Processing Boundary:</span>
-                <span className="font-semibold text-brand-700">Client Memory Only</span>
+        {/* Main 2-Column Responsive Workspace Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Left Column: Interactive Preview Stage & Backdrop Selector (7 cols) */}
+          <div className="lg:col-span-7 space-y-6">
+            {/* Master Interactive Preview Viewport */}
+            <BackgroundRemoverPreview
+              originalUrl={originalPreviewUrl}
+              compositeCanvas={compositeCanvas}
+              dimensions={dimensions}
+              viewMode={viewMode}
+              sliderPosition={sliderPosition}
+              zoom={zoom}
+              pan={pan}
+              selectedBackground={selectedBackground}
+              customHex={customColorHex}
+              hasResult={hasResult}
+              isInferring={isInferring}
+              onViewModeChange={setViewMode}
+              onSliderPositionChange={setSliderPosition}
+              onZoomIn={zoomIn}
+              onZoomOut={zoomOut}
+              onResetZoom={resetZoom}
+              onFitToScreen={fitToScreen}
+              onPanChange={setPan}
+            />
+
+            {/* Background Color Options */}
+            <BackgroundColorPicker
+              selectedColor={selectedBackground}
+              customHex={customColorHex}
+              onSelectColor={selectBackground}
+              onCustomHexChange={updateCustomHex}
+              disabled={isInferring}
+            />
+
+            {/* Privacy & Security Technical Architecture Highlights */}
+            <div className="bg-surface-50 rounded-2xl border border-surface-200/80 p-5 space-y-3">
+              <h4 className="text-xs font-bold text-surface-900 flex items-center gap-2">
+                <Lock className="w-4 h-4 text-emerald-600" />
+                <span>Client-Side Privacy Architecture</span>
+              </h4>
+              <p className="text-xs text-surface-600 leading-relaxed">
+                Commercial background removers routinely transmit user photos to remote third-party cloud servers. In Browser Utility Studio, all tensor calculations, neural inference passes, and pixel matting operations run <strong>100% inside your browser&apos;s memory</strong>. Your sensitive biometric photo never leaves your device.
+              </p>
+              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-surface-200 text-center text-[11px] font-mono">
+                <div className="p-2 rounded-xl bg-white border border-surface-200">
+                  <span className="text-surface-400 block font-sans text-[10px]">Cloud APIs</span>
+                  <span className="font-bold text-emerald-700">0 (Zero)</span>
+                </div>
+                <div className="p-2 rounded-xl bg-white border border-surface-200">
+                  <span className="text-surface-400 block font-sans text-[10px]">Image Uploads</span>
+                  <span className="font-bold text-emerald-700">0 (Zero)</span>
+                </div>
+                <div className="p-2 rounded-xl bg-white border border-surface-200">
+                  <span className="text-surface-400 block font-sans text-[10px]">Storage Mode</span>
+                  <span className="font-bold text-brand-700">Ephemeral RAM</span>
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-emerald-50 rounded-2xl border border-emerald-200/80 p-6 text-emerald-950">
-            <div className="flex items-center gap-2 mb-2">
-              <ShieldCheck className="w-5 h-5 text-emerald-600" />
-              <h4 className="text-sm font-bold">100% On-Device Privacy</h4>
-            </div>
-            <p className="text-xs text-emerald-800 leading-relaxed">
-              Unlike commercial background removal services that send your personal photos to remote cloud servers, Browser Utility Studio keeps all biometric and subject data local.
-            </p>
+          {/* Right Column: Upload, AI Model Settings & Export Panel (5 cols) */}
+          <div className="lg:col-span-5 space-y-6">
+            {/* 1. Upload & Photo Ingestion */}
+            <BackgroundRemoverUpload
+              originalFile={originalFile}
+              originalPreviewUrl={originalPreviewUrl}
+              dimensions={dimensions}
+              onFileSelect={handleFileSelect}
+              onRemove={removeImage}
+              disabled={isInferring}
+            />
+
+            {/* 2. AI Model Selection & Inference Triggers */}
+            <ModelSettingsCard
+              selectedModel={selectedModel}
+              isModelCached={isModelCachedState}
+              isModelLoaded={isModelLoaded}
+              modelProgress={modelLoadingProgress}
+              isInferring={isInferring}
+              inferenceProgress={inferenceProgress}
+              hasImage={originalFile !== null}
+              onSelectModel={selectModel}
+              onUploadCustomModel={handleCustomModelUpload}
+              onRunRemoval={processBackgroundRemoval}
+            />
+
+            {/* 3. Multi-Format Export & Photo Studio Hand-off */}
+            <BackgroundRemoverExport
+              hasResult={hasResult}
+              selectedBackground={selectedBackground}
+              customHex={customColorHex}
+              onExport={exportFile}
+              onTransferToPhotoStudio={transferToPhotoStudio}
+              disabled={isInferring}
+            />
           </div>
         </div>
       </div>

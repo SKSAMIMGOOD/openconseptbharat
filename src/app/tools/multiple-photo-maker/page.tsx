@@ -1,172 +1,196 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import Link from "next/link";
 import { ModuleLayout } from "@/components/layout/ModuleLayout";
-import { FileDropzone } from "@/components/common/FileDropzone";
 import { TOOLS } from "@/constants/tools";
-import { Grid3x3, Check, Printer, ShieldCheck, FileSpreadsheet, Sliders } from "lucide-react";
+import {
+  Grid3x3,
+  Printer,
+  ShieldCheck,
+  CheckCircle2,
+  Sparkles,
+  ArrowRight,
+  Layers,
+  Camera,
+  Download,
+} from "lucide-react";
+import type { UploadedPhoto, MultiplePhotoConfig } from "@/types/multiple-photo";
+import {
+  createDefaultMultiplePhotoConfig,
+  calculateMultiPhotoArrangement,
+} from "@/lib/multiple-photo/multiple-photo-engine";
+import { calculatePhotoSheetLayout } from "@/lib/photo-studio/sheet-calculator";
+import { revokeObjectUrlSafely } from "@/lib/utils/memory";
+import { MultiPhotoDropzone } from "@/components/multiple-photo-maker/MultiPhotoDropzone";
+import { UploadedPhotoGallery } from "@/components/multiple-photo-maker/UploadedPhotoGallery";
+import { MultiplePhotoDimensionsPanel } from "@/components/multiple-photo-maker/MultiplePhotoDimensionsPanel";
+import { MultiplePhotoSheetControls } from "@/components/multiple-photo-maker/MultiplePhotoSheetControls";
+import { MultiplePhotoPreviewPanel } from "@/components/multiple-photo-maker/MultiplePhotoPreviewPanel";
 
 export default function MultiplePhotoMakerPage() {
   const tool = TOOLS.find((t) => t.id === "multiple-photo-maker")!;
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [selectedPaper, setSelectedPaper] = useState<"a4" | "4x6" | "5x7">("a4");
-  const [withCutLines, setWithCutLines] = useState(true);
+
+  // 1. Uploaded photographs state
+  const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
+  const photosRef = useRef<UploadedPhoto[]>([]);
+  photosRef.current = photos;
+
+  // 2. Sheet layout & dimensions configuration state
+  const [config, setConfig] = useState<MultiplePhotoConfig>(() =>
+    createDefaultMultiplePhotoConfig("a4")
+  );
+
+  // 3. Calculated multi-photo sheet arrangement
+  const arrangement = useMemo(() => {
+    return calculateMultiPhotoArrangement(photos, config, calculatePhotoSheetLayout);
+  }, [photos, config]);
+
+  // Clean up object URLs on component unmount
+  useEffect(() => {
+    return () => {
+      photosRef.current.forEach((p) => {
+        revokeObjectUrlSafely(p.previewUrl);
+      });
+    };
+  }, []);
+
+  // Add more photos without removing existing ones
+  const handlePhotosAdded = useCallback((newPhotos: UploadedPhoto[]) => {
+    setPhotos((prev) => [...prev, ...newPhotos]);
+  }, []);
+
+  // Clear all photos and safely release memory
+  const handleClearAll = useCallback(() => {
+    photos.forEach((p) => {
+      revokeObjectUrlSafely(p.previewUrl);
+    });
+    setPhotos([]);
+  }, [photos]);
 
   return (
     <ModuleLayout tool={tool}>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Workspace: Upload & Sheet Staging */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-2xl border border-surface-200 p-6 sm:p-8 shadow-card">
-            <h3 className="text-base font-bold text-surface-900 mb-4 flex items-center gap-2">
-              <Grid3x3 className="w-5 h-5 text-brand-600" />
-              <span>Step 1: Choose Master Passport Photo</span>
-            </h3>
-
-            <FileDropzone
-              acceptTypes={tool.fileAccept}
-              maxSizeMB={tool.maxFileSizeMB}
-              label="Select your cropped passport photo"
-              hint="High-resolution JPG, PNG, or WebP portrait. We will auto-tile it across your selected print sheet."
-              onFileSelect={(file) => setSelectedFile(file)}
-            />
-
-            {selectedFile && (
-              <div className="mt-4 p-4 rounded-xl bg-surface-50 border border-surface-200 flex items-center justify-between">
-                <div>
-                  <h4 className="text-sm font-semibold text-surface-900">{selectedFile.name}</h4>
-                  <p className="text-xs text-surface-500 mt-0.5">
-                    {(selectedFile.size / 1024).toFixed(1)} KB • In-Memory Buffer
-                  </p>
-                </div>
-                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 flex items-center gap-1">
-                  <Check className="w-3.5 h-3.5" />
-                  Ready to Tile
+      <div className="space-y-8">
+        {/* Phase 03F Header Feature Callout Banner */}
+        <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-brand-50 via-emerald-50 to-teal-50 border border-brand-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-2xl bg-brand-600 text-white flex items-center justify-center shrink-0 shadow-md">
+              <Grid3x3 className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-sm font-bold text-surface-900">
+                  Multiple Photo Maker — Phase 03F Active
+                </h4>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                  100% In-Browser
                 </span>
               </div>
-            )}
+              <p className="text-xs text-surface-600 mt-0.5 max-w-2xl">
+                Upload multiple photographs, configure physical dimensions and DPI, and arrange them seamlessly on A4 or 4×6″ sheets with top-aligned grid math, maximum 4 photos per row, and print-ready PDF export.
+              </p>
+            </div>
           </div>
 
-          {/* Sheet Layout Staging Configuration */}
-          <div className="bg-white rounded-2xl border border-surface-200 p-6 sm:p-8 shadow-subtle">
-            <h3 className="text-base font-bold text-surface-900 mb-2 flex items-center gap-2">
-              <Printer className="w-5 h-5 text-surface-600" />
-              <span>Step 2: Print Sheet Staging & Layout Preset</span>
-            </h3>
-            <p className="text-xs text-surface-600 mb-6 leading-relaxed">
-              Configure your paper dimensions, tile counts, and cutting border guides. In Phase 02, this workspace will render the calibrated 1:1 vector PDF sheet preview in real-time.
-            </p>
-
-            {/* Paper Size Selector */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-              <button
-                type="button"
-                onClick={() => setSelectedPaper("a4")}
-                className={`p-4 rounded-xl border text-left transition-all ${
-                  selectedPaper === "a4"
-                    ? "border-brand-500 bg-brand-50/50 shadow-sm ring-1 ring-brand-500"
-                    : "border-surface-200 hover:border-surface-300 bg-white"
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-sm text-surface-900">A4 Standard</span>
-                  <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-surface-100 text-surface-600">
-                    30-Up
-                  </span>
-                </div>
-                <span className="text-xs text-surface-500 block">210 × 297 mm</span>
-                <span className="text-[11px] text-brand-700 font-medium block mt-1.5">
-                  Best for bulk printing
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSelectedPaper("4x6")}
-                className={`p-4 rounded-xl border text-left transition-all ${
-                  selectedPaper === "4x6"
-                    ? "border-brand-500 bg-brand-50/50 shadow-sm ring-1 ring-brand-500"
-                    : "border-surface-200 hover:border-surface-300 bg-white"
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-sm text-surface-900">4 × 6 Inch</span>
-                  <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-surface-100 text-surface-600">
-                    8-Up
-                  </span>
-                </div>
-                <span className="text-xs text-surface-500 block">102 × 152 mm (10×15 cm)</span>
-                <span className="text-[11px] text-brand-700 font-medium block mt-1.5">
-                  Standard photo lab paper
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSelectedPaper("5x7")}
-                className={`p-4 rounded-xl border text-left transition-all ${
-                  selectedPaper === "5x7"
-                    ? "border-brand-500 bg-brand-50/50 shadow-sm ring-1 ring-brand-500"
-                    : "border-surface-200 hover:border-surface-300 bg-white"
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-sm text-surface-900">5 × 7 Inch</span>
-                  <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-surface-100 text-surface-600">
-                    12-Up
-                  </span>
-                </div>
-                <span className="text-xs text-surface-500 block">127 × 178 mm</span>
-                <span className="text-[11px] text-brand-700 font-medium block mt-1.5">
-                  Studio portrait paper
-                </span>
-              </button>
-            </div>
-
-            {/* Print Options */}
-            <div className="p-4 rounded-xl bg-surface-50 border border-surface-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="cut-lines"
-                  checked={withCutLines}
-                  onChange={(e) => setWithCutLines(e.target.checked)}
-                  className="rounded border-surface-300 text-brand-600 focus:ring-brand-500 w-4 h-4"
-                />
-                <label htmlFor="cut-lines" className="font-medium text-surface-800 cursor-pointer">
-                  Include cutting guide lines (0.25 pt light dashed rules)
-                </label>
-              </div>
-              <span className="text-surface-500 font-mono">DPI: 300 / 600 Calibrated</span>
-            </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Link
+              href="/tools/photo-studio"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-surface-50 border border-surface-200 text-surface-700 text-xs font-semibold transition-all shadow-xs"
+            >
+              <Camera className="w-3.5 h-3.5 text-brand-600" />
+              <span>Single Photo Studio</span>
+            </Link>
           </div>
         </div>
 
-        {/* Sidebar Controls & Specifications */}
-        <div className="space-y-6">
-          <div className="bg-white rounded-2xl border border-surface-200 p-6 shadow-subtle">
-            <h4 className="text-sm font-bold text-surface-900 mb-3 flex items-center gap-2">
-              <FileSpreadsheet className="w-4 h-4 text-brand-600" />
-              <span>Sheet Layout Capabilities</span>
-            </h4>
-            <ul className="text-xs text-surface-600 space-y-2.5">
-              {tool.features.map((feature, idx) => (
-                <li key={idx} className="flex items-start gap-2">
-                  <Check className="w-3.5 h-3.5 text-brand-600 shrink-0 mt-0.5" />
-                  <span>{feature}</span>
-                </li>
-              ))}
-            </ul>
+        {/* Responsive Workspace Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Left Column: Photo Upload, Gallery, Dimensions & Sheet Controls */}
+          <div className="lg:col-span-7 space-y-6">
+            {/* 1. Multi-Photo Upload Dropzone */}
+            <div className="bg-white rounded-3xl border border-surface-200 p-5 sm:p-6 shadow-card space-y-4">
+              <div className="flex items-center justify-between border-b border-surface-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
+                    <Grid3x3 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-surface-900">
+                      Step 1: Upload Photographs
+                    </h3>
+                    <p className="text-xs text-surface-500">
+                      Add one or more JPG, PNG, or WebP portrait photos.
+                    </p>
+                  </div>
+                </div>
+                {photos.length > 0 && (
+                  <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-brand-50 text-brand-700 border border-brand-200">
+                    {photos.length} {photos.length === 1 ? "Photo" : "Photos"}
+                  </span>
+                )}
+              </div>
+
+              <MultiPhotoDropzone
+                onPhotosAdded={handlePhotosAdded}
+                defaultCopies={config.defaultCopiesPerPhoto}
+              />
+            </div>
+
+            {/* 2. Uploaded Photos Gallery (if photos exist) */}
+            {photos.length > 0 && (
+              <UploadedPhotoGallery
+                photos={photos}
+                onPhotosChange={setPhotos}
+                onClearAll={handleClearAll}
+                onPhotosAdded={handlePhotosAdded}
+                defaultCopies={config.defaultCopiesPerPhoto}
+              />
+            )}
+
+            {/* 3. Photo Dimensions & DPI Settings */}
+            <MultiplePhotoDimensionsPanel
+              dimensions={config.dimensions}
+              dpi={config.dpi}
+              onDimensionsChange={(updater) =>
+                setConfig((prev) => ({
+                  ...prev,
+                  dimensions: updater(prev.dimensions),
+                }))
+              }
+              onDpiChange={(newDpi) =>
+                setConfig((prev) => ({
+                  ...prev,
+                  dpi: newDpi,
+                }))
+              }
+            />
+
+            {/* 4. Sheet Layout, Paper Size & Margins */}
+            <MultiplePhotoSheetControls
+              config={config}
+              onConfigChange={setConfig}
+            />
           </div>
 
-          <div className="bg-emerald-50 rounded-2xl border border-emerald-200/80 p-6 text-emerald-950">
-            <div className="flex items-center gap-2 mb-2">
-              <ShieldCheck className="w-5 h-5 text-emerald-600" />
-              <h4 className="text-sm font-bold">Local PDF Assembly</h4>
+          {/* Right Column: Live Sheet Preview & Export (Sticky on Desktop) */}
+          <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-8">
+            {/* Live Sheet Preview Panel */}
+            <MultiplePhotoPreviewPanel
+              photos={photos}
+              config={config}
+              arrangement={arrangement}
+            />
+
+            {/* Local Security & Privacy Assurance Card */}
+            <div className="bg-emerald-50 rounded-3xl border border-emerald-200/90 p-5 sm:p-6 text-emerald-950 space-y-2.5 shadow-xs">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+                <h4 className="text-sm font-bold">100% In-Browser Privacy Invariant</h4>
+              </div>
+              <p className="text-xs text-emerald-800 leading-relaxed">
+                All image decoding, aspect-ratio safe center-cropping, canvas rasterization, and PDF synthesis occur strictly inside your device&apos;s browser memory. Zero bytes are uploaded to remote servers or cloud storage.
+              </p>
             </div>
-            <p className="text-xs text-emerald-800 leading-relaxed">
-              PDF generation executes via `pdf-lib` entirely in your browser. Print layout bytes are produced locally without remote API roundtrips.
-            </p>
           </div>
         </div>
       </div>

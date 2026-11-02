@@ -58,6 +58,7 @@ export interface CustomDimensionsInput {
   width: number;
   height: number;
   unit: DimensionUnit;
+  dpi?: number;
 }
 
 /**
