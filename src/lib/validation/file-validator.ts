@@ -1,4 +1,4 @@
-import { FileValidationOptions, FileValidationResult, ImageDimensions } from "@/types/files";
+import type { FileValidationOptions, FileValidationResult, ImageDimensions } from "@/types/files";
 
 /**
  * Validates a user uploaded file against allowed MIME types and max size.

@@ -143,6 +143,7 @@ export const InteractiveCropEditor: React.FC<InteractiveCropEditorProps> = ({
     const canvas = canvasRef.current;
     if (!canvas || !imageSource || !naturalWidth || !naturalHeight) return;
 
+    let isMounted = true;
     canvas.width = naturalWidth;
     canvas.height = naturalHeight;
 
@@ -154,12 +155,18 @@ export const InteractiveCropEditor: React.FC<InteractiveCropEditorProps> = ({
     if (typeof imageSource === "string") {
       const img = new Image();
       img.onload = () => {
-        ctx.drawImage(img, 0, 0);
+        if (isMounted) {
+          ctx.drawImage(img, 0, 0);
+        }
       };
       img.src = imageSource;
     } else {
       ctx.drawImage(imageSource as any, 0, 0);
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, [imageSource, naturalWidth, naturalHeight]);
 
   // Zoom Controls

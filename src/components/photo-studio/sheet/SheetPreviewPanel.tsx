@@ -30,6 +30,8 @@ export interface SheetPreviewPanelProps {
   exportFormat: SheetExportFormat;
   isExporting: boolean;
   onExportClick: () => void;
+  onPrintClick?: () => void;
+  onOpenPrintPreview?: () => void;
   className?: string;
 }
 
@@ -40,6 +42,8 @@ export const SheetPreviewPanel: React.FC<SheetPreviewPanelProps> = ({
   exportFormat,
   isExporting,
   onExportClick,
+  onPrintClick,
+  onOpenPrintPreview,
   className,
 }) => {
   // Preview Zoom & Pan State
@@ -261,28 +265,57 @@ export const SheetPreviewPanel: React.FC<SheetPreviewPanelProps> = ({
           </div>
         </div>
 
-        {/* Primary Download / Export Action Button */}
-        <div className="pt-2">
-          <button
-            type="button"
-            onClick={onExportClick}
-            disabled={isExporting || layout.totalPhotos === 0 || layout.isOverflowing}
-            className="w-full py-4 px-6 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm sm:text-base flex items-center justify-center gap-2.5 shadow-lg shadow-brand-600/25 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none"
-          >
-            {isExporting ? (
-              <>
-                <RefreshCw className="w-5 h-5 animate-spin" />
-                <span>Generating High-Resolution {formatLabel}...</span>
-              </>
-            ) : (
-              <>
-                <Download className="w-5 h-5" />
-                <span>
-                  Download {layout.paperSize.toUpperCase()} Sheet ({formatLabel.split(" ")[0]})
-                </span>
-              </>
+        {/* Primary Action Buttons: Print Sheet & Download Sheet */}
+        <div className="pt-2 space-y-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {onPrintClick && (
+              <button
+                type="button"
+                onClick={onPrintClick}
+                disabled={isExporting || layout.totalPhotos === 0 || layout.isOverflowing}
+                className="w-full py-4 px-4 rounded-2xl bg-surface-900 hover:bg-black text-white font-bold text-sm sm:text-base flex items-center justify-center gap-2 shadow-md transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none"
+              >
+                <Printer className="w-5 h-5 text-brand-400" />
+                <span>Print Sheet</span>
+              </button>
             )}
-          </button>
+
+            <button
+              type="button"
+              onClick={onExportClick}
+              disabled={isExporting || layout.totalPhotos === 0 || layout.isOverflowing}
+              className={cn(
+                "w-full py-4 px-4 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg shadow-brand-600/25 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none",
+                !onPrintClick && "sm:col-span-2"
+              )}
+            >
+              {isExporting ? (
+                <>
+                  <RefreshCw className="w-5 h-5 animate-spin" />
+                  <span>Generating {formatLabel.split(" ")[0]}...</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-5 h-5" />
+                  <span>
+                    Download {layout.paperSize.toUpperCase()} ({formatLabel.split(" ")[0]})
+                  </span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {onOpenPrintPreview && (
+            <button
+              type="button"
+              onClick={onOpenPrintPreview}
+              disabled={isExporting || layout.totalPhotos === 0 || layout.isOverflowing}
+              className="w-full py-2.5 px-4 rounded-xl bg-surface-100 hover:bg-surface-200 text-surface-700 hover:text-surface-900 font-semibold text-xs flex items-center justify-center gap-2 transition-colors border border-surface-200"
+            >
+              <Maximize2 className="w-3.5 h-3.5 text-brand-600" />
+              <span>Open 1:1 Print Preview & Settings Guide</span>
+            </button>
+          )}
         </div>
       </div>
 

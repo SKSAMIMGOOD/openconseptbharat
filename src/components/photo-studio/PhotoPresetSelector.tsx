@@ -48,6 +48,7 @@ import {
   MAX_DIMENSION_MM,
 } from "@/lib/crop/unit-converter";
 import { getFriendlyAspectRatioName } from "@/lib/photo-studio/dpi-calculator";
+import { usePreferences } from "@/hooks/usePreferences";
 
 export const DPI_QUICK_PRESETS: readonly number[] = [150, 200, 300, 600];
 
@@ -82,10 +83,16 @@ export const PhotoPresetSelector: React.FC<PhotoPresetSelectorProps> = ({
   const dpiInputId = useId();
   const customColorInputId = useId();
 
+  const { settings: userPreferences } = usePreferences();
+
   // Custom Dimensions local state
   const [customWidth, setCustomWidth] = useState<number>(selectedPreset.width);
   const [customHeight, setCustomHeight] = useState<number>(selectedPreset.height);
-  const [customUnit, setCustomUnit] = useState<DimensionUnit>(selectedPreset.unit);
+  const [customUnit, setCustomUnit] = useState<DimensionUnit>(
+    selectedPreset.id === "custom" && userPreferences.defaultUnit
+      ? userPreferences.defaultUnit
+      : selectedPreset.unit
+  );
   const [widthStr, setWidthStr] = useState<string>(String(selectedPreset.width));
   const [heightStr, setHeightStr] = useState<string>(String(selectedPreset.height));
   const [dpiStr, setDpiStr] = useState<string>(String(dpi || DEFAULT_CUSTOM_DPI));

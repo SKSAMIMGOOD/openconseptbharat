@@ -103,6 +103,7 @@ export interface ImageExportOptions {
   quality?: number; // 0.1 to 1.0 (defaults to 0.92 for lossy)
   backgroundColor?: string; // used when exporting transparency to formats like JPEG
   fileName?: string;
+  dpi?: number; // Optional physical resolution in dots per inch (e.g. 300)
 }
 
 export interface ExportResult {

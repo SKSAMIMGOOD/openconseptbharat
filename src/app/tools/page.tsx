@@ -3,43 +3,60 @@
 import React, { useState, useMemo, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
-  Sparkles,
-  Grid,
+  Grid3x3,
   Camera,
-  CreditCard,
-  FileSpreadsheet,
-  FileText,
+  Scissors,
+  Printer,
   SlidersHorizontal,
+  X,
 } from "lucide-react";
-import { TOOLS, TOOL_CATEGORIES } from "@/constants/tools";
+import { TOOLS } from "@/constants/tools";
 import { ToolCategory } from "@/types/tools";
 import { ToolCard } from "@/components/common/ToolCard";
 import { SearchBar } from "@/components/common/SearchBar";
 import { EmptyState } from "@/components/common/EmptyState";
 import { PageHeader } from "@/components/common/PageHeader";
 import { PrivacyNotice } from "@/components/common/PrivacyNotice";
+import { RecentlyUsedSection } from "@/components/dashboard/RecentlyUsedSection";
 
 const CATEGORY_TABS: { id: "all" | ToolCategory; label: string; icon: React.ElementType }[] = [
-  { id: "all", label: "All Utilities", icon: Grid },
-  { id: "photo", label: "Photo Tools", icon: Camera },
-  { id: "document", label: "Document Tools", icon: CreditCard },
-  { id: "pdf", label: "PDF Tools", icon: FileSpreadsheet },
-  { id: "resume", label: "Resume & CV Tools", icon: FileText },
+  { id: "all", label: "All Utilities", icon: Grid3x3 },
+  { id: "photo-studio", label: "Photo Studio", icon: Camera },
+  { id: "image-tools", label: "Image Tools", icon: Scissors },
+  { id: "photo-printing", label: "Photo Printing", icon: Printer },
+  { id: "utilities", label: "Utilities", icon: SlidersHorizontal },
 ];
+
+function normalizeCategory(cat: string | null): "all" | ToolCategory {
+  if (!cat || cat === "all") return "all";
+  // Support legacy category aliases
+  if (cat === "photo") return "photo-studio";
+  if (cat === "document") return "utilities";
+  if (cat === "pdf") return "photo-printing";
+  if (cat === "resume") return "utilities";
+  if (
+    cat === "photo-studio" ||
+    cat === "image-tools" ||
+    cat === "photo-printing" ||
+    cat === "utilities"
+  ) {
+    return cat as ToolCategory;
+  }
+  return "all";
+}
 
 function ToolsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const initialCategory = (searchParams.get("category") as ToolCategory) || "all";
-  const [selectedCategory, setSelectedCategory] = useState<"all" | ToolCategory>(
-    CATEGORY_TABS.some((tab) => tab.id === initialCategory) ? initialCategory : "all"
-  );
+  const rawCategory = searchParams.get("category");
+  const initialCategory = normalizeCategory(rawCategory);
+
+  const [selectedCategory, setSelectedCategory] = useState<"all" | ToolCategory>(initialCategory);
   const [searchQuery, setSearchQuery] = useState("");
 
   const handleCategorySelect = (categoryId: "all" | ToolCategory) => {
     setSelectedCategory(categoryId);
-    // Update URL query parameters without reloading
     const params = new URLSearchParams(window.location.search);
     if (categoryId === "all") {
       params.delete("category");
@@ -60,7 +77,7 @@ function ToolsContent() {
       if (selectedCategory !== "all") {
         matchesCategory =
           tool.category === selectedCategory ||
-          tool.categories.includes(selectedCategory);
+          (tool.categories && tool.categories.includes(selectedCategory));
       }
 
       // Search matching
@@ -71,21 +88,22 @@ function ToolsContent() {
         const inDesc = tool.description.toLowerCase().includes(query);
         const inFeatures = tool.features.some((f) => f.toLowerCase().includes(query));
         const inBadge = tool.badge?.toLowerCase().includes(query) || false;
-        matchesSearch = inName || inShortDesc || inDesc || inFeatures || inBadge;
+        const inId = tool.id.toLowerCase().includes(query);
+        matchesSearch = inName || inShortDesc || inDesc || inFeatures || inBadge || inId;
       }
 
       return matchesCategory && matchesSearch;
     });
   }, [searchQuery, selectedCategory]);
 
-  // Compute live counts per category (under current search query)
+  // Compute live counts per category
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { all: TOOLS.length };
     CATEGORY_TABS.forEach((tab) => {
       if (tab.id === "all") return;
       const catId = tab.id as ToolCategory;
       counts[catId] = TOOLS.filter(
-        (t) => t.category === catId || t.categories.includes(catId)
+        (t) => t.category === catId || (t.categories && t.categories.includes(catId))
       ).length;
     });
     return counts;
@@ -101,11 +119,17 @@ function ToolsContent() {
       <PageHeader
         title="All Browser Utilities"
         subtitle="Explore our complete suite of browser-native photo, document, and printing tools. Zero server uploads."
-        badge="8 Client-Side Utilities"
-        breadcrumbs={[{ label: "All Tools" }]}
+        badge={`${TOOLS.length} Client-Side Utilities`}
+        breadcrumbs={[
+          { label: "Dashboard", href: "/" },
+          { label: "All Tools" },
+        ]}
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 flex-1 w-full">
+        {/* Recently Used Tools Bar (if user has opened tools) */}
+        <RecentlyUsedSection />
+
         {/* Search & Category Filter Toolbar */}
         <div className="bg-white rounded-2xl border border-surface-200 p-4 sm:p-5 shadow-subtle mb-8 space-y-4">
           <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
@@ -115,30 +139,35 @@ function ToolsContent() {
                 value={searchQuery}
                 onChange={setSearchQuery}
                 onClear={() => setSearchQuery("")}
-                placeholder="Search tools by name, keyword, or document type..."
+                placeholder="Search tools by name, description, features, or keyword..."
               />
             </div>
 
             {/* Quick Status / Reset */}
             <div className="flex items-center justify-between md:justify-end gap-3 text-xs text-surface-500">
               <span>
-                Showing <strong className="text-surface-900">{filteredTools.length}</strong> of{" "}
-                {TOOLS.length} utilities
+                Showing <strong className="text-surface-900 font-bold">{filteredTools.length}</strong> of{" "}
+                <strong className="text-surface-900">{TOOLS.length}</strong> utilities
               </span>
               {(searchQuery || selectedCategory !== "all") && (
                 <button
                   type="button"
                   onClick={handleResetFilters}
-                  className="font-semibold text-brand-600 hover:text-brand-800 hover:underline"
+                  className="inline-flex items-center gap-1 font-semibold text-brand-600 hover:text-brand-800 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded px-1.5 py-0.5"
                 >
-                  Reset all filters
+                  <X className="w-3 h-3" />
+                  <span>Reset all filters</span>
                 </button>
               )}
             </div>
           </div>
 
           {/* Category Tabs */}
-          <div className="pt-2 border-t border-surface-100 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none" role="tablist">
+          <div
+            className="pt-2 border-t border-surface-100 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none"
+            role="tablist"
+            aria-label="Filter utilities by category"
+          >
             {CATEGORY_TABS.map((tab) => {
               const TabIcon = tab.icon;
               const isSelected = selectedCategory === tab.id;
@@ -175,7 +204,7 @@ function ToolsContent() {
 
         {/* Tools Grid or Empty State */}
         {filteredTools.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-16">
             {filteredTools.map((tool) => (
               <ToolCard key={tool.id} tool={tool} showCategoryTag />
             ))}
@@ -184,7 +213,7 @@ function ToolsContent() {
           <div className="my-12">
             <EmptyState
               title="No utilities matched your search"
-              description={`We couldn't find any tools matching "${searchQuery}". Try searching for terms like "passport", "crop", "PAN", "PDF", or "resume".`}
+              description={`We couldn't find any tools matching "${searchQuery}". Try searching for terms like "passport", "crop", "background", "sheet", "Aadhaar", or "resume".`}
               actionLabel="Clear search & reset filters"
               onAction={handleResetFilters}
             />

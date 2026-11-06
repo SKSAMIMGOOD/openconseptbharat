@@ -41,6 +41,7 @@ export async function exportSheetAsImage(
       format,
       quality,
       backgroundColor: "#ffffff",
+      dpi: layout.dpi,
     });
 
     const fileName =
@@ -129,7 +130,7 @@ export async function exportSheetAsPdf(
     });
 
     const pdfBytes = await pdfDoc.save();
-    const pdfBlob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" });
+    const pdfBlob = new Blob([pdfBytes as any], { type: "application/pdf" });
 
     const fileName =
       options.fileName ||

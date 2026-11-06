@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import {
   ShieldCheck,
@@ -13,36 +13,38 @@ import {
   SlidersHorizontal,
   CreditCard,
   FileText,
-  CheckCircle2,
-  Cpu,
-  Layers,
-  Crop,
   Printer,
-  ChevronRight,
+  Grid3x3,
   HardDriveDownload,
   Info,
+  Layers,
+  X,
 } from "lucide-react";
 import { TOOLS, TOOL_CATEGORIES } from "@/constants/tools";
-import { ToolMetadata } from "@/types/tools";
+import { ToolCategory } from "@/types/tools";
 import { CategoryCard } from "@/components/common/CategoryCard";
 import { ToolCard } from "@/components/common/ToolCard";
 import { PrivacyNotice } from "@/components/common/PrivacyNotice";
 import { FileDropzone } from "@/components/common/FileDropzone";
 import { NotificationBanner } from "@/components/common/NotificationBanner";
+import { SearchBar } from "@/components/common/SearchBar";
+import { EmptyState } from "@/components/common/EmptyState";
+import { RecentlyUsedSection } from "@/components/dashboard/RecentlyUsedSection";
 import { useNotification } from "@/hooks/useNotification";
 
-// 5 Featured Tools for Section 4B
-const FEATURED_TOOL_IDS = [
-  "photo-studio",
-  "background-remover",
-  "photo-editor",
-  "pan-card-crop", // Smart Document Crop
-  "resume-maker",
+const CATEGORY_FILTER_TABS: { id: "all" | ToolCategory; label: string; icon: React.ElementType }[] = [
+  { id: "all", label: "All Utilities", icon: Grid3x3 },
+  { id: "photo-studio", label: "Photo Studio", icon: Camera },
+  { id: "image-tools", label: "Image Tools", icon: Scissors },
+  { id: "photo-printing", label: "Photo Printing", icon: Printer },
+  { id: "utilities", label: "Utilities", icon: SlidersHorizontal },
 ];
 
 export default function HomePage() {
   const { notifications, notify, removeNotification } = useNotification();
   const [activeMockupTab, setActiveMockupTab] = useState<"passport" | "card" | "resume">("passport");
+  const [selectedCategory, setSelectedCategory] = useState<"all" | ToolCategory>("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const handleDemoFileSelect = (file: File) => {
     notify({
@@ -53,87 +55,59 @@ export default function HomePage() {
     });
   };
 
-  // Get the 5 featured tools
-  const featuredTools: {
-    id: string;
-    name: string;
-    shortDescription: string;
-    route: string;
-    icon: React.ElementType;
-    badge: string;
-    features: string[];
-    accentColor: string;
-    iconBg: string;
-    iconColor: string;
-  }[] = [
-    {
-      id: "photo-studio",
-      name: "Professional Photo Studio",
-      shortDescription: "Generate standard Indian passport, visa, and stamp-size photos with customizable backdrops.",
-      route: "/tools/photo-studio",
-      icon: Camera,
-      badge: "Passport & Visa",
-      features: ["Indian Passport (35×45 mm)", "US & Schengen Visa presets", "300 DPI resolution", "Name & Date imprint"],
-      accentColor: "hover:border-blue-300",
-      iconBg: "bg-blue-50",
-      iconColor: "text-blue-600",
-    },
-    {
-      id: "background-remover",
-      name: "Background Remover",
-      shortDescription: "Automatically remove image backgrounds using in-browser neural networks with zero server uploads.",
-      route: "/tools/background-remover",
-      icon: Scissors,
-      badge: "Local AI",
-      features: ["100% on-device AI model", "Fine edge alpha matting", "Transparent PNG export", "Zero cloud latency"],
-      accentColor: "hover:border-violet-300",
-      iconBg: "bg-violet-50",
-      iconColor: "text-violet-600",
-    },
-    {
-      id: "photo-editor",
-      name: "Advanced Photo Editor",
-      shortDescription: "Crop, rotate, adjust tone, and compress photos to exact target file sizes in browser memory.",
-      route: "/tools/photo-editor",
-      icon: SlidersHorizontal,
-      badge: "Canvas Editor",
-      features: ["Non-destructive curves", "Aspect ratio presets", "Target KB compressor (<50KB)", "Instant browser export"],
-      accentColor: "hover:border-teal-300",
-      iconBg: "bg-teal-50",
-      iconColor: "text-teal-600",
-    },
-    {
-      id: "smart-document-crop",
-      name: "Smart Document Crop",
-      shortDescription: "Extract front and back PAN, Aadhaar, and Ration cards to standard ISO/IEC 7810 ID-1 wallet size.",
-      route: "/tools/pan-card-crop",
-      icon: CreditCard,
-      badge: "ID-1 Standard",
-      features: ["PAN & Aadhaar calibration", "Dual-side front & back", "High-contrast text boost", "Print-ready A4 sheet"],
-      accentColor: "hover:border-emerald-300",
-      iconBg: "bg-emerald-50",
-      iconColor: "text-emerald-600",
-    },
-    {
-      id: "resume-maker",
-      name: "Resume / CV Maker",
-      shortDescription: "Craft clean, modern ATS-friendly resumes with instant browser vector PDF rendering.",
-      route: "/tools/resume-maker",
-      icon: FileText,
-      badge: "ATS-Ready",
-      features: ["Structured form builder", "Live side-by-side preview", "Direct vector PDF export", "Zero employment profiling"],
-      accentColor: "hover:border-indigo-300",
-      iconBg: "bg-indigo-50",
-      iconColor: "text-indigo-600",
-    },
-  ];
+  // Filter tools based on search query and selected category
+  const filteredTools = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    return TOOLS.filter((tool) => {
+      // Category filter
+      let matchesCategory = true;
+      if (selectedCategory !== "all") {
+        matchesCategory =
+          tool.category === selectedCategory ||
+          (tool.categories && tool.categories.includes(selectedCategory));
+      }
+
+      // Search matching
+      let matchesSearch = true;
+      if (query) {
+        const inName = tool.name.toLowerCase().includes(query);
+        const inShortDesc = tool.shortDescription.toLowerCase().includes(query);
+        const inDesc = tool.description.toLowerCase().includes(query);
+        const inFeatures = tool.features.some((f) => f.toLowerCase().includes(query));
+        const inBadge = tool.badge?.toLowerCase().includes(query) || false;
+        const inId = tool.id.toLowerCase().includes(query);
+        matchesSearch = inName || inShortDesc || inDesc || inFeatures || inBadge || inId;
+      }
+
+      return matchesCategory && matchesSearch;
+    });
+  }, [searchQuery, selectedCategory]);
+
+  // Compute tool counts per category tab
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: TOOLS.length };
+    CATEGORY_FILTER_TABS.forEach((tab) => {
+      if (tab.id === "all") return;
+      const catId = tab.id as ToolCategory;
+      counts[catId] = TOOLS.filter(
+        (t) => t.category === catId || (t.categories && t.categories.includes(catId))
+      ).length;
+    });
+    return counts;
+  }, []);
+
+  const handleResetFilters = () => {
+    setSearchQuery("");
+    setSelectedCategory("all");
+  };
 
   return (
     <div className="flex-1 flex flex-col">
       <NotificationBanner notifications={notifications} onDismiss={removeNotification} />
 
-      {/* 4A. HERO SECTION */}
-      <section className="relative overflow-hidden bg-white border-b border-surface-200/80 pt-16 pb-20 lg:pt-20 lg:pb-24">
+      {/* 1. HERO SECTION */}
+      <section className="relative overflow-hidden bg-white border-b border-surface-200/80 pt-14 pb-16 lg:pt-18 lg:pb-20">
         {/* Subtle grid pattern */}
         <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:24px_24px] opacity-60 pointer-events-none" />
 
@@ -145,28 +119,28 @@ export default function HomePage() {
               <span>Zero-Upload Guarantee • 100% In-Browser Execution</span>
             </div>
 
-            {/* Suggested Headline */}
+            {/* Headline */}
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-surface-900 tracking-tight leading-[1.15]">
               Everything You Need to{" "}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 via-indigo-600 to-teal-600">
-                Edit, Crop & Create.
+                Edit, Crop & Print.
               </span>
             </h1>
 
-            {/* Suggested Subtitle */}
+            {/* Subtitle */}
             <p className="mt-5 text-base sm:text-lg text-surface-600 leading-relaxed max-w-2xl mx-auto">
-              Professional photo, document and printing tools. Process everything directly in your browser.
+              Professional browser-native tools for photo editing, passport photos, government ID card crops, and photo printing. Zero server uploads, zero data tracking.
             </p>
 
             {/* Actions: Primary Explore Tools & Secondary Privacy Information */}
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3.5">
-              <Link
-                href="/tools"
+              <a
+                href="#dashboard-tools"
                 className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 rounded-xl text-sm font-semibold bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800 transition-all shadow-sm hover:shadow gap-2 group"
               >
                 <span>Explore Tools</span>
                 <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
-              </Link>
+              </a>
 
               <Link
                 href="/privacy"
@@ -196,13 +170,13 @@ export default function HomePage() {
               <span className="text-surface-300 hidden sm:inline">•</span>
               <div className="flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-                <span>8 Modular Tools</span>
+                <span>8 In-Browser Utilities</span>
               </div>
             </div>
           </div>
 
-          {/* Visual Illustration of the Utility Platform (4A) */}
-          <div className="mt-14 max-w-4xl mx-auto">
+          {/* Visual Illustration Mockup */}
+          <div className="mt-12 max-w-4xl mx-auto">
             <div className="bg-white rounded-2xl sm:rounded-3xl border border-surface-200 shadow-float overflow-hidden">
               {/* Window Header */}
               <div className="bg-surface-100/90 border-b border-surface-200 px-4 py-3 flex items-center justify-between">
@@ -277,7 +251,6 @@ export default function HomePage() {
 
                     <div className="md:col-span-5 flex justify-center">
                       <div className="relative w-44 h-56 bg-white rounded-2xl border-2 border-brand-500 shadow-card p-3 flex flex-col items-center justify-between">
-                        {/* Overlay guidelines */}
                         <div className="absolute inset-x-4 top-10 border-b border-dashed border-brand-400 text-[10px] text-brand-600 font-mono text-center">
                           Crown Guide
                         </div>
@@ -304,45 +277,37 @@ export default function HomePage() {
                         <span>ISO/IEC 7810 ID-1 Standard (85.6 × 53.98 mm)</span>
                       </div>
                       <h3 className="text-xl font-bold text-surface-900">
-                        Government Identity Card Dual-Side Crop Pipeline
+                        Standard Wallet Card Proportions & High-Contrast Text
                       </h3>
                       <p className="text-xs text-surface-600 leading-relaxed">
-                        Crop front and back sections of PAN, Aadhaar, and Ration Card documents with calibrated aspect locking, dot-matrix text enhancement, and printable PVC sheet layout.
+                        Extract front and back segments of PAN, Aadhaar, and Ration card documents into standard physical card dimensions ready for PVC card printers and lamination sheets.
                       </p>
                       <div className="flex flex-wrap gap-2 text-xs">
                         <span className="px-2.5 py-1 rounded-lg bg-white border border-surface-200 font-medium text-surface-700">
-                          ✓ NSDL / UTIITSL PAN PDFs
+                          ✓ Dual-Side Front & Back Alignment
                         </span>
                         <span className="px-2.5 py-1 rounded-lg bg-white border border-surface-200 font-medium text-surface-700">
-                          ✓ In-Browser e-Aadhaar Unlock
+                          ✓ Greyscale & Text Sharpening
                         </span>
                         <span className="px-2.5 py-1 rounded-lg bg-white border border-surface-200 font-medium text-surface-700">
-                          ✓ 1:1 Scale Print Calibrated
+                          ✓ Direct Printable A4 PDF Output
                         </span>
                       </div>
                     </div>
 
                     <div className="md:col-span-5 flex justify-center">
-                      <div className="w-56 h-36 bg-white rounded-xl border-2 border-teal-500 shadow-card p-3 flex flex-col justify-between">
-                        <div className="flex items-center justify-between border-b border-surface-100 pb-2">
-                          <span className="text-xs font-bold text-surface-900">ID-1 CARD STANDARD</span>
-                          <span className="text-[10px] font-mono bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded">
-                            1.586 : 1
-                          </span>
+                      <div className="w-56 h-36 bg-gradient-to-br from-emerald-600 to-teal-700 rounded-xl p-3 text-white shadow-card flex flex-col justify-between">
+                        <div className="flex items-center justify-between">
+                          <div className="w-6 h-5 rounded bg-amber-400/80" />
+                          <span className="text-[10px] font-mono tracking-widest uppercase">ID-1 WALLET</span>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-14 rounded bg-surface-200/80 flex items-center justify-center shrink-0">
-                            <CreditCard className="w-6 h-6 text-surface-400" />
-                          </div>
-                          <div className="space-y-1.5 w-full">
-                            <div className="h-2 w-full bg-surface-200 rounded" />
-                            <div className="h-2 w-3/4 bg-surface-200 rounded" />
-                            <div className="h-2 w-1/2 bg-surface-200 rounded" />
-                          </div>
+                        <div className="space-y-1">
+                          <div className="w-24 h-2 bg-white/40 rounded" />
+                          <div className="w-36 h-2 bg-white/30 rounded" />
                         </div>
-                        <div className="flex items-center justify-between text-[10px] text-surface-500 font-mono pt-1">
-                          <span>85.6 mm</span>
-                          <span className="text-emerald-600 font-semibold">0 Server Uploads</span>
+                        <div className="flex items-center justify-between text-[10px] font-mono text-teal-100">
+                          <span>85.6 × 53.98 mm</span>
+                          <span>300 DPI</span>
                         </div>
                       </div>
                     </div>
@@ -352,43 +317,43 @@ export default function HomePage() {
                 {activeMockupTab === "resume" && (
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
                     <div className="md:col-span-7 space-y-4">
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-200">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
                         <FileText className="w-3.5 h-3.5" />
-                        <span>ATS-Friendly Vector Document Builder</span>
+                        <span>ATS-Friendly Vector PDF Engine</span>
                       </div>
                       <h3 className="text-xl font-bold text-surface-900">
-                        Clean ATS Resume Maker with Vector PDF Synthesis
+                        Professional Structure With Zero Employment Profiling
                       </h3>
                       <p className="text-xs text-surface-600 leading-relaxed">
-                        Design professional, recruiter-ready resumes without signing up or exposing your sensitive employment records to cloud job boards.
+                        Design clean, modern curriculum vitae with live side-by-side rendering and vector PDF export. Personal information never touches any analytics or recruitment database.
                       </p>
                       <div className="flex flex-wrap gap-2 text-xs">
                         <span className="px-2.5 py-1 rounded-lg bg-white border border-surface-200 font-medium text-surface-700">
-                          ✓ Pure Vector PDF Output
+                          ✓ Machine-Readable ATS Layouts
                         </span>
                         <span className="px-2.5 py-1 rounded-lg bg-white border border-surface-200 font-medium text-surface-700">
-                          ✓ Selectable Text & ATS Scores
+                          ✓ Direct pdf-lib Vector Export
                         </span>
                         <span className="px-2.5 py-1 rounded-lg bg-white border border-surface-200 font-medium text-surface-700">
-                          ✓ Zero Account Requirement
+                          ✓ 100% In-Browser Privacy
                         </span>
                       </div>
                     </div>
 
                     <div className="md:col-span-5 flex justify-center">
-                      <div className="w-48 h-56 bg-white rounded-xl border-2 border-violet-500 shadow-card p-4 flex flex-col justify-between">
-                        <div className="space-y-2">
-                          <div className="h-3 w-3/4 bg-surface-300 rounded" />
-                          <div className="h-2 w-1/2 bg-surface-200 rounded" />
-                          <div className="pt-2 space-y-1.5">
-                            <div className="h-1.5 w-full bg-surface-200 rounded" />
-                            <div className="h-1.5 w-5/6 bg-surface-200 rounded" />
-                            <div className="h-1.5 w-4/6 bg-surface-200 rounded" />
-                          </div>
+                      <div className="w-40 h-52 bg-white rounded-xl border border-surface-300 shadow-card p-3 flex flex-col gap-2">
+                        <div className="w-16 h-2 bg-indigo-600 rounded" />
+                        <div className="w-24 h-1.5 bg-surface-300 rounded" />
+                        <div className="w-full border-t border-surface-200 my-1" />
+                        <div className="space-y-1.5">
+                          <div className="w-12 h-1.5 bg-surface-400 rounded" />
+                          <div className="w-full h-1 bg-surface-200 rounded" />
+                          <div className="w-5/6 h-1 bg-surface-200 rounded" />
                         </div>
-                        <div className="border-t border-surface-100 pt-2 flex items-center justify-between text-[10px] text-surface-500 font-mono">
-                          <span>pdf-lib Vector</span>
-                          <span className="text-emerald-600 font-semibold">Client-Only</span>
+                        <div className="space-y-1.5 mt-1">
+                          <div className="w-14 h-1.5 bg-surface-400 rounded" />
+                          <div className="w-full h-1 bg-surface-200 rounded" />
+                          <div className="w-4/5 h-1 bg-surface-200 rounded" />
                         </div>
                       </div>
                     </div>
@@ -400,19 +365,23 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 4B. FEATURED TOOLS SECTION */}
-      <section className="py-16 sm:py-20 bg-surface-50 border-b border-surface-200/80" id="featured-tools">
+      {/* 2. CENTRAL DASHBOARD SECTION */}
+      <section className="py-14 sm:py-18 bg-surface-50 border-b border-surface-200/80" id="dashboard-tools">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10">
+          {/* Recently Used Section (hydrated from localStorage) */}
+          <RecentlyUsedSection />
+
+          {/* Section Header */}
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
             <div>
               <span className="text-xs font-bold uppercase tracking-wider text-brand-600 block mb-1">
-                Essential Studio Utilities
+                Central Tool Registry
               </span>
               <h2 className="text-2xl sm:text-3xl font-extrabold text-surface-900 tracking-tight">
-                Featured Tools
+                All Browser Utilities
               </h2>
               <p className="text-xs sm:text-sm text-surface-600 mt-1 max-w-2xl">
-                The most popular client-side photo, document, and printing workflows built for precision and privacy.
+                Explore our full suite of privacy-first photo, document, and printing workflows. Every tool runs 100% in your browser.
               </p>
             </div>
 
@@ -420,64 +389,104 @@ export default function HomePage() {
               href="/tools"
               className="inline-flex items-center text-xs font-semibold text-brand-600 hover:text-brand-800 transition-colors gap-1.5 shrink-0"
             >
-              <span>View all 8 utilities</span>
+              <span>View dedicated catalog</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
-          {/* 5 Featured Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {featuredTools.map((tool) => {
-              const Icon = tool.icon;
-              return (
-                <Link
-                  key={tool.id}
-                  href={tool.route}
-                  className={`group relative flex flex-col justify-between bg-white rounded-2xl border border-surface-200/90 p-6 shadow-subtle hover:shadow-float hover:-translate-y-1 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand-500 ${tool.accentColor}`}
-                >
-                  <div>
-                    <div className="flex items-start justify-between gap-2 mb-4">
-                      <div
-                        className={`w-12 h-12 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105 border border-surface-200/60 ${tool.iconBg} ${tool.iconColor}`}
-                      >
-                        <Icon className="w-6 h-6" />
-                      </div>
-                      <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200">
-                        {tool.badge}
-                      </span>
-                    </div>
+          {/* Search & Category Filter Toolbar */}
+          <div className="bg-white rounded-2xl border border-surface-200 p-4 sm:p-5 shadow-subtle mb-8 space-y-4">
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+              {/* Search Bar Input */}
+              <div className="w-full md:max-w-md">
+                <SearchBar
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  onClear={() => setSearchQuery("")}
+                  placeholder="Search tools by name, description, features, or keyword..."
+                />
+              </div>
 
-                    <h3 className="text-base font-bold text-surface-900 group-hover:text-brand-600 transition-colors">
-                      {tool.name}
-                    </h3>
-                    <p className="text-xs text-surface-600 mt-2 line-clamp-2 leading-relaxed">
-                      {tool.shortDescription}
-                    </p>
+              {/* Status Counter & Reset Action */}
+              <div className="flex items-center justify-between md:justify-end gap-3 text-xs text-surface-500">
+                <span>
+                  Showing <strong className="text-surface-900 font-bold">{filteredTools.length}</strong> of{" "}
+                  <strong className="text-surface-900">{TOOLS.length}</strong> utilities
+                </span>
+                {(searchQuery || selectedCategory !== "all") && (
+                  <button
+                    type="button"
+                    onClick={handleResetFilters}
+                    className="inline-flex items-center gap-1 font-semibold text-brand-600 hover:text-brand-800 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded px-1.5 py-0.5"
+                  >
+                    <X className="w-3 h-3" />
+                    <span>Reset filters</span>
+                  </button>
+                )}
+              </div>
+            </div>
 
-                    <div className="mt-4 pt-3 border-t border-surface-100 flex flex-wrap gap-1.5">
-                      {tool.features.slice(0, 2).map((feat, idx) => (
-                        <span
-                          key={idx}
-                          className="text-[11px] text-surface-600 bg-surface-50 px-2 py-0.5 rounded-md border border-surface-200/60 truncate max-w-full"
-                        >
-                          • {feat}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+            {/* Category Filter Tabs */}
+            <div
+              className="pt-2 border-t border-surface-100 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none"
+              role="tablist"
+              aria-label="Filter utilities by category"
+            >
+              {CATEGORY_FILTER_TABS.map((tab) => {
+                const TabIcon = tab.icon;
+                const isSelected = selectedCategory === tab.id;
+                const count = categoryCounts[tab.id] ?? 0;
 
-                  <div className="mt-6 pt-2 flex items-center justify-between text-xs font-semibold text-brand-600 group-hover:text-brand-700">
-                    <span>Open Tool</span>
-                    <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </Link>
-              );
-            })}
+                return (
+                  <button
+                    key={tab.id}
+                    role="tab"
+                    aria-selected={isSelected}
+                    onClick={() => setSelectedCategory(tab.id)}
+                    className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${
+                      isSelected
+                        ? "bg-brand-600 text-white shadow-sm"
+                        : "bg-surface-50 text-surface-700 hover:bg-surface-100 border border-surface-200/80"
+                    }`}
+                  >
+                    <TabIcon className={`w-3.5 h-3.5 ${isSelected ? "text-white" : "text-surface-500"}`} />
+                    <span>{tab.label}</span>
+                    <span
+                      className={`ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                        isSelected
+                          ? "bg-brand-700 text-white"
+                          : "bg-surface-200 text-surface-600"
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
+
+          {/* Tools Grid or Empty State */}
+          {filteredTools.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredTools.map((tool) => (
+                <ToolCard key={tool.id} tool={tool} showCategoryTag />
+              ))}
+            </div>
+          ) : (
+            <div className="my-10">
+              <EmptyState
+                title="No utilities matched your search"
+                description={`We couldn't find any tools matching "${searchQuery}". Try searching for "passport", "background", "crop", "sheet", "Aadhaar", or "resume".`}
+                actionLabel="Clear search & reset filters"
+                onAction={handleResetFilters}
+              />
+            </div>
+          )}
         </div>
       </section>
 
-      {/* 4C. CATEGORIES SECTION */}
+      {/* 3. CATEGORIES SECTION */}
       <section className="py-16 sm:py-20 bg-white border-b border-surface-200/80" id="categories">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-12">
@@ -488,7 +497,7 @@ export default function HomePage() {
               Explore by Tool Category
             </h2>
             <p className="text-xs sm:text-sm text-surface-600 mt-2">
-              Select a specialized category to find tailored utilities for photo editing, government document card cropping, PDF workflows, or resume drafting.
+              Select a specialized category to find tailored utilities for biometric photos, local AI image enhancements, multi-copy print sheets, or government card cropping.
             </p>
           </div>
 
@@ -500,7 +509,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Interactive Dropzone Verification Showcase (Zero-Upload Demonstration) */}
+      {/* 4. ZERO-UPLOAD INGESTION DEMONSTRATION */}
       <section className="py-16 bg-surface-50 border-b border-surface-200/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-white rounded-3xl border border-surface-200/90 p-8 sm:p-12 shadow-subtle">
@@ -526,7 +535,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 4D. PRIVACY SECTION */}
+      {/* 5. PRIVACY SECTION */}
       <section className="py-16 sm:py-20 bg-white" id="privacy-section">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-12">

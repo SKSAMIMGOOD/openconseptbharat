@@ -1,9 +1,12 @@
-import React from "react";
+"use client";
+
+import React, { useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft, ShieldCheck, Sparkles, Lock, Cpu } from "lucide-react";
 import { Badge } from "@/components/common/Badge";
 import { Breadcrumb } from "@/components/common/Breadcrumb";
 import { ToolMetadata } from "@/types/tools";
+import { recordToolUsage } from "@/lib/utils/recent-tools";
 
 export interface ModuleLayoutProps {
   tool: ToolMetadata;
@@ -11,6 +14,13 @@ export interface ModuleLayoutProps {
 }
 
 export const ModuleLayout: React.FC<ModuleLayoutProps> = ({ tool, children }) => {
+  // Automatically record this tool in recent tools
+  useEffect(() => {
+    if (tool && tool.id) {
+      recordToolUsage(tool.id);
+    }
+  }, [tool]);
+
   return (
     <div className="min-h-[calc(100vh-4rem)] flex flex-col bg-surface-50">
       {/* Module Sub-Header & Breadcrumb Bar */}
@@ -20,16 +30,17 @@ export const ModuleLayout: React.FC<ModuleLayoutProps> = ({ tool, children }) =>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-3">
               <Link
-                href="/tools"
+                href="/"
                 className="inline-flex items-center text-xs font-semibold text-surface-500 hover:text-brand-600 transition-colors gap-1.5 p-1 rounded-lg hover:bg-surface-100"
-                title="Return to tool index"
+                title="Return to Dashboard"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
-                <span>All Tools</span>
+                <span>Dashboard</span>
               </Link>
               <span className="text-surface-300">|</span>
               <Breadcrumb
                 items={[
+                  { label: "Dashboard", href: "/" },
                   { label: "All Tools", href: "/tools" },
                   { label: tool.name },
                 ]}

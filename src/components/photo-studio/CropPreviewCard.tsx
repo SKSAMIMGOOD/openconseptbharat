@@ -26,8 +26,9 @@ import {
   assessResolutionQuality,
   getFriendlyAspectRatioName,
 } from "@/lib/photo-studio/dpi-calculator";
-import { exportCanvasToBlob } from "@/lib/image/exporter";
-import { createTrackedObjectURL, revokeObjectUrlSafely } from "@/lib/utils/memory";
+import { exportCanvasToBlob, downloadImageBlob } from "@/lib/image/exporter";
+import { releaseCanvasBuffer } from "@/lib/utils/memory";
+import { usePreferences } from "@/hooks/usePreferences";
 
 export interface CropPreviewCardProps {
   imageElement: HTMLImageElement | ImageBitmap | null;
@@ -55,10 +56,28 @@ export const CropPreviewCard: React.FC<CropPreviewCardProps> = ({
   className,
 }) => {
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
+  const { settings: userPreferences } = usePreferences();
+  const hasUserChangedExportRef = useRef(false);
   const [renderError, setRenderError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [exportFeedback, setExportFeedback] = useState<string | null>(null);
-  const [exportFormat, setExportFormat] = useState<"image/png" | "image/jpeg">("image/png");
+  const [exportFormat, setExportFormat] = useState<"image/png" | "image/jpeg">(
+    userPreferences.defaultExportFormat || "image/png"
+  );
+  const [jpegQuality, setJpegQuality] = useState<number>(
+    userPreferences.defaultJpegQuality || 0.95
+  );
+
+  useEffect(() => {
+    if (!hasUserChangedExportRef.current) {
+      if (userPreferences.defaultExportFormat) {
+        setExportFormat(userPreferences.defaultExportFormat);
+      }
+      if (userPreferences.defaultJpegQuality) {
+        setJpegQuality(userPreferences.defaultJpegQuality);
+      }
+    }
+  }, [userPreferences.defaultExportFormat, userPreferences.defaultJpegQuality]);
 
   // Physical dimensions in mm
   const targetWidthMm = unitToMm(preset.width, preset.unit);
@@ -129,56 +148,74 @@ export const CropPreviewCard: React.FC<CropPreviewCardProps> = ({
     }
   }, [imageElement, crop, backgroundColor]);
 
-  // Export cropped photo at exact calculated pixel dimensions
+  // Export cropped photo at exact calculated pixel dimensions with embedded DPI metadata
   const handleExportCroppedPhoto = useCallback(async () => {
-    if (!imageElement || !targetCalculation.isValid) return;
+    if (!imageElement || !targetCalculation.isValid || isExporting) return;
 
     setIsExporting(true);
     setExportFeedback(null);
+    let exportCanvas: any = null;
+
     try {
       const outW = targetCalculation.widthPx;
       const outH = targetCalculation.heightPx;
 
+      // Preserving transparency: for PNG, if backgroundColor is "transparent", do not paint background.
+      // For JPEG, since alpha is unsupported, flatten with white if transparent.
+      const isJpeg = exportFormat === "image/jpeg";
+      const effectiveBgColor = isJpeg
+        ? backgroundColor !== "transparent"
+          ? backgroundColor
+          : "#ffffff"
+        : backgroundColor;
+
       // Render at exact target pixel dimensions without stretching or distortion
-      const exportCanvas = renderCropCanvas(
+      exportCanvas = renderCropCanvas(
         imageElement,
         crop,
         outW,
         outH,
-        backgroundColor
+        effectiveBgColor
       );
 
       const blob = await exportCanvasToBlob(exportCanvas, {
         format: exportFormat,
-        quality: 0.95,
-        backgroundColor: backgroundColor !== "transparent" ? backgroundColor : "#ffffff",
+        quality: isJpeg ? jpegQuality : 1.0,
+        backgroundColor: effectiveBgColor,
+        dpi,
       });
 
       const cleanUnit = preset.unit === "inch" ? "in" : preset.unit;
-      const fileName = `photo-${preset.width}${cleanUnit}x${preset.height}${cleanUnit}-${dpi}dpi-${outW}x${outH}px${
-        exportFormat === "image/png" ? ".png" : ".jpg"
-      }`;
+      const cleanPresetName = (preset.id || "photo").toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+      const ext = exportFormat === "image/png" ? ".png" : ".jpg";
+      const fileName = `photo-${cleanPresetName}-${preset.width}${cleanUnit}x${preset.height}${cleanUnit}-${dpi}dpi-${outW}x${outH}px${ext}`;
 
-      const blobUrl = createTrackedObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      downloadImageBlob(blob, fileName);
 
-      setTimeout(() => {
-        revokeObjectUrlSafely(blobUrl);
-      }, 1500);
-
-      setExportFeedback(`Exported: ${outW} × ${outH} px @ ${dpi} DPI`);
-      setTimeout(() => setExportFeedback(null), 4000);
+      const metaType = exportFormat === "image/png" ? "PNG pHYs" : "JFIF APP0";
+      setExportFeedback(
+        `Downloaded ${outW} × ${outH} px @ ${dpi} DPI (${metaType} metadata embedded)`
+      );
+      setTimeout(() => setExportFeedback(null), 5000);
     } catch (err) {
       setRenderError(err instanceof Error ? err.message : "Export failed.");
     } finally {
+      if (exportCanvas && exportCanvas instanceof HTMLCanvasElement) {
+        releaseCanvasBuffer(exportCanvas);
+      }
       setIsExporting(false);
     }
-  }, [imageElement, targetCalculation, crop, backgroundColor, preset, dpi, exportFormat]);
+  }, [
+    imageElement,
+    targetCalculation,
+    crop,
+    backgroundColor,
+    preset,
+    dpi,
+    exportFormat,
+    jpegQuality,
+    isExporting,
+  ]);
 
   const activeAspectRatio = crop.width / Math.max(1, crop.height);
   const friendlyRatio = getFriendlyAspectRatioName(activeAspectRatio);
@@ -348,7 +385,10 @@ export const CropPreviewCard: React.FC<CropPreviewCardProps> = ({
             <div className="flex-1 flex items-center p-1 bg-surface-100 rounded-xl border border-surface-200 text-xs">
               <button
                 type="button"
-                onClick={() => setExportFormat("image/png")}
+                onClick={() => {
+                  hasUserChangedExportRef.current = true;
+                  setExportFormat("image/png");
+                }}
                 className={cn(
                   "flex-1 py-1 px-2 rounded-lg font-semibold transition-all text-center",
                   exportFormat === "image/png"
@@ -360,7 +400,10 @@ export const CropPreviewCard: React.FC<CropPreviewCardProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => setExportFormat("image/jpeg")}
+                onClick={() => {
+                  hasUserChangedExportRef.current = true;
+                  setExportFormat("image/jpeg");
+                }}
                 className={cn(
                   "flex-1 py-1 px-2 rounded-lg font-semibold transition-all text-center",
                   exportFormat === "image/jpeg"
@@ -388,6 +431,38 @@ export const CropPreviewCard: React.FC<CropPreviewCardProps> = ({
                 Download Photo ({targetCalculation.widthPx} × {targetCalculation.heightPx} px)
               </span>
             </button>
+          </div>
+
+          {/* Configurable JPEG Quality Slider when JPEG format is active */}
+          {exportFormat === "image/jpeg" && (
+            <div className="bg-surface-50 p-3 rounded-xl border border-surface-200 space-y-1.5 animate-in fade-in">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-surface-700">JPEG Compression Quality:</span>
+                <span className="font-mono font-bold text-brand-700">
+                  {Math.round(jpegQuality * 100)}% ({jpegQuality >= 0.9 ? "High Quality" : "Standard"})
+                </span>
+              </div>
+              <input
+                type="range"
+                min={0.7}
+                max={1.0}
+                step={0.01}
+                value={jpegQuality}
+                onChange={(e) => {
+                  hasUserChangedExportRef.current = true;
+                  setJpegQuality(parseFloat(e.target.value));
+                }}
+                className="w-full accent-brand-600 cursor-pointer"
+              />
+            </div>
+          )}
+
+          {/* Embedded DPI indicator */}
+          <div className="text-[11px] font-mono text-surface-500 flex items-center justify-between px-1">
+            <span>DPI Output: {dpi} DPI</span>
+            <span className="text-emerald-700 font-semibold">
+              ✓ Embedded {exportFormat === "image/png" ? "PNG pHYs" : "JFIF APP0"} Metadata
+            </span>
           </div>
 
           {exportFeedback && (

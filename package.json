@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node --experimental-strip-types --test tests/image-engine.test.mjs tests/photo-studio.test.mjs tests/dpi-calculator.test.mjs tests/crop-editor.test.mjs tests/photo-sheet.test.mjs tests/a4-photo-sheet.test.mjs tests/multiple-photo-maker.test.mjs tests/background-remover.test.mjs tests/custom-dimensions.test.mjs"
+    "test": "node --experimental-strip-types --test tests/image-engine.test.mjs tests/photo-studio.test.mjs tests/dpi-calculator.test.mjs tests/crop-editor.test.mjs tests/photo-sheet.test.mjs tests/a4-photo-sheet.test.mjs tests/multiple-photo-maker.test.mjs tests/background-remover.test.mjs tests/custom-dimensions.test.mjs tests/export-and-print.test.mjs tests/phase-03i-qa-integration.test.mjs tests/dashboard-integration.test.mjs tests/settings-and-preferences.test.mjs tests/document-studio.test.mjs tests/document-studio-crop.test.mjs tests/document-specific-detection.test.mjs tests/manual-cropping-workflow.test.mjs tests/document-enhancement.test.mjs tests/document-dimensions.test.mjs"
   },
   "dependencies": {
     "clsx": "^2.1.1",

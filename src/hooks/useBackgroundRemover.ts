@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import {
   BackgroundColorOption,
   BeforeAfterViewMode,
+  ExecutionProvider,
   ExportFormat,
   InferenceProgress,
   ModelDefinition,
@@ -32,6 +33,9 @@ import { validateImageFile } from "@/lib/image/validator";
 import { decodeImage } from "@/lib/image/decoder";
 import { createTrackedObjectURL, revokeObjectUrlSafely, releaseCanvasBuffer } from "@/lib/utils/memory";
 import { stageImageForTransfer } from "@/lib/utils/image-transfer";
+import { attachDpiMetadata } from "@/lib/image/dpi-metadata";
+import { downloadImageBlob } from "@/lib/image/exporter";
+import { usePreferences } from "@/hooks/usePreferences";
 import * as ort from "onnxruntime-web";
 
 export interface UseBackgroundRemoverReturn {
@@ -114,14 +118,66 @@ export function useBackgroundRemover(): UseBackgroundRemoverReturn {
   const [segmentationResult, setSegmentationResult] = useState<SegmentationResult | null>(null);
 
   // 4. Background & Preview state
-  const [selectedBackground, setSelectedBackground] = useState<BackgroundColorOption>(DEFAULT_BACKGROUND_COLOR);
-  const [customColorHex, setCustomColorHex] = useState<string>("#6366F1");
+  const { settings: userPreferences } = usePreferences();
+  const hasUserModifiedBgRef = useRef(false);
+  const hasUserModifiedViewModeRef = useRef(false);
+
+  const [selectedBackground, setSelectedBackground] = useState<BackgroundColorOption>(() => {
+    if (userPreferences.defaultBackgroundColor) {
+      const match = BACKGROUND_COLOR_PRESETS.find(
+        (b) => b.value.toLowerCase() === userPreferences.defaultBackgroundColor.toLowerCase()
+      );
+      if (match) return match;
+      if (userPreferences.defaultBackgroundColor !== "transparent") {
+        return {
+          id: "custom",
+          name: "Custom Color",
+          value: userPreferences.defaultBackgroundColor,
+          description: "Configured default color",
+        };
+      }
+    }
+    return DEFAULT_BACKGROUND_COLOR;
+  });
+  const [customColorHex, setCustomColorHex] = useState<string>(
+    userPreferences.defaultBackgroundColor && userPreferences.defaultBackgroundColor !== "transparent"
+      ? userPreferences.defaultBackgroundColor
+      : "#6366F1"
+  );
   const [compositeCanvas, setCompositeCanvas] = useState<HTMLCanvasElement | null>(null);
-  const [viewMode, setViewMode] = useState<BeforeAfterViewMode>("split_slider");
+  const [viewMode, setViewMode] = useState<BeforeAfterViewMode>(
+    userPreferences.defaultPreviewMode || "split_slider"
+  );
   const [sliderPosition, setSliderPosition] = useState<number>(50);
   const [zoom, setZoom] = useState<number>(1.0);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [error, setError] = useState<string | null>(null);
+
+  // Synchronize with user preferences when no file is loaded
+  useEffect(() => {
+    if (!originalFile && !hasUserModifiedBgRef.current && userPreferences.defaultBackgroundColor) {
+      const match = BACKGROUND_COLOR_PRESETS.find(
+        (b) => b.value.toLowerCase() === userPreferences.defaultBackgroundColor.toLowerCase()
+      );
+      if (match) {
+        setSelectedBackground(match);
+      } else if (userPreferences.defaultBackgroundColor !== "transparent") {
+        setSelectedBackground({
+          id: "custom",
+          name: "Custom Color",
+          value: userPreferences.defaultBackgroundColor,
+          description: "Configured default color",
+        });
+        setCustomColorHex(userPreferences.defaultBackgroundColor);
+      }
+    }
+  }, [userPreferences.defaultBackgroundColor, originalFile]);
+
+  useEffect(() => {
+    if (!originalFile && !hasUserModifiedViewModeRef.current && userPreferences.defaultPreviewMode) {
+      setViewMode(userPreferences.defaultPreviewMode);
+    }
+  }, [userPreferences.defaultPreviewMode, originalFile]);
 
   // Persistent refs to track latest resources without triggering unmount cleanups on render
   const originalPreviewUrlRef = useRef<string | null>(null);
@@ -257,6 +313,8 @@ export function useBackgroundRemover(): UseBackgroundRemoverReturn {
 
   // Remove current image
   const removeImage = useCallback(() => {
+    hasUserModifiedBgRef.current = false;
+    hasUserModifiedViewModeRef.current = false;
     if (originalPreviewUrlRef.current) {
       revokeObjectUrlSafely(originalPreviewUrlRef.current);
     }
@@ -328,7 +386,11 @@ export function useBackgroundRemover(): UseBackgroundRemoverReturn {
         source: "Local Disk",
       };
 
-      const { session } = await createSession(buffer);
+      const preferredProvider =
+        userPreferences.performancePreference === "auto"
+          ? undefined
+          : (userPreferences.performancePreference as ExecutionProvider);
+      const { session } = await createSession(buffer, preferredProvider);
       mainSessionRef.current = session;
 
       // Also initialize in worker if supported
@@ -356,7 +418,7 @@ export function useBackgroundRemover(): UseBackgroundRemoverReturn {
         message: msg,
       });
     }
-  }, []);
+  }, [userPreferences.performancePreference]);
 
   // Main Background Removal Trigger
   const processBackgroundRemoval = useCallback(async () => {
@@ -403,7 +465,11 @@ export function useBackgroundRemover(): UseBackgroundRemoverReturn {
           message: "Compiling neural network into WebAssembly/WebGPU...",
         });
 
-        const { session } = await createSession(buffer);
+        const preferredProvider =
+          userPreferences.performancePreference === "auto"
+            ? undefined
+            : (userPreferences.performancePreference as ExecutionProvider);
+        const { session } = await createSession(buffer, preferredProvider);
         mainSessionRef.current = session;
 
         // Try initializing worker
@@ -462,15 +528,22 @@ export function useBackgroundRemover(): UseBackgroundRemoverReturn {
     } finally {
       setIsInferring(false);
     }
-  }, [originalFile, isModelLoaded, selectedModel]);
+  }, [originalFile, isModelLoaded, selectedModel, userPreferences.performancePreference]);
 
   // Background selection
   const selectBackground = useCallback((bg: BackgroundColorOption) => {
+    hasUserModifiedBgRef.current = true;
     setSelectedBackground(bg);
   }, []);
 
   const updateCustomHex = useCallback((hex: string) => {
+    hasUserModifiedBgRef.current = true;
     setCustomColorHex(hex);
+  }, []);
+
+  const handleSetViewMode = useCallback((mode: BeforeAfterViewMode) => {
+    hasUserModifiedViewModeRef.current = true;
+    setViewMode(mode);
   }, []);
 
   // Zoom controls
@@ -493,11 +566,14 @@ export function useBackgroundRemover(): UseBackgroundRemoverReturn {
   }, []);
 
   // Export File (Transparent PNG, PNG with background, JPEG with background)
-  const exportFile = useCallback(async (format: ExportFormat, quality: number = 0.95) => {
+  const exportFile = useCallback(async (format: ExportFormat, quality?: number) => {
     if (!segmentationResult || !originalFile) {
       setError("No processed photo available for export.");
       return;
     }
+
+    const effectiveQuality = quality ?? userPreferences.defaultJpegQuality ?? 0.95;
+    const effectiveDpi = userPreferences.defaultDpi ?? 300;
 
     const baseName = originalFile.name.replace(/\.[^/.]+$/, "");
     let targetCanvas: HTMLCanvasElement;
@@ -537,8 +613,8 @@ export function useBackgroundRemover(): UseBackgroundRemoverReturn {
       exportNameSuffix = selectedBackground.id === "transparent" ? "white-bg" : selectedBackground.id;
     }
 
-    const blob = await new Promise<Blob | null>((res) => {
-      targetCanvas.toBlob((b) => res(b), mimeType, quality);
+    let blob = await new Promise<Blob | null>((res) => {
+      targetCanvas.toBlob((b) => res(b), mimeType, effectiveQuality);
     });
 
     if (!blob) {
@@ -546,19 +622,15 @@ export function useBackgroundRemover(): UseBackgroundRemoverReturn {
       return;
     }
 
+    try {
+      blob = await attachDpiMetadata(blob, mimeType, effectiveDpi);
+    } catch {}
+
     const timestamp = Date.now();
     const downloadFileName = `bg-removed-${baseName}-${exportNameSuffix}-${timestamp}.${extension}`;
 
-    const downloadUrl = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = downloadUrl;
-    link.download = downloadFileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000);
-  }, [segmentationResult, originalFile, selectedBackground, customColorHex]);
+    downloadImageBlob(blob, downloadFileName);
+  }, [segmentationResult, originalFile, selectedBackground, customColorHex, userPreferences]);
 
   // Transfer to Professional Photo Studio in RAM
   const transferToPhotoStudio = useCallback(async (): Promise<boolean> => {
@@ -629,7 +701,7 @@ export function useBackgroundRemover(): UseBackgroundRemoverReturn {
     processBackgroundRemoval,
     selectBackground,
     updateCustomHex,
-    setViewMode,
+    setViewMode: handleSetViewMode,
     setSliderPosition,
     zoomIn,
     zoomOut,

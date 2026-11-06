@@ -1,4 +1,12 @@
-export type ToolCategory = "photo" | "document" | "pdf" | "resume";
+export type ToolCategory =
+  | "photo-studio"
+  | "image-tools"
+  | "photo-printing"
+  | "utilities"
+  | "photo"
+  | "document"
+  | "pdf"
+  | "resume";
 
 export type ToolStatus = "ready" | "in-development" | "planned";
 

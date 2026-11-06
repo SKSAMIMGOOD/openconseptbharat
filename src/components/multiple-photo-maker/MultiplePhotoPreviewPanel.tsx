@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState, useEffect, useCallback } from "react";
+import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import {
   ZoomIn,
   ZoomOut,
@@ -28,12 +28,14 @@ import type {
   MultiplePhotoConfig,
   MultiPhotoArrangementResult,
 } from "@/types/multiple-photo";
-import { renderScaledSheetPreview } from "@/lib/photo-studio/sheet-renderer";
+import { renderScaledSheetPreview, renderMasterSheetCanvas } from "@/lib/photo-studio/sheet-renderer";
 import {
   exportSheetAsPdf,
   exportSheetAsImage,
   downloadSheet,
 } from "@/lib/photo-studio/sheet-exporter";
+import { PrintPreviewModal } from "@/components/photo-studio/sheet/PrintPreviewModal";
+import { releaseCanvasBuffer, revokeObjectUrlSafely } from "@/lib/utils/memory";
 import {
   SHEET_A4_SHORT_EDGE_INCHES,
   SHEET_A4_LONG_EDGE_INCHES,
@@ -74,12 +76,25 @@ export const MultiplePhotoPreviewPanel: React.FC<MultiplePhotoPreviewPanelProps>
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // Export states
+  // Export & Print states
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [exportMessage, setExportMessage] = useState<{
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState<boolean>(false);
+  const [printImageUrl, setPrintImageUrl] = useState<string | null>(null);
+  const printImageUrlRef = useRef<string | null>(null);
+  printImageUrlRef.current = printImageUrl;
+
+  // Clean up print image URL object URLs on unmount
+  useEffect(() => {
+    return () => {
+      if (printImageUrlRef.current && printImageUrlRef.current.startsWith("blob:")) {
+        revokeObjectUrlSafely(printImageUrlRef.current);
+      }
+    };
+  }, []);
 
   // Zoom handlers
   const handleZoomIn = () => setZoom((prev) => Math.min(3.0, Number((prev + 0.25).toFixed(2))));
@@ -270,6 +285,166 @@ export const MultiplePhotoPreviewPanel: React.FC<MultiplePhotoPreviewPanelProps>
       setIsExporting(false);
     }
   };
+
+  // Direct Sheet Print Trigger (Browser Print Dialog with calibrated @page styling)
+  const handlePrintSheet = async () => {
+    if (photos.length === 0 || arrangement.placements.length === 0 || isExporting) {
+      return;
+    }
+
+    setIsExporting(true);
+    setExportMessage(null);
+    let masterCanvas: any = null;
+
+    try {
+      const isTargetA4 = config.paperSize === "a4";
+      const orientation = config.orientation;
+      const isManualCols = typeof config.columnsMode === "number";
+      const manualCols = isManualCols ? Math.min(4, Math.max(1, config.columnsMode as number)) : 4;
+      const flatPhotos = flattenPhotoCopies(photos);
+      const manualRows = Math.max(1, Math.ceil(Math.max(1, flatPhotos.length) / manualCols));
+
+      const paperWidthInches = isTargetA4
+        ? orientation === "landscape"
+          ? SHEET_A4_LONG_EDGE_INCHES
+          : SHEET_A4_SHORT_EDGE_INCHES
+        : orientation === "landscape"
+        ? SHEET_4X6_LONG_EDGE_INCHES
+        : SHEET_4X6_SHORT_EDGE_INCHES;
+      const paperHeightInches = isTargetA4
+        ? orientation === "landscape"
+          ? SHEET_A4_SHORT_EDGE_INCHES
+          : SHEET_A4_LONG_EDGE_INCHES
+        : orientation === "landscape"
+        ? SHEET_4X6_SHORT_EDGE_INCHES
+        : SHEET_4X6_LONG_EDGE_INCHES;
+
+      const printSheetConfig: PhotoSheetConfig = {
+        paperSize: config.paperSize,
+        orientation,
+        paperWidthInches,
+        paperHeightInches,
+        dpi: config.dpi,
+        layoutMode: isManualCols ? "manual" : "auto",
+        manualCols,
+        manualRows,
+        copies: Math.max(1, flatPhotos.length),
+        centerAlignment: false,
+        margins: config.margins,
+        spacing: config.spacing,
+        cutGuides: config.cutGuides,
+      };
+
+      const photoWidthMm = unitToMm(config.dimensions.width, config.dimensions.unit);
+      const photoHeightMm = unitToMm(config.dimensions.height, config.dimensions.unit);
+
+      const targetLayout = calculatePhotoSheetLayout(printSheetConfig, {
+        widthMm: photoWidthMm,
+        heightMm: photoHeightMm,
+      });
+
+      const exportSources = targetLayout.placements.map((p) => {
+        if (p.index < flatPhotos.length) {
+          return flatPhotos[p.index].imageElement || null;
+        }
+        return null;
+      });
+
+      masterCanvas = renderMasterSheetCanvas(
+        exportSources,
+        targetLayout,
+        config.cutGuides,
+        config.cutGuides.includeInExport
+      );
+
+      if (printImageUrlRef.current && printImageUrlRef.current.startsWith("blob:")) {
+        revokeObjectUrlSafely(printImageUrlRef.current);
+      }
+
+      let dataUrl: string;
+      if (masterCanvas instanceof HTMLCanvasElement) {
+        dataUrl = masterCanvas.toDataURL("image/jpeg", 0.98);
+      } else {
+        const blob = await masterCanvas.convertToBlob({ type: "image/jpeg", quality: 0.98 });
+        dataUrl = URL.createObjectURL(blob);
+      }
+
+      setPrintImageUrl(dataUrl);
+
+      const isLandscape = config.orientation === "landscape";
+      const pageSizeCss = isTargetA4
+        ? isLandscape
+          ? "A4 landscape"
+          : "A4 portrait"
+        : isLandscape
+        ? "6in 4in landscape"
+        : "4in 6in portrait";
+
+      let styleEl = document.getElementById("dynamic-print-page-style") as HTMLStyleElement | null;
+      if (!styleEl) {
+        styleEl = document.createElement("style");
+        styleEl.id = "dynamic-print-page-style";
+        document.head.appendChild(styleEl);
+      }
+      styleEl.innerHTML = `@media print { @page { size: ${pageSizeCss}; margin: 0; } }`;
+
+      setTimeout(() => {
+        window.print();
+        setIsExporting(false);
+      }, 300);
+    } catch (err: any) {
+      console.error("Print generation failed:", err);
+      setExportMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Failed to prepare sheet for printing.",
+      });
+      setIsExporting(false);
+    } finally {
+      if (masterCanvas && masterCanvas instanceof HTMLCanvasElement) {
+        releaseCanvasBuffer(masterCanvas);
+      }
+    }
+  };
+
+  const printModalConfig: PhotoSheetConfig = useMemo(() => {
+    const isTargetA4 = config.paperSize === "a4";
+    const orientation = config.orientation;
+    const isManualCols = typeof config.columnsMode === "number";
+    const manualCols = isManualCols ? Math.min(4, Math.max(1, config.columnsMode as number)) : 4;
+    const flatPhotos = flattenPhotoCopies(photos);
+    const manualRows = Math.max(1, Math.ceil(Math.max(1, flatPhotos.length) / manualCols));
+
+    const paperWidthInches = isTargetA4
+      ? orientation === "landscape"
+        ? SHEET_A4_LONG_EDGE_INCHES
+        : SHEET_A4_SHORT_EDGE_INCHES
+      : orientation === "landscape"
+      ? SHEET_4X6_LONG_EDGE_INCHES
+      : SHEET_4X6_SHORT_EDGE_INCHES;
+    const paperHeightInches = isTargetA4
+      ? orientation === "landscape"
+        ? SHEET_A4_SHORT_EDGE_INCHES
+        : SHEET_A4_LONG_EDGE_INCHES
+      : orientation === "landscape"
+      ? SHEET_4X6_SHORT_EDGE_INCHES
+      : SHEET_4X6_LONG_EDGE_INCHES;
+
+    return {
+      paperSize: config.paperSize,
+      orientation,
+      paperWidthInches,
+      paperHeightInches,
+      dpi: config.dpi,
+      layoutMode: isManualCols ? "manual" : "auto",
+      manualCols,
+      manualRows,
+      copies: Math.max(1, flatPhotos.length),
+      centerAlignment: false,
+      margins: config.margins,
+      spacing: config.spacing,
+      cutGuides: config.cutGuides,
+    };
+  }, [config, photos]);
 
   const isA4 = config.paperSize === "a4";
   const paperTitle = isA4
@@ -471,8 +646,33 @@ export const MultiplePhotoPreviewPanel: React.FC<MultiplePhotoPreviewPanelProps>
           </div>
         )}
 
+        {/* Direct Print & Preview Action Buttons */}
+        <div className="pt-1 space-y-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              type="button"
+              disabled={photos.length === 0 || isExporting}
+              onClick={handlePrintSheet}
+              className="w-full py-4 px-4 rounded-2xl bg-surface-900 hover:bg-black text-white font-bold text-sm sm:text-base flex items-center justify-center gap-2 shadow-md transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none"
+            >
+              <Printer className="w-5 h-5 text-brand-400" />
+              <span>Print Sheet</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={photos.length === 0 || isExporting}
+              onClick={() => setIsPrintPreviewOpen(true)}
+              className="w-full py-4 px-4 rounded-2xl bg-surface-100 hover:bg-surface-200 text-surface-800 font-bold text-sm sm:text-base flex items-center justify-center gap-2 border border-surface-200 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none"
+            >
+              <Maximize2 className="w-4 h-4 text-brand-600" />
+              <span>1:1 Print Preview</span>
+            </button>
+          </div>
+        </div>
+
         {/* Primary Download Buttons */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
           {/* Download Current Paper PDF */}
           <button
             type="button"
@@ -532,6 +732,36 @@ export const MultiplePhotoPreviewPanel: React.FC<MultiplePhotoPreviewPanelProps>
             In your printer dialog, always select <span className="font-semibold text-surface-900">Actual Size (100%)</span> and uncheck &quot;Fit to Page&quot; or &quot;Shrink to Printable Area&quot; so photos print at exact physical dimensions.
           </p>
         </div>
+      </div>
+
+      {/* Interactive 1:1 Print Preview & Calibration Modal */}
+      <PrintPreviewModal
+        isOpen={isPrintPreviewOpen}
+        onClose={() => setIsPrintPreviewOpen(false)}
+        config={printModalConfig}
+        layout={arrangement.layout}
+        imageSource={imageSources}
+        onPrintNow={() => {
+          setIsPrintPreviewOpen(false);
+          handlePrintSheet();
+        }}
+        onDownloadPdf={() => {
+          setIsPrintPreviewOpen(false);
+          executeExport(config.paperSize, "pdf");
+        }}
+        isExporting={isExporting}
+      />
+
+      {/* Hidden-on-Screen Printable Container for High-DPI Physical Print Output */}
+      <div id="printable-sheet-container" className="hidden print:flex">
+        {printImageUrl && (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={printImageUrl}
+            alt="Printable Photo Sheet"
+            className="w-full h-full object-contain"
+          />
+        )}
       </div>
     </div>
   );

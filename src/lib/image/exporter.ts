@@ -5,6 +5,7 @@ import type {
 } from "../../types/image-engine";
 import type { AnyCanvas } from "./transform";
 import { createTrackedObjectURL, revokeObjectUrlSafely } from "../utils/memory";
+import { attachDpiMetadata } from "./dpi-metadata";
 
 /** Default export quality for lossy formats (JPEG/WebP) */
 export const DEFAULT_EXPORT_QUALITY = 0.92;
@@ -52,7 +53,10 @@ function getExportReadyCanvas(
     return canvas;
   }
 
-  const bgColor = options.backgroundColor || "#ffffff";
+  const bgColor =
+    options.backgroundColor && options.backgroundColor !== "transparent"
+      ? options.backgroundColor
+      : "#ffffff";
   const width = canvas.width;
   const height = canvas.height;
 
@@ -79,6 +83,7 @@ function getExportReadyCanvas(
 /**
  * Exports an HTMLCanvasElement or OffscreenCanvas to a high-quality Blob.
  * Handles both DOM canvas and OffscreenCanvas environments cleanly.
+ * Automatically embeds DPI metadata when options.dpi is provided.
  */
 export async function exportCanvasToBlob(
   canvas: AnyCanvas,
@@ -88,24 +93,24 @@ export async function exportCanvasToBlob(
   const format = options.format;
   const quality = Math.max(0.01, Math.min(1.0, options.quality ?? DEFAULT_EXPORT_QUALITY));
 
+  let blob: Blob;
+
   // 1. OffscreenCanvas Path
   if (
     typeof OffscreenCanvas !== "undefined" &&
     targetCanvas instanceof OffscreenCanvas
   ) {
-    return targetCanvas.convertToBlob({
+    blob = await targetCanvas.convertToBlob({
       type: format,
       quality: format === "image/png" ? undefined : quality,
     });
-  }
-
-  // 2. HTMLCanvasElement Path
-  if ("toBlob" in targetCanvas && typeof targetCanvas.toBlob === "function") {
-    return new Promise((resolve, reject) => {
+  } else if ("toBlob" in targetCanvas && typeof targetCanvas.toBlob === "function") {
+    // 2. HTMLCanvasElement Path
+    blob = await new Promise<Blob>((resolve, reject) => {
       targetCanvas.toBlob(
-        (blob) => {
-          if (blob) {
-            resolve(blob);
+        (b) => {
+          if (b) {
+            resolve(b);
           } else {
             reject(new Error(`Failed to encode canvas to format "${format}".`));
           }
@@ -114,9 +119,16 @@ export async function exportCanvasToBlob(
         format === "image/png" ? undefined : quality
       );
     });
+  } else {
+    throw new Error("Unable to export canvas: Unsupported canvas type in this environment.");
   }
 
-  throw new Error("Unable to export canvas: Unsupported canvas type in this environment.");
+  // Attach DPI metadata if specified for PNG or JPEG
+  if (options.dpi && options.dpi > 0) {
+    blob = await attachDpiMetadata(blob, format, options.dpi);
+  }
+
+  return blob;
 }
 
 /**
@@ -156,10 +168,14 @@ export function downloadImageBlob(blob: Blob, fileName: string): void {
   link.style.display = "none";
   document.body.appendChild(link);
   link.click();
-  document.body.removeChild(link);
 
   // Safely revoke the URL once download initiation is handed to the browser
   setTimeout(() => {
+    try {
+      if (document.body.contains(link)) {
+        document.body.removeChild(link);
+      }
+    } catch {}
     revokeObjectUrlSafely(objectUrl);
-  }, 1000);
+  }, 1500);
 }

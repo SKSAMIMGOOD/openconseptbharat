@@ -5,7 +5,7 @@ export interface CropCoordinates {
   height: number;
 }
 
-export type DocumentCardType = "pan" | "aadhaar" | "ration";
+export type DocumentCardType = "pan" | "aadhaar" | "ration" | "voter-id";
 
 export interface CardSpecification {
   id: DocumentCardType;

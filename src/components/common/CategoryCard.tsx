@@ -2,6 +2,9 @@ import React from "react";
 import Link from "next/link";
 import {
   Camera,
+  Scissors,
+  Printer,
+  SlidersHorizontal,
   CreditCard,
   FileSpreadsheet,
   FileText,
@@ -12,13 +15,43 @@ import { cn } from "@/lib/utils/cn";
 
 const CATEGORY_ICON_MAP: Record<string, React.ElementType> = {
   Camera,
+  Scissors,
+  Printer,
+  SlidersHorizontal,
   CreditCard,
   FileSpreadsheet,
   FileText,
 };
 
-// Subtle accent themes for different categories
-const ACCENT_STYLES: Record<string, { iconBg: string; iconColor: string; borderHover: string; badge: string }> = {
+const ACCENT_STYLES: Record<
+  string,
+  { iconBg: string; iconColor: string; borderHover: string; badge: string }
+> = {
+  "photo-studio": {
+    iconBg: "bg-blue-50",
+    iconColor: "text-blue-600",
+    borderHover: "hover:border-blue-300",
+    badge: "bg-blue-50 text-blue-700 border-blue-200",
+  },
+  "image-tools": {
+    iconBg: "bg-violet-50",
+    iconColor: "text-violet-600",
+    borderHover: "hover:border-violet-300",
+    badge: "bg-violet-50 text-violet-700 border-violet-200",
+  },
+  "photo-printing": {
+    iconBg: "bg-amber-50",
+    iconColor: "text-amber-600",
+    borderHover: "hover:border-amber-300",
+    badge: "bg-amber-50 text-amber-700 border-amber-200",
+  },
+  utilities: {
+    iconBg: "bg-teal-50",
+    iconColor: "text-teal-600",
+    borderHover: "hover:border-teal-300",
+    badge: "bg-teal-50 text-teal-700 border-teal-200",
+  },
+  // Legacy aliases
   photo: {
     iconBg: "bg-blue-50",
     iconColor: "text-blue-600",
@@ -52,7 +85,7 @@ export interface CategoryCardProps {
 
 export const CategoryCard: React.FC<CategoryCardProps> = ({ category, className }) => {
   const IconComponent = CATEGORY_ICON_MAP[category.iconName] || FileText;
-  const accent = ACCENT_STYLES[category.id] || ACCENT_STYLES.photo;
+  const accent = ACCENT_STYLES[category.id] || ACCENT_STYLES["photo-studio"];
 
   return (
     <Link
@@ -67,7 +100,7 @@ export const CategoryCard: React.FC<CategoryCardProps> = ({ category, className 
         <div className="flex items-center justify-between mb-4">
           <div
             className={cn(
-              "w-12 h-12 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105",
+              "w-12 h-12 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105 border border-surface-200/60",
               accent.iconBg,
               accent.iconColor
             )}

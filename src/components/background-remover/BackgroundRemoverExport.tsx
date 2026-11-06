@@ -13,6 +13,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { ExportFormat, BackgroundColorOption } from "@/types/background-remover";
+import { usePreferences } from "@/hooks/usePreferences";
 import { cn } from "@/lib/utils/cn";
 
 export interface BackgroundRemoverExportProps {
@@ -33,6 +34,7 @@ export const BackgroundRemoverExport: React.FC<BackgroundRemoverExportProps> = (
   disabled = false,
 }) => {
   const router = useRouter();
+  const { settings: userPreferences } = usePreferences();
   const [isExporting, setIsExporting] = useState<string | null>(null);
   const [isTransferring, setIsTransferring] = useState(false);
   const [transferSuccess, setTransferSuccess] = useState(false);
@@ -41,7 +43,7 @@ export const BackgroundRemoverExport: React.FC<BackgroundRemoverExportProps> = (
     if (disabled || !hasResult) return;
     setIsExporting(format);
     try {
-      await onExport(format, 0.95);
+      await onExport(format, userPreferences.defaultJpegQuality || 0.95);
     } finally {
       setIsExporting(null);
     }

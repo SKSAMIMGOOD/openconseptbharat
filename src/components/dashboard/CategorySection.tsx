@@ -1,12 +1,21 @@
 import React from "react";
 import { CategoryMetadata, ToolMetadata } from "@/types/tools";
-import { ToolCard } from "./ToolCard";
-import { CreditCard, Camera, Wand2, FileText } from "lucide-react";
+import { ToolCard } from "@/components/common/ToolCard";
+import {
+  Camera,
+  Scissors,
+  Printer,
+  SlidersHorizontal,
+  CreditCard,
+  FileText,
+} from "lucide-react";
 
 const CATEGORY_ICON_MAP: Record<string, React.ElementType> = {
-  CreditCard,
   Camera,
-  Wand2,
+  Scissors,
+  Printer,
+  SlidersHorizontal,
+  CreditCard,
   FileText,
 };
 
@@ -16,7 +25,7 @@ export interface CategorySectionProps {
 }
 
 export const CategorySection: React.FC<CategorySectionProps> = ({ category, tools }) => {
-  const IconComponent = CATEGORY_ICON_MAP[category.iconName] || CreditCard;
+  const IconComponent = CATEGORY_ICON_MAP[category.iconName] || SlidersHorizontal;
 
   if (tools.length === 0) return null;
 
@@ -34,7 +43,7 @@ export const CategorySection: React.FC<CategorySectionProps> = ({ category, tool
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {tools.map((tool) => (
-          <ToolCard key={tool.id} tool={tool} />
+          <ToolCard key={tool.id} tool={tool} showCategoryTag />
         ))}
       </div>
     </section>

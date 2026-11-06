@@ -42,10 +42,15 @@ import {
   pixelsToMm,
   getFriendlyAspectRatioName,
 } from "@/lib/photo-studio/dpi-calculator";
+import { usePreferences } from "@/hooks/usePreferences";
 
 export interface PhotoDimensionsPanelProps {
   imageFile?: ValidatedImageFile | null;
   className?: string;
+  currentWidthMm?: number;
+  currentHeightMm?: number;
+  currentDpi?: number;
+  currentPresetId?: string;
   onDimensionsChange?: (dimensions: {
     widthMm: number;
     heightMm: number;
@@ -58,28 +63,69 @@ export interface PhotoDimensionsPanelProps {
 export const PhotoDimensionsPanel: React.FC<PhotoDimensionsPanelProps> = ({
   imageFile,
   className,
+  currentWidthMm,
+  currentHeightMm,
+  currentDpi,
+  currentPresetId,
   onDimensionsChange,
 }) => {
   const widthInputId = useId();
   const heightInputId = useId();
   const dpiInputId = useId();
   const presetSelectId = useId();
+  const { settings: userPreferences } = usePreferences();
 
   // Active form state
-  const [selectedPresetId, setSelectedPresetId] = useState<string>("passport_standard");
-  const [widthMm, setWidthMm] = useState<number>(DEFAULT_PHOTO_WIDTH_MM);
-  const [heightMm, setHeightMm] = useState<number>(DEFAULT_PHOTO_HEIGHT_MM);
-  const [dpi, setDpi] = useState<number>(DEFAULT_DPI);
-  const [isCustomDpi, setIsCustomDpi] = useState<boolean>(false);
+  const effectiveDefaultDpi = currentDpi || userPreferences.defaultDpi || DEFAULT_DPI;
+  const [selectedPresetId, setSelectedPresetId] = useState<string>(currentPresetId || "passport_standard");
+  const [widthMm, setWidthMm] = useState<number>(currentWidthMm || DEFAULT_PHOTO_WIDTH_MM);
+  const [heightMm, setHeightMm] = useState<number>(currentHeightMm || DEFAULT_PHOTO_HEIGHT_MM);
+  const [dpi, setDpi] = useState<number>(effectiveDefaultDpi);
+  const [isCustomDpi, setIsCustomDpi] = useState<boolean>(
+    !SUPPORTED_DPI_PRESETS.includes(effectiveDefaultDpi as StandardDpiPreset)
+  );
   const [isAspectLocked, setIsAspectLocked] = useState<boolean>(true);
   const [lockedRatio, setLockedRatio] = useState<number>(
-    DEFAULT_PHOTO_WIDTH_MM / DEFAULT_PHOTO_HEIGHT_MM
+    (currentWidthMm || DEFAULT_PHOTO_WIDTH_MM) / (currentHeightMm || DEFAULT_PHOTO_HEIGHT_MM)
   );
 
   // Raw string inputs to allow intermediate typing (e.g. typing decimals or backspacing)
-  const [widthInputStr, setWidthInputStr] = useState<string>(String(DEFAULT_PHOTO_WIDTH_MM));
-  const [heightInputStr, setHeightInputStr] = useState<string>(String(DEFAULT_PHOTO_HEIGHT_MM));
-  const [customDpiStr, setCustomDpiStr] = useState<string>(String(DEFAULT_DPI));
+  const [widthInputStr, setWidthInputStr] = useState<string>(String(currentWidthMm || DEFAULT_PHOTO_WIDTH_MM));
+  const [heightInputStr, setHeightInputStr] = useState<string>(String(currentHeightMm || DEFAULT_PHOTO_HEIGHT_MM));
+  const [customDpiStr, setCustomDpiStr] = useState<string>(String(currentDpi || DEFAULT_DPI));
+
+  // Synchronize with external controlled props if provided
+  React.useEffect(() => {
+    if (currentWidthMm !== undefined && currentWidthMm > 0 && Math.abs(currentWidthMm - widthMm) > 0.01) {
+      setWidthMm(currentWidthMm);
+      setWidthInputStr(String(currentWidthMm));
+    }
+  }, [currentWidthMm, widthMm]);
+
+  React.useEffect(() => {
+    if (currentHeightMm !== undefined && currentHeightMm > 0 && Math.abs(currentHeightMm - heightMm) > 0.01) {
+      setHeightMm(currentHeightMm);
+      setHeightInputStr(String(currentHeightMm));
+    }
+  }, [currentHeightMm, heightMm]);
+
+  React.useEffect(() => {
+    if (currentDpi !== undefined && currentDpi >= MIN_DPI && currentDpi <= MAX_DPI && currentDpi !== dpi) {
+      setDpi(currentDpi);
+      setCustomDpiStr(String(currentDpi));
+      setIsCustomDpi(!SUPPORTED_DPI_PRESETS.includes(currentDpi as StandardDpiPreset));
+    } else if (currentDpi === undefined && !isCustomDpi && userPreferences.defaultDpi && userPreferences.defaultDpi !== dpi) {
+      setDpi(userPreferences.defaultDpi);
+      setCustomDpiStr(String(userPreferences.defaultDpi));
+    }
+  }, [currentDpi, dpi, isCustomDpi, userPreferences.defaultDpi]);
+
+  React.useEffect(() => {
+    if (currentPresetId && currentPresetId !== selectedPresetId) {
+      const match = PHOTO_DIMENSION_PRESETS.find((p) => p.id === currentPresetId);
+      setSelectedPresetId(match ? match.id : "custom");
+    }
+  }, [currentPresetId, selectedPresetId]);
 
   // Compute calculated pixel dimensions via pure calculation engine
   const calculationResult = useMemo(() => {

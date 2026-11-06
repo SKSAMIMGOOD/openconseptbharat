@@ -25,7 +25,8 @@ import {
   renderCropCanvas,
 } from "@/lib/crop/crop-geometry";
 import { unitToMm } from "@/lib/crop/unit-converter";
-import { consumeTransferredImage } from "@/lib/utils/image-transfer";
+import { consumeTransferredImage, peekStagedImage } from "@/lib/utils/image-transfer";
+import { usePreferences } from "@/hooks/usePreferences";
 import { cn } from "@/lib/utils/cn";
 import {
   Camera,
@@ -50,6 +51,8 @@ export type PhotoStudioWorkspaceState =
 export default function PhotoStudioPage() {
   const tool = TOOLS.find((t) => t.id === "photo-studio")!;
   const engine = useImageEngine();
+  const { settings: userPreferences } = usePreferences();
+  const hasUserModifiedSettingsRef = useRef(false);
 
   const [workspaceState, setWorkspaceState] =
     useState<PhotoStudioWorkspaceState>("empty");
@@ -60,11 +63,31 @@ export default function PhotoStudioPage() {
   const [customDimensions, setCustomDimensions] = useState<CustomDimensionsInput>({
     width: DEFAULT_PRESET.width,
     height: DEFAULT_PRESET.height,
-    unit: DEFAULT_PRESET.unit,
+    unit: userPreferences.defaultUnit || DEFAULT_PRESET.unit,
   });
   const [cropMode, setCropMode] = useState<CropMode>("fixed");
-  const [backgroundColor, setBackgroundColor] = useState<string>(DEFAULT_BACKGROUND_COLOR);
-  const [dpi, setDpi] = useState<number>(300);
+  const [backgroundColor, setBackgroundColor] = useState<string>(
+    userPreferences.defaultBackgroundColor || DEFAULT_BACKGROUND_COLOR
+  );
+  const [dpi, setDpi] = useState<number>(userPreferences.defaultDpi || 300);
+
+  // Sync with global preferences when workspace is empty and user hasn't overridden
+  useEffect(() => {
+    if (!hasUserModifiedSettingsRef.current && workspaceState === "empty") {
+      if (userPreferences.defaultDpi) {
+        setDpi(userPreferences.defaultDpi);
+      }
+      if (userPreferences.defaultBackgroundColor) {
+        setBackgroundColor(userPreferences.defaultBackgroundColor);
+      }
+      if (userPreferences.defaultUnit) {
+        setCustomDimensions((prev) => ({
+          ...prev,
+          unit: userPreferences.defaultUnit,
+        }));
+      }
+    }
+  }, [userPreferences, workspaceState]);
 
   // Active Crop Coordinates in intrinsic image pixels
   const [crop, setCrop] = useState<CropCoordinates>({
@@ -196,33 +219,42 @@ export default function PhotoStudioPage() {
 
   // Check for ephemeral image handed off from AI Background Remover in RAM
   useEffect(() => {
-    const transferred = consumeTransferredImage();
-    if (transferred) {
+    const staged = peekStagedImage();
+    if (staged) {
+      let isCancelled = false;
       (async () => {
         try {
           const { decodeImage } = await import("@/lib/image/decoder");
           const { createTrackedObjectURL } = await import("@/lib/utils/memory");
-          const decoded = await decodeImage(transferred);
+          const decoded = await decodeImage(staged.file);
+          if (isCancelled) {
+            decoded.close();
+            return;
+          }
           const validated: ValidatedImageFile = {
             id: `img-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-            file: transferred,
-            name: transferred.name,
-            size: transferred.size,
-            type: (transferred.type as any) || "image/png",
+            file: staged.file,
+            name: staged.file.name,
+            size: staged.file.size,
+            type: (staged.file.type as any) || "image/png",
             dimensions: {
               width: decoded.width,
               height: decoded.height,
               aspectRatio: decoded.aspectRatio,
             },
-            previewUrl: createTrackedObjectURL(transferred),
+            previewUrl: createTrackedObjectURL(staged.file),
             createdAt: Date.now(),
           };
           decoded.close();
-          handleImageLoaded(validated);
+          consumeTransferredImage();
+          await handleImageLoaded(validated);
         } catch (err) {
           console.error("Failed to ingest transferred photo:", err);
         }
       })();
+      return () => {
+        isCancelled = true;
+      };
     }
   }, [handleImageLoaded]);
 
@@ -293,6 +325,7 @@ export default function PhotoStudioPage() {
 
   // Handle removing the photo
   const handleRemovePhoto = useCallback(() => {
+    hasUserModifiedSettingsRef.current = false;
     engine.clear();
     setImageElement(null);
     setErrorMessage(null);
@@ -321,6 +354,7 @@ export default function PhotoStudioPage() {
   // Handle Preset Selection: Automatically updates crop frame without resetting photo
   const handlePresetChange = useCallback(
     (preset: PhotoPreset) => {
+      hasUserModifiedSettingsRef.current = true;
       setSelectedPreset(preset);
       if (preset.id === "custom") {
         setCustomDimensions((prev) => ({
@@ -351,6 +385,7 @@ export default function PhotoStudioPage() {
   // Handle Custom Dimensions Change
   const handleCustomDimensionsChange = useCallback(
     (custom: CustomDimensionsInput) => {
+      hasUserModifiedSettingsRef.current = true;
       setCustomDimensions(custom);
       if (custom.dpi && custom.dpi !== dpi) {
         setDpi(custom.dpi);
@@ -402,6 +437,7 @@ export default function PhotoStudioPage() {
   // Handle Studio Background Color Change
   const handleBackgroundColorChange = useCallback(
     (color: string) => {
+      hasUserModifiedSettingsRef.current = true;
       setBackgroundColor(color);
       engine.updateBackgroundColor(color);
     },
@@ -417,7 +453,7 @@ export default function PhotoStudioPage() {
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-bold uppercase tracking-wider text-brand-600 flex items-center gap-1.5">
                 <Printer className="w-3.5 h-3.5" />
-                <span>Phase 03D: Photo Studio & 4×6″ Sheet Generator</span>
+                <span>Phase 03: Photo Studio & Multi-Format Sheet Generator</span>
               </span>
               <span className="text-surface-300">•</span>
               <span
@@ -598,6 +634,10 @@ export default function PhotoStudioPage() {
             initialPaperSize={activeTab === "sheet_4x6" ? "4x6" : "a4"}
             initialDpi={dpi}
             onNavigateToCrop={() => setActiveTab("crop")}
+            onPaperSizeChange={(paperSize) =>
+              setActiveTab(paperSize === "4x6" ? "sheet_4x6" : "sheet_a4")
+            }
+            onDpiChange={setDpi}
           />
         ) : (
           /* Active Tab: Interactive Crop Workspace, Controls & Live Preview */
@@ -664,8 +704,14 @@ export default function PhotoStudioPage() {
                 {/* 2. Dedicated DPI & Physical Resolution Assessment Panel */}
                 <PhotoDimensionsPanel
                   imageFile={engine.currentFile}
+                  currentWidthMm={photoDimensionsMm.width}
+                  currentHeightMm={photoDimensionsMm.height}
+                  currentDpi={dpi}
+                  currentPresetId={selectedPreset.id}
                   onDimensionsChange={(dims) => {
-                    setDpi(dims.dpi);
+                    if (dims.dpi !== dpi) {
+                      setDpi(dims.dpi);
+                    }
                   }}
                 />
               </div>

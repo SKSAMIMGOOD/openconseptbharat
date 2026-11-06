@@ -12,7 +12,10 @@ import {
   DEFAULT_PHOTO_SHEET_CONFIG,
 } from "@/constants/photo-sheet";
 import { calculatePhotoSheetLayout } from "@/lib/photo-studio/sheet-calculator";
-import { renderScaledSheetPreview } from "@/lib/photo-studio/sheet-renderer";
+import {
+  renderScaledSheetPreview,
+  renderMasterSheetCanvas,
+} from "@/lib/photo-studio/sheet-renderer";
 import {
   exportSheetAsPdf,
   exportSheetAsImage,
@@ -20,6 +23,9 @@ import {
 } from "@/lib/photo-studio/sheet-exporter";
 import { SheetControlsPanel } from "./SheetControlsPanel";
 import { SheetPreviewPanel } from "./SheetPreviewPanel";
+import { PrintPreviewModal } from "./PrintPreviewModal";
+import { releaseCanvasBuffer, revokeObjectUrlSafely } from "@/lib/utils/memory";
+import { usePreferences } from "@/hooks/usePreferences";
 import {
   Crop,
   AlertCircle,
@@ -38,6 +44,8 @@ export interface PhotoSheetWorkspaceProps {
   initialPaperSize?: SheetPaperSize;
   initialDpi?: number;
   onNavigateToCrop: () => void;
+  onPaperSizeChange?: (paperSize: SheetPaperSize) => void;
+  onDpiChange?: (dpi: number) => void;
   className?: string;
 }
 
@@ -48,24 +56,34 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
   initialPaperSize = "a4",
   initialDpi,
   onNavigateToCrop,
+  onPaperSizeChange,
+  onDpiChange,
   className,
 }) => {
+  const { settings: userPreferences } = usePreferences();
+
   // Sheet configuration state - default to A4 (Phase 03E) or initialPaperSize
   const [sheetConfig, setSheetConfig] = useState<PhotoSheetConfig>(() => {
+    const effectiveDpi = initialDpi || userPreferences.defaultDpi || 300;
     const base =
       initialPaperSize === "4x6"
-        ? { ...DEFAULT_PHOTO_SHEET_CONFIG, paperSize: "4x6" as const }
-        : { ...DEFAULT_A4_SHEET_CONFIG, paperSize: "a4" as const };
-    if (initialDpi) {
-      return { ...base, dpi: initialDpi };
-    }
+        ? { ...DEFAULT_PHOTO_SHEET_CONFIG, paperSize: "4x6" as const, dpi: effectiveDpi }
+        : { ...DEFAULT_A4_SHEET_CONFIG, paperSize: "a4" as const, dpi: effectiveDpi };
     return base;
   });
 
+  const prevInitialPaperSizeRef = useRef<SheetPaperSize>(initialPaperSize);
+
   const [exportFormat, setExportFormat] = useState<SheetExportFormat>("application/pdf");
-  const [jpegQuality, setJpegQuality] = useState<number>(0.95);
+  const [jpegQuality, setJpegQuality] = useState<number>(
+    userPreferences.defaultJpegQuality || 0.95
+  );
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [exportMessage, setExportMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState<boolean>(false);
+  const [printImageUrl, setPrintImageUrl] = useState<string | null>(null);
+  const printImageUrlRef = useRef<string | null>(null);
+  printImageUrlRef.current = printImageUrl;
 
   // Scaled preview canvas ref
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -80,24 +98,55 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
     }
   }, [initialDpi]);
 
-  // Synchronize paper size if initialPaperSize changes externally
+  // Synchronize paper size when initialPaperSize changes externally (e.g. user switched step tabs)
   useEffect(() => {
-    if (initialPaperSize && sheetConfig.paperSize !== initialPaperSize) {
+    if (initialPaperSize && initialPaperSize !== prevInitialPaperSizeRef.current) {
+      prevInitialPaperSizeRef.current = initialPaperSize;
       if (initialPaperSize === "a4") {
         setSheetConfig((prev) => ({
           ...DEFAULT_A4_SHEET_CONFIG,
           paperSize: "a4",
+          dpi: prev.dpi,
           copies: Math.max(prev.copies, 24),
         }));
       } else {
         setSheetConfig((prev) => ({
           ...DEFAULT_PHOTO_SHEET_CONFIG,
           paperSize: "4x6",
+          dpi: prev.dpi,
           copies: Math.min(prev.copies, 8),
         }));
       }
     }
-  }, [initialPaperSize, sheetConfig.paperSize]);
+  }, [initialPaperSize]);
+
+  // Wrapper for config changes that keeps paperSize & DPI synced with parent
+  const handleConfigChange = useCallback(
+    (updater: (prev: PhotoSheetConfig) => PhotoSheetConfig) => {
+      setSheetConfig((prev) => {
+        const next = updater(prev);
+        const nextPaperSize: SheetPaperSize = next.paperSize || "a4";
+        if (nextPaperSize !== prev.paperSize) {
+          prevInitialPaperSizeRef.current = nextPaperSize;
+          onPaperSizeChange?.(nextPaperSize);
+        }
+        if (next.dpi !== prev.dpi) {
+          onDpiChange?.(next.dpi);
+        }
+        return next;
+      });
+    },
+    [onPaperSizeChange, onDpiChange]
+  );
+
+  // Clean up print image URL object URLs on unmount
+  useEffect(() => {
+    return () => {
+      if (printImageUrlRef.current && printImageUrlRef.current.startsWith("blob:")) {
+        revokeObjectUrlSafely(printImageUrlRef.current);
+      }
+    };
+  }, []);
 
   // Calculate layout whenever config or photo dimensions change
   const layout: SheetCalculationResult = useMemo(() => {
@@ -190,6 +239,110 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
     }
   }, [croppedCanvas, layout, sheetConfig, exportFormat, jpegQuality]);
 
+  // Handle Direct Export as PDF (Vector-sized print document)
+  const handleExportPdf = useCallback(async () => {
+    if (!croppedCanvas || layout.totalPhotos === 0 || layout.isOverflowing) return;
+
+    setIsExporting(true);
+    setExportMessage(null);
+    const isA4 = (layout.paperSize || "a4") === "a4";
+    const paperName = isA4 ? "A4" : "4×6″";
+    const pageDimText = isA4 ? "210 × 297 mm" : "6 × 4 inches";
+
+    try {
+      const result = await exportSheetAsPdf(
+        croppedCanvas,
+        layout,
+        sheetConfig,
+        {
+          format: "application/pdf",
+          quality: jpegQuality,
+          includeCutGuides: sheetConfig.cutGuides.includeInExport,
+        }
+      );
+      downloadSheet(result);
+      setExportMessage({
+        type: "success",
+        text: `Print-ready ${paperName} PDF exported successfully (${result.fileName}). Exact page dimensions: ${pageDimText} (${result.pageWidthPt} × ${result.pageHeightPt} pt).`,
+      });
+    } catch (err) {
+      setExportMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Failed to generate print PDF.",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  }, [croppedCanvas, layout, sheetConfig, jpegQuality]);
+
+  // Handle Direct Sheet Print (Browser Print Dialog with calibrated @page styling)
+  const handlePrintSheet = useCallback(async () => {
+    if (!croppedCanvas || layout.totalPhotos === 0 || layout.isOverflowing || isExporting) {
+      return;
+    }
+
+    setIsExporting(true);
+    setExportMessage(null);
+    let masterCanvas: any = null;
+
+    try {
+      // 1. Render master full-resolution canvas
+      masterCanvas = renderMasterSheetCanvas(
+        croppedCanvas,
+        layout,
+        sheetConfig.cutGuides,
+        sheetConfig.cutGuides.includeInExport
+      );
+
+      // 2. Generate high-quality raster image for print container
+      let dataUrl: string;
+      if (masterCanvas instanceof HTMLCanvasElement) {
+        dataUrl = masterCanvas.toDataURL("image/jpeg", 0.98);
+      } else {
+        const blob = await masterCanvas.convertToBlob({ type: "image/jpeg", quality: 0.98 });
+        dataUrl = URL.createObjectURL(blob);
+      }
+
+      setPrintImageUrl(dataUrl);
+
+      // 3. Dynamically set @page rule for paper size and orientation
+      const isA4 = (layout.paperSize || "a4") === "a4";
+      const isLandscape = sheetConfig.orientation === "landscape";
+      const pageSizeCss = isA4
+        ? isLandscape
+          ? "A4 landscape"
+          : "A4 portrait"
+        : isLandscape
+        ? "6in 4in landscape"
+        : "4in 6in portrait";
+
+      let styleEl = document.getElementById("dynamic-print-page-style") as HTMLStyleElement | null;
+      if (!styleEl) {
+        styleEl = document.createElement("style");
+        styleEl.id = "dynamic-print-page-style";
+        document.head.appendChild(styleEl);
+      }
+      styleEl.innerHTML = `@media print { @page { size: ${pageSizeCss}; margin: 0; } }`;
+
+      // 4. Trigger print after layout synchronization
+      setTimeout(() => {
+        window.print();
+        setIsExporting(false);
+      }, 300);
+    } catch (err) {
+      console.error("Print generation failed:", err);
+      setExportMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Failed to prepare sheet for printing.",
+      });
+      setIsExporting(false);
+    } finally {
+      if (masterCanvas && masterCanvas instanceof HTMLCanvasElement) {
+        releaseCanvasBuffer(masterCanvas);
+      }
+    }
+  }, [croppedCanvas, layout, sheetConfig, isExporting]);
+
   // Empty state if user navigated without a cropped photo
   if (!croppedCanvas) {
     return (
@@ -202,7 +355,7 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
             No Cropped Photograph Selected
           </h3>
           <p className="text-sm text-surface-500 max-w-md mx-auto leading-relaxed">
-            The A4 photo sheet generator arranges your active cropped photograph from Step 1. Please upload and frame your portrait first.
+            The photo sheet generator arranges your active cropped photograph from Step 1. Please upload and frame your portrait first.
           </p>
         </div>
         <div className="pt-2">
@@ -282,10 +435,12 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
             exportFormat={exportFormat}
             jpegQuality={jpegQuality}
             isExporting={isExporting}
-            onConfigChange={setSheetConfig}
+            onConfigChange={handleConfigChange}
             onExportFormatChange={setExportFormat}
             onJpegQualityChange={setJpegQuality}
             onExportClick={handleExport}
+            onPrintClick={handlePrintSheet}
+            onOpenPrintPreview={() => setIsPrintPreviewOpen(true)}
             onNavigateToCrop={onNavigateToCrop}
           />
         </div>
@@ -299,8 +454,40 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
             exportFormat={exportFormat}
             isExporting={isExporting}
             onExportClick={handleExport}
+            onPrintClick={handlePrintSheet}
+            onOpenPrintPreview={() => setIsPrintPreviewOpen(true)}
           />
         </div>
+      </div>
+
+      {/* Interactive 1:1 Print Preview & Calibration Modal */}
+      <PrintPreviewModal
+        isOpen={isPrintPreviewOpen}
+        onClose={() => setIsPrintPreviewOpen(false)}
+        config={sheetConfig}
+        layout={layout}
+        imageSource={croppedCanvas}
+        onPrintNow={() => {
+          setIsPrintPreviewOpen(false);
+          handlePrintSheet();
+        }}
+        onDownloadPdf={() => {
+          setIsPrintPreviewOpen(false);
+          handleExportPdf();
+        }}
+        isExporting={isExporting}
+      />
+
+      {/* Hidden-on-Screen Printable Container for High-DPI Physical Print Output */}
+      <div id="printable-sheet-container" className="hidden print:flex">
+        {printImageUrl && (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={printImageUrl}
+            alt="Printable Photo Sheet"
+            className="w-full h-full object-contain"
+          />
+        )}
       </div>
     </div>
   );

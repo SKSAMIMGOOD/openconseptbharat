@@ -21,7 +21,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   className,
 }) => {
   return (
-    <div className={cn("bg-white border-b border-surface-200/80 py-8 mb-8", className)}>
+    <div className={cn("bg-white dark:bg-surface-900 border-b border-surface-200/80 dark:border-surface-800 py-8 mb-8 transition-colors duration-150", className)}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {breadcrumbs && breadcrumbs.length > 0 && (
           <div className="mb-4">
@@ -36,11 +36,11 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
                 {badge}
               </Badge>
             )}
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-surface-900 tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-surface-900 dark:text-surface-100 tracking-tight">
               {title}
             </h1>
             {subtitle && (
-              <p className="mt-1.5 text-sm sm:text-base text-surface-600 max-w-3xl leading-relaxed">
+              <p className="mt-1.5 text-sm sm:text-base text-surface-600 dark:text-surface-400 max-w-3xl leading-relaxed">
                 {subtitle}
               </p>
             )}
