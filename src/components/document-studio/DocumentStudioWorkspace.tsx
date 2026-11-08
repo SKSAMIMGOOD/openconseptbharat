@@ -7,6 +7,7 @@ import { DocumentCropEditor } from "./DocumentCropEditor";
 import { DocumentStudioControls } from "./DocumentStudioControls";
 import { DocumentEnhancementPanel } from "./DocumentEnhancementPanel";
 import { DocumentPrintSettingsPanel } from "./DocumentPrintSettingsPanel";
+import { DocumentPrintStudio } from "./DocumentPrintStudio";
 import {
   ALLOWED_DOCUMENT_EXTENSIONS,
   MAX_DOCUMENT_FILE_SIZE_MB,
@@ -17,7 +18,10 @@ import type {
   SourceLayoutMode,
   DocumentSide,
 } from "@/types/document-studio";
-import { isEnhancementActive } from "@/types/document-studio";
+import {
+  isEnhancementActive,
+  DEFAULT_PRINT_STUDIO_STATE,
+} from "@/types/document-studio";
 import { cn } from "@/lib/utils/cn";
 import {
   Sparkles,
@@ -131,6 +135,9 @@ export const DocumentStudioWorkspace: React.FC<DocumentStudioWorkspaceProps> = (
     toggleSideBeforeAfter,
     setSidePrintSettings,
     setAllPrintSettings,
+    setPrintStudioMode,
+    setPrintStudioArrangement,
+    setPrintLayoutSettings,
     clearAll,
   } = useDocumentStudio(initialDocType);
 
@@ -364,6 +371,28 @@ export const DocumentStudioWorkspace: React.FC<DocumentStudioWorkspaceProps> = (
               >
                 <Printer className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400" />
                 <span>Print & Size</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const el = document.getElementById("print-studio-section");
+                  if (el) {
+                    el.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-50 hover:bg-brand-100 text-brand-700 dark:bg-brand-950/60 dark:hover:bg-brand-900/60 dark:text-brand-300 border border-brand-200/80 dark:border-brand-800/60 transition-colors shadow-2xs"
+                title="Scroll to dedicated Print Studio preview section"
+              >
+                <Printer className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400" />
+                <span>Print Studio</span>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-brand-200/70 dark:bg-brand-900 text-brand-800 dark:text-brand-200">
+                  {state.printStudio?.mode === "front-only"
+                    ? "Front"
+                    : state.printStudio?.mode === "back-only"
+                    ? "Back"
+                    : "Combined"}
+                </span>
               </button>
 
               <button
@@ -643,6 +672,20 @@ export const DocumentStudioWorkspace: React.FC<DocumentStudioWorkspaceProps> = (
               />
             )}
           </div>
+
+          {/* DEDICATED PRINT STUDIO PANEL (Phase 3 & Phase 4: Print Studio & Print Layout Settings) */}
+          <DocumentPrintStudio
+            state={state.printStudio || DEFAULT_PRINT_STUDIO_STATE}
+            front={state.front}
+            back={state.back}
+            docDef={currentDocDef}
+            isSingleSided={isSingleSided}
+            isFrontActive={isFrontActive}
+            isBackActive={isBackActive}
+            onModeChange={setPrintStudioMode}
+            onArrangementChange={setPrintStudioArrangement}
+            onLayoutChange={setPrintLayoutSettings}
+          />
 
           {/* LARGE MANUAL CROP EDITOR MODAL (Single Enlarged Viewing Area) */}
           {activeCropSide && state.source.previewUrl && state.source.dimensions && (

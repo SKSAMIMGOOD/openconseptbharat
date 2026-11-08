@@ -53,13 +53,41 @@ body {
   background: #475569;
 }
 
-/* Phase 03H: Professional Print Styles */
+/* Screen: Printable container must never be visible or interactive on screen */
+#printable-sheet-container {
+  display: none;
+}
+
+/* Phase 03H & Phase 09: Professional Microsoft Print & Browser Print Engine */
+
+/* Default top-level page definition ensuring 0 margin physical page fitting */
+@page {
+  margin: 0 !important;
+  size: auto;
+}
+
 @media print {
+  @page {
+    margin: 0 !important;
+  }
+
+  /* Hide the entire Next.js root application and any portals/overlays attached to body */
+  body > *:not(#printable-sheet-container) {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
   /* Hide all website chrome, navigation, headers, footers, sidebars, buttons, toolbars */
   header,
   footer,
   nav,
   aside,
+  main,
   .no-print,
   [role="navigation"],
   [data-radix-portal],
@@ -69,39 +97,82 @@ body {
     display: none !important;
   }
 
+  /* Reset HTML and BODY for exact physical page fitting with 0 margins */
   html,
   body {
     width: 100% !important;
-    height: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
     margin: 0 !important;
     padding: 0 !important;
+    border: 0 !important;
     background: #ffffff !important;
     overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
-  /* Printable Sheet Stage: Only this container is rendered on physical paper */
+  /* Printable Sheet Stage: direct child of body in normal document flow (NEVER position: fixed!) */
   #printable-sheet-container {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    z-index: auto !important;
+  }
+
+  /* Each physical printed page: strictly sized to 100vw x 100vh of the page box with overflow clipped */
+  .print-page {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    position: fixed !important;
-    left: 0 !important;
-    top: 0 !important;
+    position: relative !important;
+    box-sizing: border-box !important;
     width: 100vw !important;
     height: 100vh !important;
+    max-width: 100vw !important;
+    max-height: 100vh !important;
     margin: 0 !important;
     padding: 0 !important;
+    border: 0 !important;
+    overflow: hidden !important;
     background: #ffffff !important;
-    z-index: 99999999 !important;
+    page-break-before: auto !important;
+    page-break-after: auto !important;
+    break-after: auto !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
+  /* Multi-page break: ONLY break before subsequent pages (Page 2, 3, etc.) */
+  .print-page + .print-page {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+
+  /* The last page must NOT force a page-break, preventing accidental blank trailing sheet */
+  .print-page:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+
+  /* High-resolution sheet image inside each physical page */
+  .print-page img,
+  .print-page canvas,
   #printable-sheet-container img,
   #printable-sheet-container canvas {
     display: block !important;
-    width: 100% !important;
-    height: 100% !important;
+    width: auto !important;
+    height: auto !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
     object-fit: contain !important;
-    margin: 0 auto !important;
+    margin: auto !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }

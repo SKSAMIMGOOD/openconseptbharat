@@ -2,10 +2,10 @@ import type {
   ExportResult,
   ImageExportOptions,
   SupportedImageFormat,
-} from "../../types/image-engine";
-import type { AnyCanvas } from "./transform";
-import { createTrackedObjectURL, revokeObjectUrlSafely } from "../utils/memory";
-import { attachDpiMetadata } from "./dpi-metadata";
+} from "../../types/image-engine.ts";
+import type { AnyCanvas } from "./transform.ts";
+import { createTrackedObjectURL, revokeObjectUrlSafely } from "../utils/memory.ts";
+import { attachDpiMetadata } from "./dpi-metadata.ts";
 
 /** Default export quality for lossy formats (JPEG/WebP) */
 export const DEFAULT_EXPORT_QUALITY = 0.92;

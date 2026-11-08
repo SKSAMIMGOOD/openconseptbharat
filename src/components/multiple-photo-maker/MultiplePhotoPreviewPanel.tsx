@@ -31,10 +31,12 @@ import type {
 import { renderScaledSheetPreview, renderMasterSheetCanvas } from "@/lib/photo-studio/sheet-renderer";
 import {
   exportSheetAsPdf,
+  exportMultiSheetAsPdf,
   exportSheetAsImage,
   downloadSheet,
 } from "@/lib/photo-studio/sheet-exporter";
 import { PrintPreviewModal } from "@/components/photo-studio/sheet/PrintPreviewModal";
+import { PrintContainer } from "@/components/common/PrintContainer";
 import { releaseCanvasBuffer, revokeObjectUrlSafely } from "@/lib/utils/memory";
 import {
   SHEET_A4_SHORT_EDGE_INCHES,
@@ -51,7 +53,11 @@ import {
   calculatePhotoSheetLayout,
   MM_PER_INCH,
 } from "@/lib/photo-studio/sheet-calculator";
-import { flattenPhotoCopies } from "@/lib/multiple-photo/multiple-photo-engine";
+import {
+  flattenPhotoCopies,
+  calculateMultiSheetPages,
+  type MultiSheetPage,
+} from "@/lib/multiple-photo/multiple-photo-engine";
 import { cn } from "@/lib/utils/cn";
 
 export interface MultiplePhotoPreviewPanelProps {
@@ -83,16 +89,24 @@ export const MultiplePhotoPreviewPanel: React.FC<MultiplePhotoPreviewPanelProps>
     text: string;
   } | null>(null);
   const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState<boolean>(false);
-  const [printImageUrl, setPrintImageUrl] = useState<string | null>(null);
-  const printImageUrlRef = useRef<string | null>(null);
-  printImageUrlRef.current = printImageUrl;
+  const [modalPageIndex, setModalPageIndex] = useState<number>(0);
+  const [printImageUrls, setPrintImageUrls] = useState<string[]>([]);
+  const printImageUrlsRef = useRef<string[]>([]);
+  printImageUrlsRef.current = printImageUrls;
+
+  // Calculate multi-sheet pagination across physical sheets
+  const multiSheetPages = useMemo(() => {
+    return calculateMultiSheetPages(photos, config, calculatePhotoSheetLayout);
+  }, [photos, config]);
 
   // Clean up print image URL object URLs on unmount
   useEffect(() => {
     return () => {
-      if (printImageUrlRef.current && printImageUrlRef.current.startsWith("blob:")) {
-        revokeObjectUrlSafely(printImageUrlRef.current);
-      }
+      printImageUrlsRef.current.forEach((url) => {
+        if (url && url.startsWith("blob:")) {
+          revokeObjectUrlSafely(url);
+        }
+      });
     };
   }, []);
 
@@ -255,10 +269,19 @@ export const MultiplePhotoPreviewPanel: React.FC<MultiplePhotoPreviewPanelProps>
       let result: SheetExportResult;
 
       if (format === "pdf") {
-        result = await exportSheetAsPdf(exportSources, targetLayout, exportSheetConfig, {
-          format: "application/pdf",
-          includeCutGuides: config.cutGuides.enabled,
-        });
+        const targetPages = calculateMultiSheetPages(
+          photos,
+          { ...config, paperSize: targetPaperSize, orientation },
+          calculatePhotoSheetLayout
+        );
+        result = await exportMultiSheetAsPdf(
+          targetPages.map((p) => ({ imageSource: p.imageSources, layout: p.layout })),
+          exportSheetConfig,
+          {
+            format: "application/pdf",
+            includeCutGuides: config.cutGuides.enabled,
+          }
+        );
       } else {
         result = await exportSheetAsImage(exportSources, targetLayout, exportSheetConfig, {
           format: format === "jpeg" ? "image/jpeg" : "image/png",
@@ -294,91 +317,54 @@ export const MultiplePhotoPreviewPanel: React.FC<MultiplePhotoPreviewPanelProps>
 
     setIsExporting(true);
     setExportMessage(null);
-    let masterCanvas: any = null;
+
+    const pages = calculateMultiSheetPages(photos, config, calculatePhotoSheetLayout);
+    if (pages.length === 0) {
+      setIsExporting(false);
+      return;
+    }
+
+    // Revoke previous blob URLs
+    printImageUrlsRef.current.forEach((url) => {
+      if (url && url.startsWith("blob:")) {
+        revokeObjectUrlSafely(url);
+      }
+    });
+
+    const renderedUrls: string[] = [];
+    const createdCanvases: (HTMLCanvasElement | OffscreenCanvas)[] = [];
 
     try {
-      const isTargetA4 = config.paperSize === "a4";
-      const orientation = config.orientation;
-      const isManualCols = typeof config.columnsMode === "number";
-      const manualCols = isManualCols ? Math.min(4, Math.max(1, config.columnsMode as number)) : 4;
-      const flatPhotos = flattenPhotoCopies(photos);
-      const manualRows = Math.max(1, Math.ceil(Math.max(1, flatPhotos.length) / manualCols));
+      for (const page of pages) {
+        const masterCanvas = renderMasterSheetCanvas(
+          page.imageSources,
+          page.layout,
+          config.cutGuides,
+          config.cutGuides.includeInExport
+        );
+        createdCanvases.push(masterCanvas);
 
-      const paperWidthInches = isTargetA4
-        ? orientation === "landscape"
-          ? SHEET_A4_LONG_EDGE_INCHES
-          : SHEET_A4_SHORT_EDGE_INCHES
-        : orientation === "landscape"
-        ? SHEET_4X6_LONG_EDGE_INCHES
-        : SHEET_4X6_SHORT_EDGE_INCHES;
-      const paperHeightInches = isTargetA4
-        ? orientation === "landscape"
-          ? SHEET_A4_SHORT_EDGE_INCHES
-          : SHEET_A4_LONG_EDGE_INCHES
-        : orientation === "landscape"
-        ? SHEET_4X6_SHORT_EDGE_INCHES
-        : SHEET_4X6_LONG_EDGE_INCHES;
-
-      const printSheetConfig: PhotoSheetConfig = {
-        paperSize: config.paperSize,
-        orientation,
-        paperWidthInches,
-        paperHeightInches,
-        dpi: config.dpi,
-        layoutMode: isManualCols ? "manual" : "auto",
-        manualCols,
-        manualRows,
-        copies: Math.max(1, flatPhotos.length),
-        centerAlignment: false,
-        margins: config.margins,
-        spacing: config.spacing,
-        cutGuides: config.cutGuides,
-      };
-
-      const photoWidthMm = unitToMm(config.dimensions.width, config.dimensions.unit);
-      const photoHeightMm = unitToMm(config.dimensions.height, config.dimensions.unit);
-
-      const targetLayout = calculatePhotoSheetLayout(printSheetConfig, {
-        widthMm: photoWidthMm,
-        heightMm: photoHeightMm,
-      });
-
-      const exportSources = targetLayout.placements.map((p) => {
-        if (p.index < flatPhotos.length) {
-          return flatPhotos[p.index].imageElement || null;
+        let dataUrl: string;
+        if (masterCanvas instanceof HTMLCanvasElement) {
+          dataUrl = masterCanvas.toDataURL("image/jpeg", 0.98);
+        } else {
+          const blob = await masterCanvas.convertToBlob({ type: "image/jpeg", quality: 0.98 });
+          dataUrl = URL.createObjectURL(blob);
         }
-        return null;
-      });
-
-      masterCanvas = renderMasterSheetCanvas(
-        exportSources,
-        targetLayout,
-        config.cutGuides,
-        config.cutGuides.includeInExport
-      );
-
-      if (printImageUrlRef.current && printImageUrlRef.current.startsWith("blob:")) {
-        revokeObjectUrlSafely(printImageUrlRef.current);
+        renderedUrls.push(dataUrl);
       }
 
-      let dataUrl: string;
-      if (masterCanvas instanceof HTMLCanvasElement) {
-        dataUrl = masterCanvas.toDataURL("image/jpeg", 0.98);
-      } else {
-        const blob = await masterCanvas.convertToBlob({ type: "image/jpeg", quality: 0.98 });
-        dataUrl = URL.createObjectURL(blob);
-      }
+      setPrintImageUrls(renderedUrls);
 
-      setPrintImageUrl(dataUrl);
-
+      const isTargetA4 = config.paperSize === "a4";
       const isLandscape = config.orientation === "landscape";
       const pageSizeCss = isTargetA4
         ? isLandscape
           ? "A4 landscape"
           : "A4 portrait"
         : isLandscape
-        ? "6in 4in landscape"
-        : "4in 6in portrait";
+        ? "6in 4in"
+        : "4in 6in";
 
       let styleEl = document.getElementById("dynamic-print-page-style") as HTMLStyleElement | null;
       if (!styleEl) {
@@ -386,7 +372,7 @@ export const MultiplePhotoPreviewPanel: React.FC<MultiplePhotoPreviewPanelProps>
         styleEl.id = "dynamic-print-page-style";
         document.head.appendChild(styleEl);
       }
-      styleEl.innerHTML = `@media print { @page { size: ${pageSizeCss}; margin: 0; } }`;
+      styleEl.innerHTML = `@page { size: ${pageSizeCss}; margin: 0 !important; }`;
 
       setTimeout(() => {
         window.print();
@@ -400,8 +386,10 @@ export const MultiplePhotoPreviewPanel: React.FC<MultiplePhotoPreviewPanelProps>
       });
       setIsExporting(false);
     } finally {
-      if (masterCanvas && masterCanvas instanceof HTMLCanvasElement) {
-        releaseCanvasBuffer(masterCanvas);
+      for (const c of createdCanvases) {
+        if (c instanceof HTMLCanvasElement) {
+          releaseCanvasBuffer(c);
+        }
       }
     }
   };
@@ -739,8 +727,11 @@ export const MultiplePhotoPreviewPanel: React.FC<MultiplePhotoPreviewPanelProps>
         isOpen={isPrintPreviewOpen}
         onClose={() => setIsPrintPreviewOpen(false)}
         config={printModalConfig}
-        layout={arrangement.layout}
-        imageSource={imageSources}
+        layout={multiSheetPages[modalPageIndex]?.layout || arrangement.layout}
+        imageSource={multiSheetPages[modalPageIndex]?.imageSources || imageSources}
+        totalPages={multiSheetPages.length || 1}
+        currentPage={modalPageIndex}
+        onPageChange={setModalPageIndex}
         onPrintNow={() => {
           setIsPrintPreviewOpen(false);
           handlePrintSheet();
@@ -752,17 +743,11 @@ export const MultiplePhotoPreviewPanel: React.FC<MultiplePhotoPreviewPanelProps>
         isExporting={isExporting}
       />
 
-      {/* Hidden-on-Screen Printable Container for High-DPI Physical Print Output */}
-      <div id="printable-sheet-container" className="hidden print:flex">
-        {printImageUrl && (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={printImageUrl}
-            alt="Printable Photo Sheet"
-            className="w-full h-full object-contain"
-          />
-        )}
-      </div>
+      {/* Unified Portaled Printable Container (attached to document.body, isolated from app layout) */}
+      <PrintContainer
+        pageImages={printImageUrls}
+        alt="Multiple Photo Sheet"
+      />
     </div>
   );
 };

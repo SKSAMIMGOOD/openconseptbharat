@@ -30,6 +30,9 @@ export interface PrintPreviewModalProps {
   onPrintNow: () => void;
   onDownloadPdf: () => void;
   isExporting?: boolean;
+  totalPages?: number;
+  currentPage?: number;
+  onPageChange?: (pageIndex: number) => void;
 }
 
 export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
@@ -41,6 +44,9 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
   onPrintNow,
   onDownloadPdf,
   isExporting = false,
+  totalPages = 1,
+  currentPage = 0,
+  onPageChange,
 }) => {
   const modalCanvasRef = useRef<HTMLCanvasElement>(null);
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
@@ -142,6 +148,31 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
               <span className="text-surface-300">•</span>
               <span>{dimensionsMmStr}</span>
             </div>
+
+            {/* Multi-Page Navigation Bar if totalPages > 1 */}
+            {totalPages > 1 && (
+              <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5 bg-white/95 backdrop-blur-md px-2.5 py-1 rounded-xl border border-surface-200 text-xs shadow-sm font-sans">
+                <span className="text-[11px] font-semibold text-surface-700 mr-1">
+                  Sheet {currentPage + 1} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onPageChange && onPageChange(Math.max(0, currentPage - 1))}
+                  disabled={currentPage <= 0}
+                  className="px-2 py-0.5 rounded-lg border border-surface-200 text-[11px] font-bold text-surface-700 hover:bg-surface-100 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                >
+                  Prev
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onPageChange && onPageChange(Math.min(totalPages - 1, currentPage + 1))}
+                  disabled={currentPage >= totalPages - 1}
+                  className="px-2 py-0.5 rounded-lg border border-surface-200 text-[11px] font-bold text-surface-700 hover:bg-surface-100 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Right Column: Print Checklist & Actions (5 cols) */}
@@ -165,7 +196,13 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
                 <span className="font-bold text-brand-700">{layout.dpi} DPI</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-surface-500 font-sans font-medium">Arranged Photos:</span>
+                <span className="text-surface-500 font-sans font-medium">Total Print Sheets:</span>
+                <span className="font-bold text-brand-700">
+                  {totalPages} {totalPages === 1 ? "Sheet" : "Sheets"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-surface-500 font-sans font-medium">Photos on Sheet:</span>
                 <span className="font-semibold text-surface-800">
                   {layout.totalPhotos} photos ({layout.activeColumns} cols × {layout.activeRows} rows)
                 </span>

@@ -349,3 +349,66 @@ export function generateMultiPhotoFileName(
   const timestamp = Date.now().toString().slice(-6);
   return `multiple-photo-sheet-${paperSize}-${orientation}-${photoCount}photos-${dpi}dpi-${timestamp}${ext}`;
 }
+
+export interface MultiSheetPage {
+  pageIndex: number;
+  totalPages: number;
+  photos: UploadedPhoto[];
+  layout: SheetCalculationResult;
+  imageSources: (any)[];
+}
+
+/**
+ * Calculates pagination across multiple physical sheets when photos exceed single-sheet capacity.
+ *
+ * Rules:
+ * - If photos fit on 1 sheet (page is not full), exactly 1 page is generated.
+ * - If photos fill a sheet, remaining photos cleanly shift onto subsequent sheets.
+ * - Each sheet strictly respects top-aligned rows, margins, and maximum 4 columns.
+ */
+export function calculateMultiSheetPages(
+  photos: UploadedPhoto[],
+  config: MultiplePhotoConfig,
+  calculateLayoutFn: (
+    sheetConfig: PhotoSheetConfig,
+    photoDims: { widthMm: number; heightMm: number }
+  ) => SheetCalculationResult
+): MultiSheetPage[] {
+  const flatPhotos = flattenPhotoCopies(photos);
+  if (flatPhotos.length === 0) return [];
+
+  const widthMm = unitToMm(config.dimensions.width, config.dimensions.unit);
+  const heightMm = unitToMm(config.dimensions.height, config.dimensions.unit);
+
+  // Probe single sheet to determine maxCapacity
+  const probeConfig = buildPhotoSheetConfig(config, flatPhotos.length);
+  const probeLayout = calculateLayoutFn(probeConfig, { widthMm, heightMm });
+  const maxCapacity = Math.max(1, probeLayout.maxCapacity);
+
+  const totalPages = Math.max(1, Math.ceil(flatPhotos.length / maxCapacity));
+  const pages: MultiSheetPage[] = [];
+
+  for (let i = 0; i < totalPages; i++) {
+    const pagePhotos = flatPhotos.slice(i * maxCapacity, (i + 1) * maxCapacity);
+    const pageSheetConfig = buildPhotoSheetConfig(config, pagePhotos.length);
+    const pageLayout = calculateLayoutFn(pageSheetConfig, { widthMm, heightMm });
+
+    const imageSources = pageLayout.placements.map((p) => {
+      if (p.index < pagePhotos.length) {
+        return pagePhotos[p.index].imageElement || null;
+      }
+      return null;
+    });
+
+    pages.push({
+      pageIndex: i,
+      totalPages,
+      photos: pagePhotos,
+      layout: pageLayout,
+      imageSources,
+    });
+  }
+
+  return pages;
+}
+

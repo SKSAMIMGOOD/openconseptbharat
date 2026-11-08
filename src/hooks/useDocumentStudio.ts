@@ -24,11 +24,26 @@ import type {
   DocumentDimensions,
   DocumentEnhancementSettings,
   DocumentPrintSettings,
+  PrintStudioMode,
+  PrintStudioArrangement,
+  DocumentPrintStudioState,
+  PrintPaperSize,
+  CustomPaperDimensions,
+  PrintOrientation,
+  PrintMarginPreset,
+  PrintMargins,
+  PrintAlignment,
+  PrintCustomPosition,
+  PrintScaleMode,
+  DocumentPrintLayoutSettings,
 } from "@/types/document-studio";
 import {
   createDefaultEnhancementSettings,
   isEnhancementActive,
   createDefaultPrintSettings,
+  createDefaultPrintStudioState,
+  createDefaultPrintLayoutSettings,
+  DEFAULT_PRINT_STUDIO_STATE,
 } from "@/types/document-studio";
 import {
   updatePrintSettings,
@@ -121,6 +136,9 @@ export function useDocumentStudio(
   const [autoDetectStatus, setAutoDetectStatus] = useState<DocumentAutoDetectState>({
     status: "idle",
   });
+  const [printStudio, setPrintStudio] = useState<DocumentPrintStudioState>(() =>
+    createDefaultPrintStudioState(isSingleSided)
+  );
 
   // Track initial detected crops for independent reset operations
   const initialFrontCropRef = useRef<CropCoordinates | null>(null);
@@ -389,6 +407,10 @@ export function useDocumentStudio(
       const newDef = getDocumentTypeDefinition(docType);
       const newAspect = newDef.targetDimensions?.aspectRatio ?? null;
       const isSingle = !newDef.supportedSides.includes("back");
+
+      if (isSingle) {
+        setPrintStudio((prev) => ({ ...prev, mode: "front-only" }));
+      }
 
       // If a source document is already loaded, re-run document-specific detection
       if (source.previewUrl && source.dimensions) {
@@ -1197,7 +1219,8 @@ export function useDocumentStudio(
     setFront(createEmptySideResult(targetAspect, selectedDocType));
     setBack(createEmptySideResult(targetAspect, selectedDocType));
     setAutoDetectStatus({ status: "idle" });
-  }, [targetAspect, selectedDocType]);
+    setPrintStudio(createDefaultPrintStudioState(isSingleSided));
+  }, [targetAspect, selectedDocType, isSingleSided]);
 
   /**
    * Phase 08D — Document Print Quality & Dimensions Settings
@@ -1238,6 +1261,154 @@ export function useDocumentStudio(
     [source.dimensions]
   );
 
+  /**
+   * Phase 3 — Document Print Studio & Print Mode Selection
+   */
+  const setPrintStudioMode = useCallback((mode: PrintStudioMode) => {
+    setPrintStudio((prev) => ({ ...prev, mode }));
+  }, []);
+
+  const setPrintStudioArrangement = useCallback(
+    (arrangement: PrintStudioArrangement) => {
+      setPrintStudio((prev) => ({ ...prev, arrangement }));
+    },
+    []
+  );
+
+  const setPrintStudioState = useCallback(
+    (updates: Partial<DocumentPrintStudioState>) => {
+      setPrintStudio((prev) => ({ ...prev, ...updates }));
+    },
+    []
+  );
+
+  /**
+   * Phase 4 — Document Studio Print Layout Settings
+   */
+  const setPrintLayoutSettings = useCallback(
+    (updates: Partial<DocumentPrintLayoutSettings>) => {
+      setPrintStudio((prev) => {
+        const currentLayout = prev.layout || createDefaultPrintLayoutSettings();
+        return {
+          ...prev,
+          layout: {
+            ...currentLayout,
+            ...updates,
+          },
+        };
+      });
+    },
+    []
+  );
+
+  const setPrintPaperSize = useCallback(
+    (paperSize: PrintPaperSize, customPaper?: CustomPaperDimensions) => {
+      setPrintStudio((prev) => {
+        const currentLayout = prev.layout || createDefaultPrintLayoutSettings();
+        return {
+          ...prev,
+          layout: {
+            ...currentLayout,
+            paperSize,
+            ...(customPaper ? { customPaper } : {}),
+          },
+        };
+      });
+    },
+    []
+  );
+
+  const setPrintOrientation = useCallback(
+    (orientation: PrintOrientation) => {
+      setPrintStudio((prev) => {
+        const currentLayout = prev.layout || createDefaultPrintLayoutSettings();
+        return {
+          ...prev,
+          layout: {
+            ...currentLayout,
+            orientation,
+          },
+        };
+      });
+    },
+    []
+  );
+
+  const setPrintMargins = useCallback(
+    (marginPreset: PrintMarginPreset, customMargins?: Partial<PrintMargins>) => {
+      setPrintStudio((prev) => {
+        const currentLayout = prev.layout || createDefaultPrintLayoutSettings();
+        return {
+          ...prev,
+          layout: {
+            ...currentLayout,
+            marginPreset,
+            ...(customMargins
+              ? { margins: { ...currentLayout.margins, ...customMargins } }
+              : {}),
+          },
+        };
+      });
+    },
+    []
+  );
+
+  const setPrintAlignment = useCallback(
+    (alignment: PrintAlignment, customPosition?: Partial<PrintCustomPosition>) => {
+      setPrintStudio((prev) => {
+        const currentLayout = prev.layout || createDefaultPrintLayoutSettings();
+        return {
+          ...prev,
+          layout: {
+            ...currentLayout,
+            alignment,
+            ...(customPosition
+              ? {
+                  customPosition: {
+                    ...currentLayout.customPosition,
+                    ...customPosition,
+                  },
+                }
+              : {}),
+          },
+        };
+      });
+    },
+    []
+  );
+
+  const setPrintScale = useCallback(
+    (scaleMode: PrintScaleMode, customPercentage?: number) => {
+      setPrintStudio((prev) => {
+        const currentLayout = prev.layout || createDefaultPrintLayoutSettings();
+        return {
+          ...prev,
+          layout: {
+            ...currentLayout,
+            scaleMode,
+            ...(typeof customPercentage === "number"
+              ? { customScalePercentage: customPercentage }
+              : {}),
+          },
+        };
+      });
+    },
+    []
+  );
+
+  const setPrintCopies = useCallback((copies: number) => {
+    setPrintStudio((prev) => {
+      const currentLayout = prev.layout || createDefaultPrintLayoutSettings();
+      return {
+        ...prev,
+        layout: {
+          ...currentLayout,
+          copies,
+        },
+      };
+    });
+  }, []);
+
   const hasAnyFile = Boolean(source.file && source.previewUrl);
 
   return {
@@ -1250,12 +1421,14 @@ export function useDocumentStudio(
       back,
       autoDetectStatus,
       printSettings: front.printSettings,
+      printStudio,
     } as DocumentStudioState,
     currentDocDef,
     availableSides,
     hasAnyFile,
     isSingleSided,
     sourceLayoutMode,
+    printStudio,
     setDocumentType,
     setCustomSidesMode,
     setSourceLayoutMode,
@@ -1283,6 +1456,16 @@ export function useDocumentStudio(
     setSideBeforeAfter,
     setSidePrintSettings,
     setAllPrintSettings,
+    setPrintStudioMode,
+    setPrintStudioArrangement,
+    setPrintStudioState,
+    setPrintLayoutSettings,
+    setPrintPaperSize,
+    setPrintOrientation,
+    setPrintMargins,
+    setPrintAlignment,
+    setPrintScale,
+    setPrintCopies,
     clearAll,
   };
 }

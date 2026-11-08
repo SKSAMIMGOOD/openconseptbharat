@@ -4,15 +4,15 @@ import type {
   SheetCalculationResult,
   SheetExportOptions,
   SheetExportResult,
-} from "@/types/photo-sheet";
+} from "../../types/photo-sheet.ts";
 import {
   renderMasterSheetCanvas,
   type ImageSourceDrawable,
   type MultiImageSource,
-} from "./sheet-renderer";
-import { exportCanvasToBlob, downloadImageBlob } from "@/lib/image/exporter";
-import { releaseCanvasBuffer } from "@/lib/utils/memory";
-import { generateSheetFileName } from "./sheet-calculator";
+} from "./sheet-renderer.ts";
+import { exportCanvasToBlob, downloadImageBlob } from "../image/exporter.ts";
+import { releaseCanvasBuffer } from "../utils/memory.ts";
+import { generateSheetFileName } from "./sheet-calculator.ts";
 export { generateSheetFileName };
 
 /**
@@ -149,6 +149,90 @@ export async function exportSheetAsPdf(
   } finally {
     if (masterCanvas instanceof HTMLCanvasElement) {
       releaseCanvasBuffer(masterCanvas);
+    }
+  }
+}
+
+export interface MultiSheetPdfPageInput {
+  imageSource: MultiImageSource;
+  layout: SheetCalculationResult;
+}
+
+/**
+ * Exports multiple physical sheets as a calibrated multi-page PDF document using pdf-lib.
+ * If 1 sheet is provided, outputs a 1-page PDF.
+ * If N sheets are provided, outputs an N-page PDF with exact vector boundaries for each sheet.
+ */
+export async function exportMultiSheetAsPdf(
+  pages: MultiSheetPdfPageInput[],
+  config: PhotoSheetConfig,
+  options: SheetExportOptions
+): Promise<SheetExportResult> {
+  if (pages.length === 0) {
+    throw new Error("No pages provided for multi-sheet PDF export.");
+  }
+
+  const firstLayout = pages[0].layout;
+  const paperName = firstLayout.paperSize === "a4" ? "A4" : "4x6";
+  const pdfDoc = await PDFDocument.create();
+  pdfDoc.setTitle(`${paperName} Photo Sheet — Browser Utility Studio`);
+  pdfDoc.setAuthor("Browser Utility Studio (Client-Side)");
+  pdfDoc.setCreator("Browser Utility Studio Photo Sheet Generator");
+  pdfDoc.setProducer("pdf-lib (In-Browser Execution)");
+
+  const createdCanvases: (HTMLCanvasElement | OffscreenCanvas)[] = [];
+
+  try {
+    for (const pageItem of pages) {
+      const includeGuides = options.includeCutGuides ?? config.cutGuides.includeInExport;
+      const masterCanvas = renderMasterSheetCanvas(
+        pageItem.imageSource,
+        pageItem.layout,
+        config.cutGuides,
+        includeGuides
+      );
+      createdCanvases.push(masterCanvas);
+
+      const jpegBlob = await exportCanvasToBlob(masterCanvas, {
+        format: "image/jpeg",
+        quality: options.quality ?? 0.95,
+        backgroundColor: "#ffffff",
+      });
+
+      const imageBytes = new Uint8Array(await jpegBlob.arrayBuffer());
+      const embeddedImage = await pdfDoc.embedJpg(imageBytes);
+
+      const page = pdfDoc.addPage([pageItem.layout.pageWidthPt, pageItem.layout.pageHeightPt]);
+      page.drawImage(embeddedImage, {
+        x: 0,
+        y: 0,
+        width: pageItem.layout.pageWidthPt,
+        height: pageItem.layout.pageHeightPt,
+      });
+    }
+
+    const pdfBytes = await pdfDoc.save();
+    const pdfBlob = new Blob([pdfBytes as any], { type: "application/pdf" });
+
+    const fileName =
+      options.fileName ||
+      generateSheetFileName(config.orientation, firstLayout.dpi, "pdf", firstLayout.paperSize);
+
+    return {
+      blob: pdfBlob,
+      fileName,
+      format: "application/pdf",
+      widthPx: firstLayout.sheetWidthPx,
+      heightPx: firstLayout.sheetHeightPx,
+      pageWidthPt: firstLayout.pageWidthPt,
+      pageHeightPt: firstLayout.pageHeightPt,
+      sizeBytes: pdfBlob.size,
+    };
+  } finally {
+    for (const canvas of createdCanvases) {
+      if (canvas instanceof HTMLCanvasElement) {
+        releaseCanvasBuffer(canvas);
+      }
     }
   }
 }

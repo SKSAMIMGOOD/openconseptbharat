@@ -345,6 +345,141 @@ export interface DocumentStudioState {
   back: DocumentSideResult;
   autoDetectStatus: DocumentAutoDetectState;
   printSettings?: DocumentPrintSettings;
+  printStudio?: DocumentPrintStudioState;
+}
+
+/**
+ * Phase 3 & Phase 4 — Document Studio Print Studio & Print Layout Settings
+ */
+export type PrintStudioMode = "front-only" | "back-only" | "combined";
+
+export type PrintStudioArrangement = "vertical" | "horizontal";
+
+export type PrintPaperSize = "a4" | "a5" | "letter" | "custom";
+
+export type PaperDimensionUnit = "mm" | "inch";
+
+export interface PaperSizeDimensions {
+  widthMm: number;
+  heightMm: number;
+}
+
+export interface CustomPaperDimensions {
+  width: number;
+  height: number;
+  unit: PaperDimensionUnit;
+}
+
+export const STANDARD_PAPER_SIZES: Record<"a4" | "a5" | "letter", PaperSizeDimensions> = {
+  a4: { widthMm: 210, heightMm: 297 },
+  a5: { widthMm: 148, heightMm: 210 },
+  letter: { widthMm: 215.9, heightMm: 279.4 },
+};
+
+export type PrintOrientation = "portrait" | "landscape";
+
+export type PrintMarginPreset = "none" | "small" | "normal" | "custom";
+
+export interface PrintMargins {
+  topMm: number;
+  bottomMm: number;
+  leftMm: number;
+  rightMm: number;
+}
+
+export const DEFAULT_PRINT_MARGINS: Readonly<PrintMargins> = {
+  topMm: 12.7,
+  bottomMm: 12.7,
+  leftMm: 12.7,
+  rightMm: 12.7,
+};
+
+export const MARGIN_PRESET_VALUES: Record<
+  "none" | "small" | "normal",
+  PrintMargins
+> = {
+  none: { topMm: 0, bottomMm: 0, leftMm: 0, rightMm: 0 },
+  small: { topMm: 5, bottomMm: 5, leftMm: 5, rightMm: 5 },
+  normal: { topMm: 12.7, bottomMm: 12.7, leftMm: 12.7, rightMm: 12.7 },
+};
+
+export type PrintAlignment = "center" | "top" | "custom";
+
+export interface PrintCustomPosition {
+  xMm: number;
+  yMm: number;
+}
+
+export type PrintScaleMode = "actual" | "fit" | "custom";
+
+export interface DocumentPrintLayoutSettings {
+  paperSize: PrintPaperSize;
+  customPaper: CustomPaperDimensions;
+  orientation: PrintOrientation;
+  marginPreset: PrintMarginPreset;
+  margins: PrintMargins;
+  alignment: PrintAlignment;
+  customPosition: PrintCustomPosition;
+  scaleMode: PrintScaleMode;
+  customScalePercentage: number;
+  copies: number;
+}
+
+export const DEFAULT_PRINT_LAYOUT_SETTINGS: Readonly<DocumentPrintLayoutSettings> = {
+  paperSize: "a4",
+  customPaper: {
+    width: 210,
+    height: 297,
+    unit: "mm",
+  },
+  orientation: "portrait",
+  marginPreset: "normal",
+  margins: DEFAULT_PRINT_MARGINS,
+  alignment: "center",
+  customPosition: {
+    xMm: 0,
+    yMm: 0,
+  },
+  scaleMode: "actual",
+  customScalePercentage: 100,
+  copies: 1,
+};
+
+export function createDefaultPrintLayoutSettings(): DocumentPrintLayoutSettings {
+  return {
+    paperSize: "a4",
+    customPaper: { width: 210, height: 297, unit: "mm" },
+    orientation: "portrait",
+    marginPreset: "normal",
+    margins: { ...DEFAULT_PRINT_MARGINS },
+    alignment: "center",
+    customPosition: { xMm: 0, yMm: 0 },
+    scaleMode: "actual",
+    customScalePercentage: 100,
+    copies: 1,
+  };
+}
+
+export interface DocumentPrintStudioState {
+  mode: PrintStudioMode;
+  arrangement: PrintStudioArrangement;
+  layout?: DocumentPrintLayoutSettings;
+}
+
+export const DEFAULT_PRINT_STUDIO_STATE: Readonly<DocumentPrintStudioState> = {
+  mode: "combined",
+  arrangement: "vertical",
+  layout: DEFAULT_PRINT_LAYOUT_SETTINGS,
+};
+
+export function createDefaultPrintStudioState(
+  isSingleSided: boolean = false
+): DocumentPrintStudioState {
+  return {
+    mode: isSingleSided ? "front-only" : "combined",
+    arrangement: "vertical",
+    layout: createDefaultPrintLayoutSettings(),
+  };
 }
 
 /** Legacy compatibility alias */

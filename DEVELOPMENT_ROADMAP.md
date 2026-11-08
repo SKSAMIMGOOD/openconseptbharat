@@ -481,14 +481,29 @@ This multi-phase roadmap outlines the step-by-step engineering progression for B
 
 ## 📌 Phase 06 — Resume / CV Maker
 
-**Target Module:** Resume / CV Maker
+**Target Module:** Resume / CV Maker  
+**Status:** Completed  
+**Target Route:** `/tools/resume-maker`
 
-- [ ] **Structured Resume Builder:**
-  - Reactive form sections: Contact, Experience, Education, Skills, Projects.
-  - Live split-screen side-by-side preview.
-  - ATS-friendly modern typography and structural formatting.
-- [ ] **Direct Vector PDF Rendering:**
-  - Vector text rendering via `pdf-lib` (selectable text, clickable links, perfect printing).
+- [x] **Structured Resume Builder Interface (`src/app/tools/resume-maker/page.tsx` & `src/components/resume/ResumeEditor.tsx`):**
+  - Reactive form sections: Contact Details, Professional Summary, Work Experience, Education, Skills, Key Projects, and Additional Sections (Certifications, Languages, Awards, Achievements).
+  - Add, edit, remove, and reorder (Move Up / Down) capabilities for Work Experience, Education, and Projects.
+  - Live split-screen side-by-side editing and preview on desktop with responsive mobile view switcher ("Edit Details" vs "Live Preview").
+  - Local persistence via `localStorage` with corrupted data recovery and 0 server uploads.
+  - JSON backup Export and Import functionality.
+  - One-click "Load Sample" and "Reset" features.
+- [x] **Resume Template Engine (`src/components/resume/templates/`):**
+  - **Modern Professional:** Contemporary typography with subtle brand accents, balanced spacing, and high readability.
+  - **Minimal ATS:** Strict single-column, high-contrast monochrome layout engineered specifically for applicant tracking system parsers.
+  - **Classic Corporate:** Elegant serif typography (Times/Georgia) with formal rules, centered header, and traditional executive alignment.
+- [x] **Direct Vector PDF Rendering (`src/lib/resume/resume-pdf.ts`):**
+  - 100% in-browser vector PDF compilation using `pdf-lib` (PageSizes.A4: $595.28 \times 841.89\text{ pt}$).
+  - Fully selectable, copyable, ATS-searchable text with standard embedded fonts (Helvetica, TimesRoman).
+  - Multi-page pagination with automatic text wrapping, orphan prevention, and footer page numbering ("Page X of Y").
+  - Browser-native print preview support.
+- [x] **Automated Test Suite (`tests/resume-maker.test.mjs`):**
+  - 24 automated unit and integration tests covering empty resume, basic contact info, full multi-section resume, long text wrapping, 10+ experience entries pagination, template switching, JSON round-trip, and local persistence.
+  - **670 total tests passing** with 0 failures across all 55 test suites.
 
 ---
 
@@ -615,3 +630,135 @@ This multi-phase roadmap outlines the step-by-step engineering progression for B
 - [x] **Automated Test Suite (`tests/document-enhancement.test.mjs`):**
   - 27 comprehensive tests across 10 suites covering brightness, contrast, saturation, grayscale, invert, QR/text-safe sharpness, front/back state independence, non-destructive reversibility, and execution performance budgets.
   - **483 total tests passing** with 0 failures across all 18 test suites.
+
+---
+
+## 📌 Phase 08D — Print Quality & Document Dimensions in Document Studio
+
+**Status:** Completed  
+**Target Route:** `/tools/document-studio`
+
+- [x] **Collapsible Print Settings Panel (`src/components/document-studio/DocumentPrintSettingsPanel.tsx`):**
+  - Print quality presets: Standard (150 DPI), High (300 DPI, default), Maximum (600 DPI), and Custom DPI (72–1200 DPI bounds with real-time validation).
+  - Standard physical dimension presets: Aadhaar (85.6 × 53.98 mm), PAN (85.6 × 53.98 mm), Voter ID (85.6 × 53.98 mm), Original Size, and Custom dimensions.
+  - Measurement unit switching: Millimeters (mm), Inches (in), and Pixels (px) with automatic unit conversions.
+  - Proportional aspect ratio lock maintaining physical shape on width or height changes.
+  - Resolution sufficiency diagnostics warning when source image lacks sufficient physical pixel density for chosen DPI without artificial upscaling.
+  - Front and Back independent print settings with optional side synchronisation.
+- [x] **Automated Test Suite (`tests/document-dimensions.test.mjs`):**
+  - 42 comprehensive tests across 10 suites covering presets, conversions, DPI bounds, aspect ratio locking, sufficiency diagnostics, and side persistence.
+  - **525 total tests passing** with 0 failures across all 19 test suites.
+
+---
+
+## 📌 Phase 08E / Phase 3 — Print Studio and Print Mode Selection
+
+**Status:** Completed  
+**Target Route:** `/tools/document-studio`
+
+- [x] **Dedicated Print Studio Section (`src/components/document-studio/DocumentPrintStudio.tsx`):**
+  - Interactive Print Studio panel embedded into Document Studio with collapsible controls and dedicated Top Control Bar navigation shortcut.
+  - Clearly visible Print Mode selector with 3 dedicated options:
+    1. **Front Side Only (`front-only`)**: Previews solely the front document; hides back side; preserves original crop, enhancements, and aspect ratio.
+    2. **Back Side Only (`back-only`)**: Previews solely the back document; hides front side; preserves original crop, enhancements, and aspect ratio.
+    3. **Front + Back Combined (`combined`)**: Previews both front and back sides simultaneously.
+  - Arrangement selection for Combined mode:
+    - **Vertical Arrangement**: Stacked layout (Front on top, Back on bottom) with clear visual flow divider.
+    - **Horizontal Arrangement**: Side-by-side layout (Front on left, Back on right) with responsive spacing.
+- [x] **Large Readable Print Studio Preview Canvas:**
+  - Neutral canvas stage distinguishing the arrangement preview from the editing workspace without paper/margin confusion.
+  - Pre-print arrangement guidance banner clarifying that paper sizes (A4/Letter), margins, and orientation belong to the upcoming Print Layout phase.
+  - Document cards with strict CSS aspect ratio preservation (`style={{ aspectRatio }}`), preventing distortion, stretching, or cropping.
+  - Prominent "Front Side" and "Back Side" badges (`F` and `B` indicators) and metadata chips (dimensions, DPI, enhancement status).
+  - Informative empty states with helpful guidance when front or back documents are missing, uncropped, or for single-sided documents (like PAN card).
+- [x] **Reactive State Engine (`src/lib/document/document-print-studio.ts` & `src/hooks/useDocumentStudio.ts`):**
+  - Pure layout resolution engine (`resolvePrintStudioLayout`, `resolveActiveSideImage`, `calculateRelativeDisplayScale`).
+  - Immediate visual updates on mode or arrangement changes without duplicate image processing.
+  - Independent enhancement reflection (Front and Back enhancements remain strictly decoupled).
+  - Relative display scale calculation preserving exact physical proportions between sides.
+  - 100% in-browser, client-side, zero-upload privacy guarantee.
+- [x] **Automated Test Suite (`tests/document-print-studio.test.mjs`):**
+  - 34 comprehensive tests across 9 suites testing Front Side Only, Back Side Only, Front + Back Combined, Vertical/Horizontal arrangements, missing document empty states, enhancement reflection, dimension preservation, and non-regression of existing features.
+  - **559 total tests passing** with 0 failures across all 20 test suites.
+
+---
+
+## 📌 Phase 08F / Phase 4 — Print Layout Settings
+
+**Status:** Completed  
+**Target Route:** `/tools/document-studio`
+
+- [x] **Paper Size Selection & Custom Dimensions (`src/components/document-studio/DocumentPrintStudio.tsx`):**
+  - Standard paper size options: **A4** (210 × 297 mm), **A5** (148 × 210 mm), **Letter** (8.5 × 11.0 in / 215.9 × 279.4 mm), and **Custom**.
+  - Custom paper dimensions editor with Width, Height, and Unit selector (`mm` or `inches`) with automatic unit conversion and validation.
+- [x] **Orientation Controls (`Portrait` vs `Landscape`):**
+  - Portrait (page height >= width) and Landscape (page width >= height) options.
+  - Immediate dynamic recalculation of paper width, height, aspect ratio, and layout positions on orientation changes.
+- [x] **Margins Configuration & Strict Sanitization:**
+  - Presets: **No Margins** (0 mm), **Small Margins** (5 mm), **Normal Margins** (12.7 mm / 0.5 in), and **Custom Margins**.
+  - Independent configuration of Top, Bottom, Left, and Right margins in millimeters.
+  - Strict validation preventing negative margins, non-numeric values, or margins exceeding paper boundaries (maintaining >= 10 mm printable area).
+- [x] **Document Alignment Controls:**
+  - Presets: **Center** (horizontally and vertically centered in printable area), **Top** (aligned to top margin, horizontally centered), and **Custom Position**.
+  - Custom Position controls: independent Horizontal offset X (mm) and Vertical offset Y (mm) adjustments.
+- [x] **Document Scaling with Aspect Ratio Preservation:**
+  - Options: **Actual Size (100%)** (1:1 physical CR80 dimensions), **Fit to Page** (dynamically scales to fill printable area without overflowing), and **Custom Percentage** (10% to 500%).
+  - Strict aspect ratio preservation mathematically guaranteed (`cardScaledW / cardScaledH = originalAspect`) to eliminate any distortion or stretching.
+- [x] **Copies Setting:**
+  - Minimum: 1, Maximum: 20, Default: 1.
+  - Interactive stepper buttons (`-` and `+`) with direct integer input validation and safe clamping.
+- [x] **Realistic Paper Sheet Layout Preview Canvas:**
+  - Visual paper-like canvas displaying accurate aspect ratio, paper drop-shadow, and responsive scaling.
+  - Visible margin guide box (dashed blue boundary) identifying the printable zone.
+  - Precise document positioning and scaling in physical percentage coordinates (`xPercent`, `yPercent`, `widthPercent`, `heightPercent`).
+  - Strict preservation of Phase 3 modes (Front Only, Back Only, Combined with Vertical/Horizontal arrangements).
+  - Informative empty states for missing sides and visual overflow warnings if documents exceed paper boundaries.
+  - Dual-view toggle: **Paper Sheet View** (default) vs **Card Details View** (Phase 3 inspection).
+- [x] **Automated Test Suite (`tests/document-print-layout.test.mjs`):**
+  - 45 comprehensive unit and integration tests across 8 suites verifying all paper sizes, orientation swapping, margin presets and clamping, alignment options, scaling, copies validation, coordinate math, overflow detection, and integration with existing enhancements and dimensions.
+  - **604 total tests passing** with 0 failures across all 21 test suites.
+
+---
+
+## 📌 Phase 08G / Phase 5 — Actual Printing and Print-Ready PDF Generation ✅ [COMPLETED]
+
+**Status:** Completed  
+**Target Route:** `/tools/document-studio`
+
+- [x] **Browser Native Print Document Action (`src/lib/document/document-print-pdf.ts` & `src/components/document-studio/DocumentPrintStudio.tsx`):**
+  - High-resolution canvas rendering engine (`renderMasterDocumentCanvas`) composing documents onto paper sheets with exact millimeter-to-pixel coordinate projection.
+  - Dedicated `#printable-sheet-container` in DOM with `@media print` isolation: prints solely the document sheet and hides all application UI, headers, sidebars, controls, and buttons.
+  - Dynamic CSS `@page { size: ...; margin: 0; }` style element injection for A4, A5, Letter, and Custom dimensions in Portrait and Landscape orientations.
+  - Opens browser native print dialog (`window.print()`) with automatic cleanup.
+  - Strict document aspect ratio preservation preventing stretching, distortion, or clipping.
+  - Applies independent front and back enhancement settings (brightness, contrast, sharpness, grayscale, binarization, auto-levels) to physical print output.
+  - Respects selected document dimensions (CR80 ID card or custom) and selected print DPI (150, 300, 600, or custom).
+- [x] **Print Modes & Arrangements:**
+  - **Front Side Only (`front-only`)**: Renders only the front side with front enhancements and dimensions.
+  - **Back Side Only (`back-only`)**: Renders only the back side with back enhancements and dimensions.
+  - **Front + Back Combined (`combined`)**:
+    - **Vertical Arrangement**: Stacks Front and Back cards with calibrated inter-card spacing.
+    - **Horizontal Arrangement**: Places Front and Back cards side-by-side with calibrated inter-card spacing.
+- [x] **Copies Behavior & Native Browser Limitation Handling:**
+  - PDF Generation: Multi-page generation producing $N$ identical vector-calibrated pages reflecting the copies setting (1–20).
+  - Native Print: Prominent disclaimer in UI and modal explaining modern browser security limitation (web applications cannot programmatically override printer copy counts), guiding users to verify copies in the native print dialog.
+- [x] **Print-Ready PDF Generation (`generatePrintReadyPdf`):**
+  - Vector-calibrated page sizing with `pdf-lib` ($1\text{ mm} = 72 / 25.4\text{ pt}$).
+  - Embeds high-fidelity JPEG raster image without lossy re-encoding or artificial downsampling.
+  - Supports all paper sizes (A4, A5, Letter, Custom) and orientations (Portrait, Landscape).
+  - Embeds document metadata (Title, Subject, Creator, Producer).
+  - Semantic filename generation (`generatePrintFileName`) such as `document-studio-aadhaar-a4-portrait-300dpi.pdf`.
+  - 100% client-side execution with tracked object URL deallocation (`createTrackedObjectURL` & `revokeObjectUrlSafely`).
+- [x] **Print Preview Modal (`src/components/document-studio/DocumentPrintPreviewModal.tsx`):**
+  - High-fidelity modal displaying large paper sheet preview with margin boundaries and document placement.
+  - Physical dimension chips: Millimeters (mm), Inches (in), PDF Points (pt), Target DPI, and Copies.
+  - Integrated action buttons to launch browser native print or download print-ready PDF.
+- [x] **Source Resolution Adequacy Diagnostics (`checkSourceResolutionAdequacy`):**
+  - Computes effective DPI based on source cropped pixels and target physical dimensions.
+  - Alerts user with actionable warnings when effective DPI < 75% of target DPI, preventing unexpectedly blurry physical prints without artificially upscaling pixels.
+- [x] **Error Handling & Feedback Banners:**
+  - Validates missing front/back documents per mode, invalid paper dimensions, and invalid DPI.
+  - Displays user-friendly error and success banners with dismiss actions.
+- [x] **Automated Test Suite (`tests/document-print-execution.test.mjs`):**
+  - 30 tests covering readiness validation, resolution checks, points conversion, CSS `@page` generation, filename generation, `pdf-lib` PDF generation with copies, aspect ratio preservation, and error handling.
+  - **634 total tests passing** with 0 failures across all 22 test suites.
