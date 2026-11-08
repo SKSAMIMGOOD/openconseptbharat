@@ -300,6 +300,38 @@ export async function renderDocumentCrop(
       cr80Scaling.drawWidth,
       cr80Scaling.drawHeight
     );
+
+    // Extend top and bottom edges using the card's edge pixels for cards wider than CR80
+    // (e.g. Ration Card artwork aspect 1.669, 78.1 x 46.8 mm) to seamlessly fill 54 mm (638 px)
+    // without cropping sides or stretching interior card content.
+    if (cr80Scaling.padVertical > 0) {
+      outCtx.drawImage(
+        rotatedCanvas,
+        cropX,
+        cropY,
+        cropW,
+        1,
+        cr80Scaling.drawX,
+        0,
+        cr80Scaling.drawWidth,
+        cr80Scaling.drawY
+      );
+      const bottomCardY = cr80Scaling.drawY + cr80Scaling.drawHeight;
+      const bottomRemaining = CR80_TARGET_HEIGHT_PX - bottomCardY;
+      if (bottomRemaining > 0) {
+        outCtx.drawImage(
+          rotatedCanvas,
+          cropX,
+          cropY + cropH - 1,
+          cropW,
+          1,
+          cr80Scaling.drawX,
+          bottomCardY,
+          cr80Scaling.drawWidth,
+          bottomRemaining
+        );
+      }
+    }
   } else {
     outCtx.drawImage(
       rotatedCanvas,

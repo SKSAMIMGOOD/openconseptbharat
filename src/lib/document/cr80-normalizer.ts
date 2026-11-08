@@ -187,6 +187,40 @@ export async function renderCR80NormalizedCrop(
     geometry.drawHeight
   );
 
+  // Extend top and bottom edges using the card's edge pixels for cards wider than CR80
+  // (e.g. Ration Card artwork aspect 1.669, 78.1 x 46.8 mm) to seamlessly fill 54 mm (638 px)
+  // without cropping sides or stretching interior card content.
+  if (geometry.padVertical > 0) {
+    // Extend top edge upward
+    ctx.drawImage(
+      sourceImage,
+      crop.x,
+      crop.y,
+      crop.width,
+      1,
+      geometry.drawX,
+      0,
+      geometry.drawWidth,
+      geometry.drawY
+    );
+    // Extend bottom edge downward
+    const bottomCardY = geometry.drawY + geometry.drawHeight;
+    const bottomRemaining = CR80_TARGET_HEIGHT_PX - bottomCardY;
+    if (bottomRemaining > 0) {
+      ctx.drawImage(
+        sourceImage,
+        crop.x,
+        crop.y + crop.height - 1,
+        crop.width,
+        1,
+        geometry.drawX,
+        bottomCardY,
+        geometry.drawWidth,
+        bottomRemaining
+      );
+    }
+  }
+
   if (applyCorners) {
     ctx.restore();
   }

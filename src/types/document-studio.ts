@@ -233,6 +233,11 @@ export interface DocumentReferenceMeasurement {
   approxHeightPx: number;
   aspectRatio: number;
   description: string;
+  cutBox?: NormalizedCardCoordinates;
+  bottomLeft?: {
+    front: NormalizedCardCoordinates;
+    back: NormalizedCardCoordinates;
+  };
 }
 
 export interface ContentClassificationResult {

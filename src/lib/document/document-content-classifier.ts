@@ -20,6 +20,10 @@ export interface CardContentFeatures {
   qrBarcodeScore: number; // 0.0 - 1.0
   textLineDensity: number; // 0.0 - 1.0
   meanSaturation: number;
+  has1DBarcode?: boolean;
+  barcode1DScore?: number;
+  hasBottomRightQr?: boolean;
+  bottomRightQrScore?: number;
 }
 
 export interface CardClassificationDecision {
@@ -68,6 +72,8 @@ export function extractCardFeatures(buffer: PixelBuffer): CardContentFeatures {
 
   const skinPixelCounts = new Array(9).fill(0);
   const qrCandidateCounts = new Array(9).fill(0);
+  const cellHTransitions = new Array(9).fill(0);
+  const cellVTransitions = new Array(9).fill(0);
   let totalSaturation = 0;
 
   // Track horizontal transitions for text/barcode detection
@@ -116,6 +122,7 @@ export function extractCardFeatures(buffer: PixelBuffer): CardContentFeatures {
           0.299 * data[nextIdx] + 0.587 * data[nextIdx + 1] + 0.114 * data[nextIdx + 2];
         if (Math.abs(lum - nextLum) > 50) {
           horizontalTransitions++;
+          cellHTransitions[cellIdx]++;
         }
       }
 
@@ -126,6 +133,7 @@ export function extractCardFeatures(buffer: PixelBuffer): CardContentFeatures {
           0.299 * data[nextIdxY] + 0.587 * data[nextIdxY + 1] + 0.114 * data[nextIdxY + 2];
         if (Math.abs(lum - nextLumY) > 50) {
           verticalTransitions++;
+          cellVTransitions[cellIdx]++;
         }
       }
     }
@@ -147,6 +155,25 @@ export function extractCardFeatures(buffer: PixelBuffer): CardContentFeatures {
   // Text density from horizontal transitions
   const textLineDensity = Math.min(1.0, (horizontalTransitions / (sampledCount || 1)) * 2.0);
 
+  // Bottom-right QR code analysis (cell 8 = gridY 2, gridX 2):
+  // Front Ration card has a QR code specifically in the bottom right corner.
+  const qrRatioCell8 = qrCandidateCounts[8] / samplesPerCell;
+  const qrTransitionsCell8 = Math.min(cellHTransitions[8], cellVTransitions[8]) / samplesPerCell;
+  const bottomRightQrScore = Math.min(1.0, qrRatioCell8 * 1.6 + qrTransitionsCell8 * 1.2);
+  const hasBottomRightQr = bottomRightQrScore >= 0.30;
+
+  // Centered 1D barcode analysis:
+  // Back Ration card features a centered 1D barcode with many thin vertical bars.
+  // 1D barcodes produce high horizontal transitions with comparatively low vertical transitions.
+  const centerH = cellHTransitions[4] + Math.round(cellHTransitions[1] * 0.5);
+  const centerV = cellVTransitions[4] + Math.round(cellVTransitions[1] * 0.5);
+  const hToVRatio = (centerH + 1) / (centerV + 1);
+  const isBarcodeDominant = hToVRatio >= 1.6 && (centerH / samplesPerCell) >= 0.12;
+  const barcode1DScore = isBarcodeDominant
+    ? Math.min(1.0, (hToVRatio * 0.25) + (centerH / samplesPerCell) * 0.5)
+    : 0;
+  const has1DBarcode = barcode1DScore >= 0.30;
+
   return {
     hasPhoto,
     photoScore: Math.round(photoScore * 100) / 100,
@@ -154,6 +181,10 @@ export function extractCardFeatures(buffer: PixelBuffer): CardContentFeatures {
     qrBarcodeScore: Math.round(qrBarcodeScore * 100) / 100,
     textLineDensity: Math.round(textLineDensity * 100) / 100,
     meanSaturation: Math.round(meanSaturation * 10) / 10,
+    has1DBarcode,
+    barcode1DScore: Math.round(barcode1DScore * 100) / 100,
+    hasBottomRightQr,
+    bottomRightQrScore: Math.round(bottomRightQrScore * 100) / 100,
   };
 }
 
@@ -165,6 +196,64 @@ export function decideFrontBackFromFeatures(
   featB: CardContentFeatures,
   docType: DocumentTypeId = "aadhaar"
 ): CardClassificationDecision {
+  // Dedicated Ration Card classification:
+  // - Front card: bottom-right QR code, personal details, NO face photo required
+  // - Back card: centered 1D barcode (vertical bars), address block
+  // - QR code presence MUST NOT be used to identify Back!
+  // - Position fallback: Left card = Front, Right card = Back
+  if (docType === "ration-card") {
+    let rationFrontScoreA = 0;
+    let rationFrontScoreB = 0;
+
+    if (featA.hasBottomRightQr) {
+      rationFrontScoreA += (featA.bottomRightQrScore ?? 0.8) * 2.2;
+    }
+    if (featB.hasBottomRightQr) {
+      rationFrontScoreB += (featB.bottomRightQrScore ?? 0.8) * 2.2;
+    }
+
+    if (featA.has1DBarcode) {
+      rationFrontScoreA -= (featA.barcode1DScore ?? 0.8) * 2.5; // Back indicator
+    }
+    if (featB.has1DBarcode) {
+      rationFrontScoreB -= (featB.barcode1DScore ?? 0.8) * 2.5; // Back indicator
+    }
+
+    const rationDiff = Math.abs(rationFrontScoreA - rationFrontScoreB);
+
+    if (rationFrontScoreB > rationFrontScoreA && rationDiff >= 0.35) {
+      return {
+        shouldSwap: true,
+        confidence: Math.min(0.98, Math.round((0.75 + rationDiff * 0.15) * 100) / 100),
+        frontCandidateFeatures: featB,
+        backCandidateFeatures: featA,
+        reason:
+          "Ration Card classification detected 1D barcode on first crop and bottom-right QR code on second crop. Crops swapped to Front/Back order.",
+      };
+    }
+
+    if (rationFrontScoreA > rationFrontScoreB && rationDiff >= 0.35) {
+      return {
+        shouldSwap: false,
+        confidence: Math.min(0.98, Math.round((0.75 + rationDiff * 0.15) * 100) / 100),
+        frontCandidateFeatures: featA,
+        backCandidateFeatures: featB,
+        reason:
+          "Ration Card classification confirmed first crop contains front features (bottom-right QR) and second crop contains back features (1D barcode).",
+      };
+    }
+
+    // Position-based fallback: Left card = Front, Right card = Back
+    return {
+      shouldSwap: false,
+      confidence: 0.90,
+      frontCandidateFeatures: featA,
+      backCandidateFeatures: featB,
+      reason:
+        "Visual content signals balanced; preserved standard positional order (Left = Front, Right = Back).",
+    };
+  }
+
   // Compute Front score for Candidate A:
   // Photos strongly indicate Front. QR codes strongly indicate Back.
   let frontScoreA = featA.photoScore * 2.2 - featA.qrBarcodeScore * 1.5;
@@ -185,10 +274,6 @@ export function decideFrontBackFromFeatures(
     // Voter ID front has photo + EPIC number
     if (featA.hasPhoto) frontScoreA += 1.4;
     if (featB.hasPhoto) frontScoreB += 1.4;
-  } else if (docType === "ration-card") {
-    // Ration card front has photo and head of family
-    if (featA.hasPhoto) frontScoreA += 1.2;
-    if (featB.hasPhoto) frontScoreB += 1.2;
   }
 
   const scoreDiff = Math.abs(frontScoreA - frontScoreB);

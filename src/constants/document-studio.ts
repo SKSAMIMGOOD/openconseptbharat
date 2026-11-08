@@ -112,6 +112,9 @@ export const AADHAAR_CARD_MEASUREMENTS: DocumentReferenceMeasurement = {
  * - Vertical fold: X ~ 1280 (normalized ~0.5020)
  * - Front card: X 317–1239, Y 2616–3168 (approx 923 x 553 px, aspect ~1.669)
  * - Back card: X 1317–2239, Y 2616–3168 (approx 923 x 553 px, aspect ~1.669)
+ * - Bottom-left normalized coordinates (Y inverted):
+ *   Front: X 0.1243–0.4859, Y 0.0400–0.2073
+ *   Back:  X 0.5165–0.8780, Y 0.0400–0.2073
  */
 export const RATION_CARD_MEASUREMENTS: DocumentReferenceMeasurement = {
   front: {
@@ -130,6 +133,26 @@ export const RATION_CARD_MEASUREMENTS: DocumentReferenceMeasurement = {
   approxHeightPx: 553,
   aspectRatio: 1.669,
   description: "Ration Card lower 35% cut box with dashed boundaries and central fold",
+  cutBox: {
+    xMin: 0.1055, // 269 / 2550
+    xMax: 0.8941, // 2280 / 2550
+    yMin: 0.7788, // 2570 / 3300
+    yMax: 0.9712, // 3205 / 3300
+  },
+  bottomLeft: {
+    front: {
+      xMin: 0.1243,
+      xMax: 0.4859,
+      yMin: 0.04, // 1 - 0.9600
+      yMax: 0.2073, // 1 - 0.7927
+    },
+    back: {
+      xMin: 0.5165,
+      xMax: 0.878,
+      yMin: 0.04, // 1 - 0.9600
+      yMax: 0.2073, // 1 - 0.7927
+    },
+  },
 };
 
 /**

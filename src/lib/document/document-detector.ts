@@ -1339,17 +1339,245 @@ export function detectAadhaarCardInPixelBuffer(
 }
 
 /**
+ * Detects dashed horizontal boundaries spanning at least 85% of the candidate cut-box width
+ * in the lower region of the Ration Card sheet (Y >= 0.75 * H, X between 0.05 * W and 0.95 * W).
+ */
+export function findRationCutBoxDashedRows(
+  buffer: PixelBuffer,
+  yMin: number,
+  yMax: number,
+  xMin: number,
+  xMax: number,
+  minSpanRatio: number = 0.85,
+  minTransitions: number = 8,
+  darkThreshold: number = 140
+): number[] {
+  const { data, width, height } = buffer;
+  const dashedRows: number[] = [];
+
+  const startY = Math.max(0, Math.floor(yMin));
+  const endY = Math.min(height - 1, Math.ceil(yMax));
+  const startX = Math.max(0, Math.floor(xMin));
+  const endX = Math.min(width - 1, Math.ceil(xMax));
+
+  // Candidate cut box width is (0.8941 - 0.1055) * width = 0.7886 * width
+  const candidateBoxWidth = (0.8941 - 0.1055) * width;
+  const requiredSpan = candidateBoxWidth * minSpanRatio;
+
+  for (let y = startY; y <= endY; y++) {
+    let transitions = 0;
+    let isDark = false;
+    let firstDarkX = -1;
+    let lastDarkX = -1;
+
+    for (let x = startX; x <= endX; x++) {
+      const idx = (y * width + x) * 4;
+      const lum = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
+      const pixelDark = lum < darkThreshold;
+
+      if (pixelDark) {
+        if (firstDarkX === -1) firstDarkX = x;
+        lastDarkX = x;
+      }
+
+      if (pixelDark !== isDark) {
+        transitions++;
+        isDark = pixelDark;
+      }
+    }
+
+    const span = lastDarkX - firstDarkX;
+    if (transitions >= minTransitions && span >= requiredSpan) {
+      dashedRows.push(y);
+    }
+  }
+
+  return dashedRows;
+}
+
+/**
+ * Detects actual card boundaries using colored card background saturation.
+ * PRIMARY algorithm:
+ * - Saturation = max(R,G,B) - min(R,G,B) with threshold 45 (or customizable).
+ * - Keep rows where at least 25% of the half-width is colored.
+ * - Keep columns where at least 12% of the half-height is colored.
+ * - The extreme kept rows and columns form the card bounding box.
+ */
+export function findRationCardBySaturation(
+  buffer: PixelBuffer,
+  region: CropCoordinates,
+  satThreshold: number = 45,
+  minRowRatio: number = 0.25,
+  minColRatio: number = 0.12
+): CropCoordinates | null {
+  const { data, width, height } = buffer;
+  const startX = Math.max(0, region.x);
+  const endX = Math.min(width, region.x + region.width);
+  const startY = Math.max(0, region.y);
+  const endY = Math.min(height, region.y + region.height);
+
+  const regionW = endX - startX;
+  const regionH = endY - startY;
+  if (regionW < 20 || regionH < 20) return null;
+
+  const rowCounts = new Int32Array(regionH);
+  const colCounts = new Int32Array(regionW);
+
+  for (let py = 0; py < regionH; py++) {
+    const y = startY + py;
+    const rowOffset = y * width * 4;
+    for (let px = 0; px < regionW; px++) {
+      const x = startX + px;
+      const idx = rowOffset + x * 4;
+      const r = data[idx];
+      const g = data[idx + 1];
+      const b = data[idx + 2];
+      const sat = Math.max(r, g, b) - Math.min(r, g, b);
+      if (sat >= satThreshold) {
+        rowCounts[py]++;
+        colCounts[px]++;
+      }
+    }
+  }
+
+  const rowThreshold = Math.max(1, Math.round(regionW * minRowRatio));
+  const colThreshold = Math.max(1, Math.round(regionH * minColRatio));
+
+  let minPy = -1;
+  let maxPy = -1;
+  for (let py = 0; py < regionH; py++) {
+    if (rowCounts[py] >= rowThreshold) {
+      if (minPy === -1) minPy = py;
+      maxPy = py;
+    }
+  }
+
+  let minPx = -1;
+  let maxPx = -1;
+  for (let px = 0; px < regionW; px++) {
+    if (colCounts[px] >= colThreshold) {
+      if (minPx === -1) minPx = px;
+      maxPx = px;
+    }
+  }
+
+  if (minPy === -1 || maxPy === -1 || minPx === -1 || maxPx === -1) {
+    return null;
+  }
+
+  const foundW = maxPx - minPx + 1;
+  const foundH = maxPy - minPy + 1;
+  const aspect = foundW / (foundH || 1);
+
+  // Validate aspect ratio (Ration Card target ~1.669, acceptable range 1.45–1.85)
+  if (foundW < regionW * 0.4 || foundH < regionH * 0.4 || aspect < 1.45 || aspect > 1.85) {
+    return null;
+  }
+
+  return {
+    x: startX + minPx,
+    y: startY + minPy,
+    width: foundW,
+    height: foundH,
+  };
+}
+
+/**
+ * Removes surrounding white space from final crop boundaries.
+ * Trims boundary rows/columns where > 95% of pixels are white/light background.
+ */
+function trimCardWhiteSpace(
+  buffer: PixelBuffer,
+  crop: CropCoordinates,
+  maxTrim: number = 8,
+  whiteThreshold: number = 240
+): CropCoordinates {
+  const { data, width, height } = buffer;
+  let startX = Math.max(0, crop.x);
+  let endX = Math.min(width, crop.x + crop.width);
+  let startY = Math.max(0, crop.y);
+  let endY = Math.min(height, crop.y + crop.height);
+
+  let trimmedTop = 0;
+  while (startY < endY - 20 && trimmedTop < maxTrim) {
+    let whiteCount = 0;
+    const w = endX - startX;
+    for (let x = startX; x < endX; x++) {
+      const idx = (startY * width + x) * 4;
+      const r = data[idx];
+      const g = data[idx + 1];
+      const b = data[idx + 2];
+      const sat = Math.max(r, g, b) - Math.min(r, g, b);
+      if (r >= whiteThreshold && g >= whiteThreshold && b >= whiteThreshold && sat < 15) {
+        whiteCount++;
+      }
+    }
+    if (whiteCount / w > 0.95) {
+      startY++;
+      trimmedTop++;
+    } else {
+      break;
+    }
+  }
+
+  let trimmedBottom = 0;
+  while (endY > startY + 20 && trimmedBottom < maxTrim) {
+    let whiteCount = 0;
+    const w = endX - startX;
+    for (let x = startX; x < endX; x++) {
+      const idx = ((endY - 1) * width + x) * 4;
+      const r = data[idx];
+      const g = data[idx + 1];
+      const b = data[idx + 2];
+      const sat = Math.max(r, g, b) - Math.min(r, g, b);
+      if (r >= whiteThreshold && g >= whiteThreshold && b >= whiteThreshold && sat < 15) {
+        whiteCount++;
+      }
+    }
+    if (whiteCount / w > 0.95) {
+      endY--;
+      trimmedBottom++;
+    } else {
+      break;
+    }
+  }
+
+  return {
+    x: startX,
+    y: startY,
+    width: Math.max(10, endX - startX),
+    height: Math.max(10, endY - startY),
+  };
+}
+
+/**
  * 3. RATION CARD — DOCUMENT-SPECIFIC DETECTION
  *
  * Page: US Letter (2550 x 3300 px at 300 DPI)
  * Reference measurements:
- * - Dashed cut box: X 269–2280, Y 2570–3205 (lower 35% of page)
+ * - Dashed cut box: X 269–2280, Y 2570–3205 (dashed cut edges ~3 px thick)
  * - Vertical fold: X ~ 1280 (normalized ~0.5020)
  * - Front card: X 317–1239, Y 2616–3168 (norm: X 0.1243–0.4859, Y 0.7927–0.9600)
  * - Back card: X 1317–2239, Y 2616–3168 (norm: X 0.5165–0.8780, Y 0.7927–0.9600)
- * - Card dimensions: approx 923 x 553 px, aspect ~1.669
+ * - Card dimensions: approx 923 x 553 px, aspect ~1.669 (acceptable: 1.55–1.70)
  *
- * Algorithm searches strictly in the lower 35% of the page and filters out scissors symbols.
+ * Algorithm:
+ * 1. Search strictly in the lower region Y >= 0.75 * H and X between 0.05 * W and 0.95 * W.
+ *    Excludes page-level QR code, status icon, signature block, and upper scissors above box.
+ * 2. Use reference coordinates with ±1.5% tolerance (≈ ±40 px at 300 DPI).
+ * 3. Detect dashed horizontal boundaries spanning at least 85% of candidate cut-box width.
+ * 4. Locate vertical dashed fold near center (X ≈ 1280, 0.5020 * W).
+ * 5. Divide cut box into left and right candidate regions.
+ * 6. Detect card boundaries using PRIMARY colored background saturation method (sat >= 45, row >= 25%, col >= 12%).
+ * 7. Exclude scissors symbols, decorative dashed lines, barcodes, text boundaries.
+ * 8. Remove surrounding white space from final crop.
+ * 9. Validate front/back dimensions match within ~2% and aspect ratio 1.55–1.70.
+ * 10. Mark low confidence if edge differs from reference by > 3% of page size.
+ * 11. Front/Back classification:
+ *     - Front: bottom-right QR code, personal details, NO face photo required.
+ *     - Back: centered 1D barcode, address.
+ *     - QR presence must NOT be used to identify back.
+ *     - Fallback: Left = Front, Right = Back.
  */
 export function detectRationCardInPixelBuffer(
   buffer: PixelBuffer,
@@ -1383,23 +1611,70 @@ export function detectRationCardInPixelBuffer(
     };
   }
 
-  // 1. Search strictly in the lower 35% of the page (Y >= 0.65 * H)
-  const lowerStartY = Math.floor(H * 0.65);
-  const dashedRows = findDashedHorizontalRows(buffer, lowerStartY, H * 0.98, 8, 140);
+  // 1. Search strictly in the lower region Y >= 0.75 * H and X between 0.05 * W and 0.95 * W.
+  // This excludes the page-level QR code, Card Status icon, signature block and upper scissors above the box.
+  const searchYMin = Math.floor(H * 0.75);
+  const searchYMax = Math.min(H - 1, Math.floor(H * 0.99));
+  const searchXMin = Math.floor(W * 0.05);
+  const searchXMax = Math.ceil(W * 0.95);
 
-  let cutBoxTopY = Math.round(0.7788 * H);
-  let cutBoxBottomY = Math.round(0.9712 * H);
+  // 2. Tolerance of about ±1.5% of page size (≈ ±40 px at 300 DPI)
+  const tolX = Math.round(W * 0.015);
+  const tolY = Math.round(H * 0.015);
 
-  if (dashedRows.length >= 2) {
-    cutBoxTopY = dashedRows[0];
-    cutBoxBottomY = dashedRows[dashedRows.length - 1];
+  const refCutBox = ref.cutBox ?? {
+    xMin: 0.1055,
+    xMax: 0.8941,
+    yMin: 0.7788,
+    yMax: 0.9712,
+  };
+
+  const refCutTopY = Math.round(refCutBox.yMin * H);
+  const refCutBottomY = Math.round(refCutBox.yMax * H);
+  const refCutLeftX = Math.round(refCutBox.xMin * W);
+  const refCutRightX = Math.round(refCutBox.xMax * W);
+
+  // 3. Detect dashed horizontal boundaries spanning at least 85% of candidate cut-box width
+  const dashedRows = findRationCutBoxDashedRows(
+    buffer,
+    searchYMin,
+    searchYMax,
+    searchXMin,
+    searchXMax,
+    0.85,
+    8,
+    140
+  );
+
+  let cutBoxTopY = refCutTopY;
+  let cutBoxBottomY = refCutBottomY;
+
+  if (dashedRows.length >= 1) {
+    // Cluster rows into top candidates (near refCutTopY within tolY * 2.5) and bottom candidates (near refCutBottomY within tolY * 2.5)
+    const topCandidates = dashedRows.filter(
+      (r) => Math.abs(r - refCutTopY) <= tolY * 2.5
+    );
+    const bottomCandidates = dashedRows.filter(
+      (r) => Math.abs(r - refCutBottomY) <= tolY * 2.5
+    );
+
+    if (topCandidates.length > 0) {
+      cutBoxTopY = Math.round(
+        topCandidates.reduce((a, b) => a + b, 0) / topCandidates.length
+      );
+    }
+    if (bottomCandidates.length > 0) {
+      cutBoxBottomY = Math.round(
+        bottomCandidates.reduce((a, b) => a + b, 0) / bottomCandidates.length
+      );
+    }
   }
 
-  // 2. Locate vertical dashed fold near center
+  // 4. Locate vertical dashed fold near center (X ≈ 1280, 0.5020 * W)
   const foldCol = findVerticalFoldColumn(
     buffer,
-    W * 0.46,
-    W * 0.54,
+    Math.round(0.487 * W),
+    Math.round(0.517 * W),
     cutBoxTopY,
     cutBoxBottomY,
     6,
@@ -1407,73 +1682,114 @@ export function detectRationCardInPixelBuffer(
   );
   const foldX = foldCol ?? Math.round(0.502 * W);
 
-  // 3. Define candidate left and right halves inside cut box
+  // 5. Divide cut box into left and right candidate regions
   const leftHalf: CropCoordinates = {
-    x: Math.max(0, Math.round(0.1055 * W)),
+    x: Math.max(0, refCutLeftX - tolX),
     y: cutBoxTopY,
-    width: Math.max(10, foldX - Math.round(0.1055 * W)),
+    width: Math.max(10, foldX - (refCutLeftX - tolX)),
     height: Math.max(10, cutBoxBottomY - cutBoxTopY),
   };
 
   const rightHalf: CropCoordinates = {
     x: foldX,
     y: cutBoxTopY,
-    width: Math.max(10, Math.round(0.8941 * W) - foldX),
+    width: Math.max(10, refCutRightX + tolX - foldX),
     height: Math.max(10, cutBoxBottomY - cutBoxTopY),
   };
 
-  // 4. Detect card regions using colored bounding boxes and edge detection
-  // Scissors symbols and small decorative elements are filtered out by minimum size/line-length threshold
-  const detectedLeft = findCardBoundsInRegion(buffer, leftHalf, 35);
-  const detectedRight = findCardBoundsInRegion(buffer, rightHalf, 35);
+  // 6. Detect actual card boundaries using:
+  // - PRIMARY: colored card background with saturation >= 45, row >= 25%, col >= 12%
+  // - Fallback 1: colored background with saturation >= 18
+  // - Fallback 2: edge/foreground bounding box (findCardBoundsInRegion)
+  // - Fallback 3: reference coordinates with tolerance
+  let detectedLeft = findRationCardBySaturation(buffer, leftHalf, 45, 0.25, 0.12);
+  let detectedRight = findRationCardBySaturation(buffer, rightHalf, 45, 0.25, 0.12);
 
-  let frontCandidate = defaultFrontCrop;
-  let backCandidate = defaultBackCrop;
-  let detectedCount = 0;
+  if (!detectedLeft) {
+    detectedLeft = findRationCardBySaturation(buffer, leftHalf, 18, 0.20, 0.10);
+  }
+  if (!detectedRight) {
+    detectedRight = findRationCardBySaturation(buffer, rightHalf, 18, 0.20, 0.10);
+  }
 
-  if (
-    detectedLeft &&
-    detectedLeft.width >= W * 0.22 &&
-    detectedLeft.width <= W * 0.45 &&
-    detectedLeft.height >= H * 0.11 &&
-    detectedLeft.height <= H * 0.24
-  ) {
-    frontCandidate = detectedLeft;
-    detectedCount++;
+  if (!detectedLeft) {
+    detectedLeft = findCardBoundsInRegion(buffer, leftHalf, 15);
+  }
+  if (!detectedRight) {
+    detectedRight = findCardBoundsInRegion(buffer, rightHalf, 15);
+  }
+
+  let frontCandidate = detectedLeft ? trimCardWhiteSpace(buffer, detectedLeft) : defaultFrontCrop;
+  let backCandidate = detectedRight ? trimCardWhiteSpace(buffer, detectedRight) : defaultBackCrop;
+  let detectedCount = (detectedLeft ? 1 : 0) + (detectedRight ? 1 : 0);
+
+  // 7. Validation Rules:
+  // Expected card dimensions: Width ≈ 923 px, Height ≈ 553 px, Aspect ratio ≈ 1.669 (acceptable: 1.55–1.70).
+  const targetAspect = 923 / 553; // ~1.669
+  let isLowConfidence = false;
+
+  // Check 3% page size edge deviation:
+  // If detected card edge differs from reference coordinates by more than ~3% of page size, mark as low confidence.
+  const maxDevX = W * 0.035;
+  const maxDevY = H * 0.035;
+
+  const refFrontX = Math.round(ref.front.xMin * W);
+  const refFrontY = Math.round(ref.front.yMin * H);
+  const refFrontW = Math.round((ref.front.xMax - ref.front.xMin) * W);
+  const refFrontH = Math.round((ref.front.yMax - ref.front.yMin) * H);
+
+  const refBackX = Math.round(ref.back.xMin * W);
+  const refBackY = Math.round(ref.back.yMin * H);
+  const refBackW = Math.round((ref.back.xMax - ref.back.xMin) * W);
+  const refBackH = Math.round((ref.back.yMax - ref.back.yMin) * H);
+
+  const frontAspect = frontCandidate.width / (frontCandidate.height || 1);
+  const backAspect = backCandidate.width / (backCandidate.height || 1);
+
+  if (frontAspect < 1.48 || frontAspect > 1.78 || backAspect < 1.48 || backAspect > 1.78) {
+    isLowConfidence = true;
   }
 
   if (
-    detectedRight &&
-    detectedRight.width >= W * 0.22 &&
-    detectedRight.width <= W * 0.45 &&
-    detectedRight.height >= H * 0.11 &&
-    detectedRight.height <= H * 0.24
+    Math.abs(frontCandidate.x - refFrontX) > maxDevX ||
+    Math.abs(frontCandidate.y - refFrontY) > maxDevY ||
+    Math.abs(frontCandidate.width - refFrontW) > maxDevX ||
+    Math.abs(frontCandidate.height - refFrontH) > maxDevY ||
+    Math.abs(backCandidate.x - refBackX) > maxDevX ||
+    Math.abs(backCandidate.y - refBackY) > maxDevY ||
+    Math.abs(backCandidate.width - refBackW) > maxDevX ||
+    Math.abs(backCandidate.height - refBackH) > maxDevY
   ) {
-    backCandidate = detectedRight;
-    detectedCount++;
+    isLowConfidence = true;
   }
 
-  // Harmonize vertical positioning, enforce dimensions match within 2%, and maintain aspect ratio ~1.669
+  // 8. Front and back dimensions must match within approximately 2%.
+  // Harmonize vertical positioning and enforce dimensions match within 2% with target aspect ratio.
   const commonY = Math.min(frontCandidate.y, backCandidate.y);
   const commonH = Math.round((frontCandidate.height + backCandidate.height) / 2);
-  const targetAspect = 923 / 553; // ~1.669
   const commonW = Math.round(commonH * targetAspect);
 
   frontCandidate = {
     x: Math.max(0, Math.min(foldX - commonW, frontCandidate.x)),
-    y: Math.max(Math.round(H * 0.65), Math.min(H - commonH, commonY)),
+    y: Math.max(Math.round(H * 0.75), Math.min(H - commonH, commonY)),
     width: Math.min(W, commonW),
     height: Math.min(H, commonH),
   };
 
   backCandidate = {
     x: Math.max(foldX, Math.min(W - commonW, backCandidate.x)),
-    y: Math.max(Math.round(H * 0.65), Math.min(H - commonH, commonY)),
+    y: Math.max(Math.round(H * 0.75), Math.min(H - commonH, commonY)),
     width: Math.min(W, commonW),
     height: Math.min(H, commonH),
   };
 
-  // 5. Content-based classification
+  // If confidence is low and cards were not detected cleanly, fall back to calibrated reference coordinates
+  if (isLowConfidence && detectedCount < 2) {
+    frontCandidate = defaultFrontCrop;
+    backCandidate = defaultBackCrop;
+  }
+
+  // 9. Content-based classification
   const leftSub = extractSubBuffer(buffer, frontCandidate);
   const rightSub = extractSubBuffer(buffer, backCandidate);
   const classification = classifyFrontBackCrops(leftSub, rightSub, "ration-card");
@@ -1488,20 +1804,24 @@ export function detectRationCardInPixelBuffer(
     swapped = true;
   }
 
+  const confidence = isLowConfidence ? 0.55 : (detectedCount === 2 ? 0.98 : 0.92);
+
   return {
-    detected: true,
-    confidence: detectedCount === 2 ? 0.97 : 0.92,
+    detected: !isLowConfidence,
+    confidence,
     frontCrop: finalFront,
     backCrop: finalBack,
     layout: "ration",
-    strategyUsed: "ration-lower-35pct-cutbox-fold-colored-bbox",
+    strategyUsed: "ration-saturation-bg-cutbox-fold-cr80",
     contentClassification: {
       frontConfidence: classification.confidence,
       backConfidence: classification.confidence,
       swapped,
       reason: classification.reason,
     },
-    message: "Ration Card lower 35% cut box detected. Scissors symbols filtered out.",
+    message: isLowConfidence
+      ? "Ration Card detection confidence is low. Reference regions applied for manual adjustment."
+      : "Ration Card front/back boundaries detected via colored background saturation and cut-box fold. Scissors excluded.",
   };
 }
 

@@ -320,6 +320,243 @@ describe("TEST 3: Ration Card Document-Specific Detection", () => {
     assert.ok(result.frontCrop.y / H >= 0.75, "Ration card must be in lower 35% region");
     assert.ok(result.backCrop.y / H >= 0.75, "Ration card back must be in lower 35% region");
   });
+
+  test("verifies reference measurements and bottom-left to top-left coordinate conversions", () => {
+    // Top-left origin reference coordinates for 2550 x 3300 px @ 300 DPI:
+    // Dashed cut box: X 269–2280 px, Y 2570–3205 px
+    // Fold: ~1280 px (X ~ 0.5020)
+    // Front card: X 317–1239 px (0.1243–0.4859), Y 2616–3168 px (0.7927–0.9600)
+    // Back card: X 1317–2239 px (0.5165–0.8780), Y 2616–3168 px (0.7927–0.9600)
+
+    const W = 2550;
+    const H = 3300;
+
+    assert.ok(RATION_CARD_MEASUREMENTS.cutBox, "Cut box coordinates must be defined");
+    const cutBox = RATION_CARD_MEASUREMENTS.cutBox;
+
+    // Cut box normalized range checks
+    assert.ok(Math.abs(cutBox.xMin - 269 / W) < 0.001);
+    assert.ok(Math.abs(cutBox.xMax - 2280 / W) < 0.001);
+    assert.ok(Math.abs(cutBox.yMin - 2570 / H) < 0.001);
+    assert.ok(Math.abs(cutBox.yMax - 3205 / H) < 0.001);
+
+    // Front card normalized range checks
+    const front = RATION_CARD_MEASUREMENTS.front;
+    assert.ok(Math.abs(front.xMin - 317 / W) < 0.001);
+    assert.ok(Math.abs(front.xMax - 1239 / W) < 0.001);
+    assert.ok(Math.abs(front.yMin - 2616 / H) < 0.001);
+    assert.ok(Math.abs(front.yMax - 3168 / H) < 0.001);
+
+    // Back card normalized range checks
+    const back = RATION_CARD_MEASUREMENTS.back;
+    assert.ok(Math.abs(back.xMin - 1317 / W) < 0.001);
+    assert.ok(Math.abs(back.xMax - 2239 / W) < 0.001);
+    assert.ok(Math.abs(back.yMin - 2616 / H) < 0.001);
+    assert.ok(Math.abs(back.yMax - 3168 / H) < 0.001);
+
+    // Bottom-left coordinate conversion formulas:
+    // Y_bottom = H - Y_top
+    // Y_bottom_normalized = 1 - Y_top_normalized
+    assert.ok(RATION_CARD_MEASUREMENTS.bottomLeft, "Bottom-left coordinates must be provided");
+    const blFront = RATION_CARD_MEASUREMENTS.bottomLeft.front;
+    const blBack = RATION_CARD_MEASUREMENTS.bottomLeft.back;
+
+    // In bottom-left space, front/back Y is ~[0.0400, 0.2073]
+    const expectedBlYMin = 1 - front.yMax; // ~0.0400
+    const expectedBlYMax = 1 - front.yMin; // ~0.2073
+
+    assert.ok(Math.abs(blFront.yMin - expectedBlYMin) < 0.001);
+    assert.ok(Math.abs(blFront.yMax - expectedBlYMax) < 0.001);
+    assert.ok(Math.abs(blBack.yMin - expectedBlYMin) < 0.001);
+    assert.ok(Math.abs(blBack.yMax - expectedBlYMax) < 0.001);
+
+    // Verify distance from dashed cut box edges to card edges:
+    // Card starts ~46 px below top dashed edge and ends ~37 px above bottom dashed edge
+    const topDashedEdgePx = Math.round(cutBox.yMin * H);
+    const bottomDashedEdgePx = Math.round(cutBox.yMax * H);
+    const topCardEdgePx = Math.round(front.yMin * H);
+    const bottomCardEdgePx = Math.round(front.yMax * H);
+
+    assert.equal(topCardEdgePx - topDashedEdgePx, 46, "Card must start 46 px below top dashed line");
+    assert.equal(bottomDashedEdgePx - bottomCardEdgePx, 37, "Card must end 37 px above bottom dashed line");
+  });
+
+  test("extracts card boundaries using primary saturation threshold (sat >= 45) at 300 DPI resolution", () => {
+    // Full 2550 x 3300 px raster buffer
+    const W = 2550;
+    const H = 3300;
+    const buffer = createBuffer(W, H, [255, 255, 255]); // Pure white (sat = 0)
+
+    // 1. Draw dashed cut box around [269, 2280] x [2570, 3205] (sat = 0)
+    drawDashedHLine(buffer, 2570, 269, 2280, 16, 12, [50, 50, 50]);
+    drawDashedHLine(buffer, 3205, 269, 2280, 16, 12, [50, 50, 50]);
+    drawDashedVLine(buffer, 1280, 2570, 3205, 16, 12, [50, 50, 50]); // Fold line
+
+    // 2. Colored cards with saturation >= 45 (light blue card background: RGB [160, 200, 245], sat = 85)
+    // Front: X: 317 to 1239, Y: 2616 to 3168 (W: 922, H: 552)
+    fillRect(buffer, 317, 2616, 922, 552, [160, 200, 245]);
+
+    // Back: X: 1317 to 2239, Y: 2616 to 3168 (W: 922, H: 552)
+    fillRect(buffer, 1317, 2616, 922, 552, [160, 200, 245]);
+
+    // 3. Add non-card distractions in upper region (sat = 0 or high sat, but Y < 0.75 * H = 2475)
+    fillRect(buffer, 100, 500, 800, 400, [255, 100, 100]); // Upper red header
+    fillRect(buffer, 1500, 1200, 600, 300, [0, 0, 0]); // Upper table
+
+    // Execute detector
+    const result = detectRationCardInPixelBuffer(buffer);
+
+    assert.equal(result.detected, true);
+    assert.ok(result.strategyUsed?.includes("ration"), "Must use Ration strategy");
+    assert.ok(result.backCrop !== null);
+
+    // Verify detected front and back card boundaries match card dimensions within ±10 px
+    assert.ok(Math.abs(result.frontCrop.x - 317) <= 10, `Front X (${result.frontCrop.x}) should be ~317`);
+    assert.ok(Math.abs(result.frontCrop.y - 2616) <= 10, `Front Y (${result.frontCrop.y}) should be ~2616`);
+    assert.ok(Math.abs(result.frontCrop.width - 922) <= 10, `Front width (${result.frontCrop.width}) should be ~922`);
+    assert.ok(Math.abs(result.frontCrop.height - 552) <= 10, `Front height (${result.frontCrop.height}) should be ~552`);
+
+    assert.ok(Math.abs(result.backCrop.x - 1317) <= 10, `Back X (${result.backCrop.x}) should be ~1317`);
+    assert.ok(Math.abs(result.backCrop.y - 2616) <= 10, `Back Y (${result.backCrop.y}) should be ~2616`);
+    assert.ok(Math.abs(result.backCrop.width - 922) <= 10, `Back width (${result.backCrop.width}) should be ~922`);
+    assert.ok(Math.abs(result.backCrop.height - 552) <= 10, `Back height (${result.backCrop.height}) should be ~552`);
+
+    // Verify dashed box perimeter is NOT included in crop
+    assert.ok(result.frontCrop.y >= 2610, "Crop must start at card edge, not top dashed line 2570");
+    assert.ok(result.frontCrop.y + result.frontCrop.height <= 3175, "Crop must end at card edge, not bottom dashed line 3205");
+
+    // Aspect ratio check: 922 / 552 = 1.670 (target 1.669, acceptable 1.55–1.70)
+    const aspect = result.frontCrop.width / result.frontCrop.height;
+    assert.ok(aspect >= 1.55 && aspect <= 1.70, `Aspect ratio ${aspect} should be ~1.669`);
+  });
+
+  test("excludes upper region content (Y < 0.75 * H) such as page-level QR, status icon, and signature block", () => {
+    const W = 510;
+    const H = 660;
+    const buffer = createBuffer(W, H, [255, 255, 255]);
+
+    // Page-level QR code at Y ~ 0.20
+    fillRect(buffer, 350, Math.round(0.20 * H), 100, 100, [0, 0, 0]);
+    // Status icon at Y ~ 0.35
+    fillRect(buffer, 50, Math.round(0.35 * H), 60, 60, [0, 180, 0]);
+    // Signature block at Y ~ 0.55
+    fillRect(buffer, 200, Math.round(0.55 * H), 250, 40, [20, 20, 20]);
+    // Scissors above cut box at Y ~ 0.70
+    fillRect(buffer, 60, Math.round(0.70 * H), 20, 20, [10, 10, 10]);
+
+    // Cards in lower region Y >= 0.79
+    const fX = Math.round(RATION_CARD_MEASUREMENTS.front.xMin * W);
+    const fY = Math.round(RATION_CARD_MEASUREMENTS.front.yMin * H);
+    const fW = Math.round((RATION_CARD_MEASUREMENTS.front.xMax - RATION_CARD_MEASUREMENTS.front.xMin) * W);
+    const fH = Math.round((RATION_CARD_MEASUREMENTS.front.yMax - RATION_CARD_MEASUREMENTS.front.yMin) * H);
+
+    const bX = Math.round(RATION_CARD_MEASUREMENTS.back.xMin * W);
+    const bY = Math.round(RATION_CARD_MEASUREMENTS.back.yMin * H);
+    const bW = Math.round((RATION_CARD_MEASUREMENTS.back.xMax - RATION_CARD_MEASUREMENTS.back.xMin) * W);
+    const bH = Math.round((RATION_CARD_MEASUREMENTS.back.yMax - RATION_CARD_MEASUREMENTS.back.yMin) * H);
+
+    fillRect(buffer, fX, fY, fW, fH, [180, 220, 250]);
+    fillRect(buffer, bX, bY, bW, bH, [180, 220, 250]);
+
+    const result = detectRationCardInPixelBuffer(buffer);
+
+    assert.equal(result.detected, true);
+    // Ensure all detected coordinates are strictly in the lower region Y >= 0.75 * H
+    assert.ok(result.frontCrop.y >= 0.75 * H, "Front crop Y must be >= 0.75 * H");
+    assert.ok(result.backCrop.y >= 0.75 * H, "Back crop Y must be >= 0.75 * H");
+  });
+
+  test("correctly classifies front (bottom-right QR) and back (centered 1D barcode) for Ration Cards without requiring photo", () => {
+    // Ration Card Front: Has bottom-right QR code, text density, NO photo
+    const frontFeatures = {
+      hasPhoto: false,
+      photoScore: 0.05,
+      hasQrOrBarcode: true,
+      qrBarcodeScore: 0.75,
+      hasBottomRightQr: true,
+      bottomRightQrScore: 0.82,
+      has1DBarcode: false,
+      barcode1DScore: 0.05,
+      textLineDensity: 0.5,
+      meanSaturation: 40,
+    };
+
+    // Ration Card Back: Centered 1D barcode, text density, NO photo
+    const backFeatures = {
+      hasPhoto: false,
+      photoScore: 0.05,
+      hasQrOrBarcode: true,
+      qrBarcodeScore: 0.80,
+      hasBottomRightQr: false,
+      bottomRightQrScore: 0.04,
+      has1DBarcode: true,
+      barcode1DScore: 0.88,
+      textLineDensity: 0.45,
+      meanSaturation: 40,
+    };
+
+    // Correct alignment: candidate 1 is Front, candidate 2 is Back -> should NOT swap
+    const decisionCorrect = decideFrontBackFromFeatures(frontFeatures, backFeatures, "ration-card");
+    assert.equal(decisionCorrect.shouldSwap, false, "Should not swap when front is on candidate 1 and back on candidate 2");
+    assert.ok(decisionCorrect.reason.includes("Ration Card"), "Reason should indicate Ration Card logic");
+
+    // Inverted alignment: candidate 1 is Back, candidate 2 is Front -> MUST swap
+    const decisionInverted = decideFrontBackFromFeatures(backFeatures, frontFeatures, "ration-card");
+    assert.equal(decisionInverted.shouldSwap, true, "Must swap when back candidate is on candidate 1 and front on candidate 2");
+    assert.ok(decisionInverted.confidence >= 0.80, "Confidence should be high based on 1D barcode and bottom-right QR");
+
+    // Verify that QR code presence does NOT penalize or flip front card when no 1D barcode on front
+    const frontWithQrOnly = { ...frontFeatures, has1DBarcode: false, barcode1DScore: 0.0 };
+    const plainBack = { ...backFeatures, hasBottomRightQr: false, bottomRightQrScore: 0.0 };
+    const qrDecision = decideFrontBackFromFeatures(frontWithQrOnly, plainBack, "ration-card");
+    assert.equal(qrDecision.shouldSwap, false, "QR code on Ration Card front must NOT trigger false swap to back");
+  });
+
+  test("marks low confidence when detected card edge deviates > 3% from reference page coordinates", () => {
+    const W = 510;
+    const H = 660;
+    const buffer = createBuffer(W, H, [255, 255, 255]);
+
+    // Place card shifted downwards significantly (> 3% of page height, > 20 px)
+    const shiftedY = Math.round((RATION_CARD_MEASUREMENTS.front.yMin + 0.05) * H); // shifted by +5% of H
+    const fX = Math.round(RATION_CARD_MEASUREMENTS.front.xMin * W);
+    const fW = Math.round((RATION_CARD_MEASUREMENTS.front.xMax - RATION_CARD_MEASUREMENTS.front.xMin) * W);
+    const fH = Math.round((RATION_CARD_MEASUREMENTS.front.yMax - RATION_CARD_MEASUREMENTS.front.yMin) * H);
+
+    fillRect(buffer, fX, shiftedY, fW, fH, [180, 220, 250]);
+    fillRect(buffer, Math.round(RATION_CARD_MEASUREMENTS.back.xMin * W), shiftedY, fW, fH, [180, 220, 250]);
+
+    const result = detectRationCardInPixelBuffer(buffer);
+
+    // If edge deviates > 3% of page dimension, confidence should be low (< 0.70)
+    assert.ok(
+      result.confidence < 0.70 || result.confidenceReason?.includes("deviates"),
+      "Should indicate lower confidence when edges deviate > 3% from reference"
+    );
+  });
+
+  test("CR80 normalizer fits Ration Card (1.669 aspect ratio) to CR80 by scaling to width and extending vertical padding", () => {
+    // Ration Card measured crop: Width = 923 px, Height = 553 px (ratio = 1.669)
+    const cardWidth = 923;
+    const cardHeight = 553;
+
+    const geo = calculateCR80Scaling(cardWidth, cardHeight);
+
+    // Must scale uniformly to CR80 width (1011 px)
+    assert.equal(geo.drawWidth, CR80_TARGET_WIDTH_PX, "Draw width must equal 1011 px");
+    assert.equal(geo.padHorizontal, 0, "Horizontal padding must be 0 (full width fit)");
+
+    // Draw height: 553 * (1011 / 923) = ~606 px
+    const expectedDrawHeight = Math.round(cardHeight * (CR80_TARGET_WIDTH_PX / cardWidth));
+    assert.equal(geo.drawHeight, expectedDrawHeight, "Draw height must be proportionally ~606 px");
+
+    // Vertical padding: 638 - 606 = 32 px
+    assert.equal(geo.padVertical, CR80_TARGET_HEIGHT_PX - expectedDrawHeight, "Vertical padding must equal remaining space (32 px)");
+    assert.equal(geo.drawY, Math.round(geo.padVertical / 2), "drawY must be centered (16 px top margin)");
+
+    // Zero stretching
+    assert.equal(geo.isStretched, false, "Must never stretch card pixels");
+  });
 });
 
 describe("TEST 4: Voter ID Card Vector PDF & Top-Aligned Detection", () => {
