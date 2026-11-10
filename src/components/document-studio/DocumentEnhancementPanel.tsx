@@ -6,7 +6,9 @@ import type {
   DocumentEnhancementSettings,
 } from "@/types/document-studio";
 import {
+  DEFAULT_ENHANCEMENT_SETTINGS,
   isEnhancementActive,
+  isEnhancementModified,
 } from "@/types/document-studio";
 import { cn } from "@/lib/utils/cn";
 import {
@@ -65,6 +67,7 @@ export const DocumentEnhancementPanel: React.FC<DocumentEnhancementPanelProps> =
   const currentSettings =
     activeSide === "front" ? frontEnhancements : backEnhancements;
   const isCurrentActive = isEnhancementActive(currentSettings);
+  const isCurrentModified = isEnhancementModified(currentSettings);
   const isFrontActive = isEnhancementActive(frontEnhancements);
   const isBackActive = isEnhancementActive(backEnhancements);
   const isCurrentShowingBefore = showingBeforeAfter[activeSide];
@@ -173,7 +176,7 @@ export const DocumentEnhancementPanel: React.FC<DocumentEnhancementPanelProps> =
         <div className="p-3 sm:p-3.5 space-y-2.5 border-t border-surface-200/80 dark:border-surface-700">
           {/* Sliders Grid: 2 columns on mobile, 4 columns on desktop in 1 single row */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            {/* Brightness (-100 to +100, default 0) */}
+            {/* Brightness (-100 to +100, default -6) */}
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs">
                 <label
@@ -189,12 +192,12 @@ export const DocumentEnhancementPanel: React.FC<DocumentEnhancementPanelProps> =
                       ? `+${currentSettings.brightness}`
                       : currentSettings.brightness}
                   </span>
-                  {currentSettings.brightness !== 0 && (
+                  {currentSettings.brightness !== DEFAULT_ENHANCEMENT_SETTINGS.brightness && (
                     <button
                       type="button"
-                      onClick={() => onChangeEnhancement(activeSide, "brightness", 0)}
+                      onClick={() => onChangeEnhancement(activeSide, "brightness", DEFAULT_ENHANCEMENT_SETTINGS.brightness)}
                       className="text-[10px] text-surface-400 hover:text-brand-600 transition-colors"
-                      title="Reset brightness to 0"
+                      title={`Reset brightness to ${DEFAULT_ENHANCEMENT_SETTINGS.brightness}`}
                     >
                       Reset
                     </button>
@@ -213,7 +216,7 @@ export const DocumentEnhancementPanel: React.FC<DocumentEnhancementPanelProps> =
               />
             </div>
 
-            {/* Contrast (-100 to +100, default 0) */}
+            {/* Contrast (-100 to +100, default +33) */}
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs">
                 <label
@@ -229,12 +232,12 @@ export const DocumentEnhancementPanel: React.FC<DocumentEnhancementPanelProps> =
                       ? `+${currentSettings.contrast}`
                       : currentSettings.contrast}
                   </span>
-                  {currentSettings.contrast !== 0 && (
+                  {currentSettings.contrast !== DEFAULT_ENHANCEMENT_SETTINGS.contrast && (
                     <button
                       type="button"
-                      onClick={() => onChangeEnhancement(activeSide, "contrast", 0)}
+                      onClick={() => onChangeEnhancement(activeSide, "contrast", DEFAULT_ENHANCEMENT_SETTINGS.contrast)}
                       className="text-[10px] text-surface-400 hover:text-brand-600 transition-colors"
-                      title="Reset contrast to 0"
+                      title={`Reset contrast to +${DEFAULT_ENHANCEMENT_SETTINGS.contrast}`}
                     >
                       Reset
                     </button>
@@ -253,7 +256,7 @@ export const DocumentEnhancementPanel: React.FC<DocumentEnhancementPanelProps> =
               />
             </div>
 
-            {/* Saturation (-100 to +100, default 0) */}
+            {/* Saturation (-100 to +100, default +33) */}
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs">
                 <label
@@ -269,12 +272,12 @@ export const DocumentEnhancementPanel: React.FC<DocumentEnhancementPanelProps> =
                       ? `+${currentSettings.saturation}`
                       : currentSettings.saturation}
                   </span>
-                  {currentSettings.saturation !== 0 && (
+                  {currentSettings.saturation !== DEFAULT_ENHANCEMENT_SETTINGS.saturation && (
                     <button
                       type="button"
-                      onClick={() => onChangeEnhancement(activeSide, "saturation", 0)}
+                      onClick={() => onChangeEnhancement(activeSide, "saturation", DEFAULT_ENHANCEMENT_SETTINGS.saturation)}
                       className="text-[10px] text-surface-400 hover:text-brand-600 transition-colors"
-                      title="Reset saturation to 0"
+                      title={`Reset saturation to +${DEFAULT_ENHANCEMENT_SETTINGS.saturation}`}
                     >
                       Reset
                     </button>
@@ -293,7 +296,7 @@ export const DocumentEnhancementPanel: React.FC<DocumentEnhancementPanelProps> =
               />
             </div>
 
-            {/* Sharpness (0 to 100, default 0) */}
+            {/* Sharpness (0 to 100, default +33) */}
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs">
                 <label
@@ -305,14 +308,16 @@ export const DocumentEnhancementPanel: React.FC<DocumentEnhancementPanelProps> =
                 </label>
                 <div className="flex items-center gap-1.5">
                   <span className="font-mono text-[11px] font-bold text-surface-800 dark:text-surface-200">
-                    {currentSettings.sharpness}
+                    {currentSettings.sharpness > 0
+                      ? `+${currentSettings.sharpness}`
+                      : currentSettings.sharpness}
                   </span>
-                  {currentSettings.sharpness !== 0 && (
+                  {currentSettings.sharpness !== DEFAULT_ENHANCEMENT_SETTINGS.sharpness && (
                     <button
                       type="button"
-                      onClick={() => onChangeEnhancement(activeSide, "sharpness", 0)}
+                      onClick={() => onChangeEnhancement(activeSide, "sharpness", DEFAULT_ENHANCEMENT_SETTINGS.sharpness)}
                       className="text-[10px] text-surface-400 hover:text-brand-600 transition-colors"
-                      title="Reset sharpness to 0"
+                      title={`Reset sharpness to +${DEFAULT_ENHANCEMENT_SETTINGS.sharpness}`}
                     >
                       Reset
                     </button>
@@ -404,7 +409,7 @@ export const DocumentEnhancementPanel: React.FC<DocumentEnhancementPanelProps> =
 
               <button
                 type="button"
-                disabled={!isCurrentActive}
+                disabled={!isCurrentModified}
                 onClick={() => onResetEnhancements(activeSide)}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-surface-200 dark:border-surface-700 text-xs font-semibold text-surface-600 dark:text-surface-400 hover:text-rose-600 hover:border-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 title={`Reset ${activeSide === "front" ? "Front" : "Back"} enhancements to default`}

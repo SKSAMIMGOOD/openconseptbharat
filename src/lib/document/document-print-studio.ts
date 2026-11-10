@@ -34,6 +34,10 @@ import type {
   PrintCustomPosition,
   PrintScaleMode,
   DocumentPrintLayoutSettings,
+  DocumentBorderSettings,
+  BorderColorPreset,
+  BorderThicknessPreset,
+  BorderStyle,
 } from "../../types/document-studio.ts";
 import {
   isEnhancementActive,
@@ -42,6 +46,9 @@ import {
   DEFAULT_PRINT_MARGINS,
   DEFAULT_PRINT_LAYOUT_SETTINGS,
   createDefaultPrintLayoutSettings,
+  DEFAULT_BORDER_SETTINGS,
+  BORDER_COLOR_PRESETS,
+  BORDER_THICKNESS_PRESETS,
 } from "../../types/document-studio.ts";
 
 export interface PrintStudioModeOption {
@@ -130,6 +137,13 @@ export const PRINT_PAPER_SIZE_OPTIONS: readonly PrintPaperSizeOption[] = [
     shortLabel: "Letter",
     dimensionsDescription: "8.5 × 11.0 in (215.9 × 279.4 mm)",
     description: "US Letter standard size (8.5 × 11.0 in / 215.9 × 279.4 mm)",
+  },
+  {
+    id: "4x6",
+    label: "4×6",
+    shortLabel: "4×6",
+    dimensionsDescription: "4.0 × 6.0 in (101.6 × 152.4 mm)",
+    description: "Standard 4×6 inch photo paper with foldable ID layout (101.6 × 152.4 mm)",
   },
   {
     id: "custom",
@@ -288,7 +302,91 @@ export function validatePrintStudioArrangement(
  * Type guard for PrintPaperSize.
  */
 export function validatePrintPaperSize(size: unknown): size is PrintPaperSize {
-  return size === "a4" || size === "a5" || size === "letter" || size === "custom";
+  return (
+    size === "a4" ||
+    size === "a5" ||
+    size === "letter" ||
+    size === "4x6" ||
+    size === "custom"
+  );
+}
+
+/**
+ * Type guard for BorderStyle.
+ */
+export function validateBorderStyle(style: unknown): style is BorderStyle {
+  return style === "solid" || style === "dashed" || style === "dotted";
+}
+
+/**
+ * Validates and sanitizes border thickness in millimeters (0.1 mm - 3.0 mm, default 0.3 mm).
+ */
+export function sanitizeBorderThickness(val: unknown): number {
+  const num = typeof val === "number" ? val : parseFloat(String(val));
+  if (isNaN(num) || !isFinite(num)) {
+    return 0.3;
+  }
+  return Number(Math.min(3.0, Math.max(0.1, num)).toFixed(2));
+}
+
+/**
+ * Validates and sanitizes border color string or hex value.
+ */
+export function sanitizeBorderColor(color: unknown): string {
+  if (typeof color !== "string" || !color.trim()) {
+    return "#000000";
+  }
+  const trimmed = color.trim();
+  if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(trimmed)) {
+    return trimmed;
+  }
+  if (trimmed.toLowerCase() === "black") return "#000000";
+  if (trimmed.toLowerCase() === "dark-gray" || trimmed.toLowerCase() === "gray") return "#374151";
+  return "#000000";
+}
+
+/**
+ * Sanitizes an entire DocumentBorderSettings configuration with safe defaults.
+ */
+export function sanitizeBorderSettings(
+  border?: Partial<DocumentBorderSettings> | null
+): DocumentBorderSettings {
+  if (!border) {
+    return { ...DEFAULT_BORDER_SETTINGS };
+  }
+
+  const enabled = Boolean(border.enabled);
+  const colorPreset: BorderColorPreset =
+    border.colorPreset === "dark-gray" || border.colorPreset === "custom"
+      ? border.colorPreset
+      : "black";
+
+  let color = sanitizeBorderColor(border.color);
+  if (colorPreset === "black") color = "#000000";
+  else if (colorPreset === "dark-gray") color = "#374151";
+
+  const thicknessPreset: BorderThicknessPreset =
+    border.thicknessPreset === "medium" ||
+    border.thicknessPreset === "thick" ||
+    border.thicknessPreset === "custom"
+      ? border.thicknessPreset
+      : "thin";
+
+  let thicknessMm = sanitizeBorderThickness(border.thicknessMm);
+  if (thicknessPreset === "thin") thicknessMm = 0.3;
+  else if (thicknessPreset === "medium") thicknessMm = 0.5;
+  else if (thicknessPreset === "thick") thicknessMm = 1.0;
+
+  const style: BorderStyle = validateBorderStyle(border.style) ? border.style : "solid";
+
+  return {
+    enabled,
+    colorPreset,
+    color,
+    thicknessPreset,
+    thicknessMm,
+    style,
+  };
 }
 
 /**
@@ -521,6 +619,8 @@ export interface PrintPlacedItem {
   yPercent: number;
   widthPercent: number;
   heightPercent: number;
+  // Rotation relative to sheet in degrees (0 or 180)
+  rotation?: number;
 }
 
 /**
@@ -548,6 +648,9 @@ export interface PrintPaperLayoutResult {
   items: PrintPlacedItem[];
   isOverflowing: boolean;
   overflowReason?: string;
+  border?: DocumentBorderSettings;
+  isFoldable4x6?: boolean;
+  foldLineYMm?: number;
 }
 
 /**
@@ -607,6 +710,194 @@ export function calculatePrintPaperLayout(options: {
   const backW = back.printSettings.widthMm > 0 ? back.printSettings.widthMm : 85.6;
   const backH = back.printSettings.heightMm > 0 ? back.printSettings.heightMm : 53.98;
   const backAspect = backW / backH;
+
+  const border = sanitizeBorderSettings(layout.border);
+
+  // Dedicated 4x6 Foldable Front/Back Layout
+  // Activates strictly when Paper Size = 4x6 AND Print Mode = Front + Back Combined
+  const isFoldable4x6 = layout.paperSize === "4x6" && mode === "combined";
+
+  if (isFoldable4x6) {
+    const halfHeightMm = Number((paperHeightMm / 2).toFixed(2)); // Exactly 76.2 mm for 4x6 portrait
+
+    // Printable area within each half (top half and bottom half)
+    const halfPrintableW = Number(
+      Math.max(0, paperWidthMm - margins.leftMm - margins.rightMm).toFixed(2)
+    );
+    const halfPrintableH = Number(
+      Math.max(0, halfHeightMm - margins.topMm - margins.bottomMm).toFixed(2)
+    );
+
+    const maxDocW = Math.max(frontW, backW);
+    const maxDocH = Math.max(frontH, backH);
+
+    let scaleFactor = 1.0;
+    const safeCustomScale = sanitizeScalePercentage(layout.customScalePercentage);
+
+    if (layout.scaleMode === "actual") {
+      // 100% actual size, using Fit to Half if natural size exceeds the half printable area to prevent clipping
+      if (maxDocW > 0 && maxDocH > 0 && halfPrintableW > 0 && halfPrintableH > 0) {
+        if (maxDocW > halfPrintableW || maxDocH > halfPrintableH) {
+          const fitScaleX = halfPrintableW / maxDocW;
+          const fitScaleY = halfPrintableH / maxDocH;
+          scaleFactor = Math.min(1.0, fitScaleX, fitScaleY);
+        } else {
+          scaleFactor = 1.0;
+        }
+      } else {
+        scaleFactor = 1.0;
+      }
+    } else if (layout.scaleMode === "fit") {
+      if (maxDocW > 0 && maxDocH > 0 && halfPrintableW > 0 && halfPrintableH > 0) {
+        const fitScaleX = halfPrintableW / maxDocW;
+        const fitScaleY = halfPrintableH / maxDocH;
+        scaleFactor = Math.min(fitScaleX, fitScaleY);
+      } else {
+        scaleFactor = 1.0;
+      }
+    } else if (layout.scaleMode === "custom") {
+      scaleFactor = safeCustomScale / 100;
+    }
+
+    scaleFactor = Number(scaleFactor.toFixed(4));
+    const scalePercentage = Number((scaleFactor * 100).toFixed(1));
+
+    const scaledFrontW = Number((frontW * scaleFactor).toFixed(2));
+    const scaledFrontH = Number((frontH * scaleFactor).toFixed(2));
+    const scaledBackW = Number((backW * scaleFactor).toFixed(2));
+    const scaledBackH = Number((backH * scaleFactor).toFixed(2));
+
+    // Alignment calculated within each respective half
+    const extraFrontX = Math.max(0, halfPrintableW - scaledFrontW);
+    const extraFrontY = Math.max(0, halfPrintableH - scaledFrontH);
+    const extraBackX = Math.max(0, halfPrintableW - scaledBackW);
+    const extraBackY = Math.max(0, halfPrintableH - scaledBackH);
+
+    let frontRelX = 0;
+    let frontRelY = 0;
+    let backRelX = 0;
+    let backRelY = 0;
+
+    if (layout.alignment === "center") {
+      frontRelX = extraFrontX / 2;
+      frontRelY = extraFrontY / 2;
+      backRelX = extraBackX / 2;
+      backRelY = extraBackY / 2;
+    } else if (layout.alignment === "top") {
+      frontRelX = extraFrontX / 2;
+      frontRelY = 0;
+      backRelX = extraBackX / 2;
+      backRelY = 0;
+    } else if (layout.alignment === "custom") {
+      const rawX = typeof layout.customPosition?.xMm === "number" ? layout.customPosition.xMm : 0;
+      const rawY = typeof layout.customPosition?.yMm === "number" ? layout.customPosition.yMm : 0;
+      const safeX = isNaN(rawX) ? 0 : rawX;
+      const safeY = isNaN(rawY) ? 0 : rawY;
+      frontRelX = safeX;
+      frontRelY = safeY;
+      backRelX = safeX;
+      backRelY = safeY;
+    }
+
+    // Front: Upper half (Y range [margins.topMm, halfHeightMm])
+    const frontX = Number((margins.leftMm + frontRelX).toFixed(2));
+    const frontY = Number((margins.topMm + frontRelY).toFixed(2));
+
+    // Back: Lower half (Y range [halfHeightMm + margins.topMm, paperHeightMm])
+    const backX = Number((margins.leftMm + backRelX).toFixed(2));
+    const backY = Number((halfHeightMm + margins.topMm + backRelY).toFixed(2));
+
+    const items: PrintPlacedItem[] = [
+      {
+        side: "front",
+        title: "Front Side",
+        badge: "F",
+        imageUrl: frontImageUrl || null,
+        isAvailable: Boolean(frontImageUrl),
+        isEnhanced: isEnhancementActive(front.enhancements),
+        xMm: frontX,
+        yMm: frontY,
+        widthMm: scaledFrontW,
+        heightMm: scaledFrontH,
+        aspectRatio: frontAspect,
+        xPercent: Number(((frontX / paperWidthMm) * 100).toFixed(3)),
+        yPercent: Number(((frontY / paperHeightMm) * 100).toFixed(3)),
+        widthPercent: Number(((scaledFrontW / paperWidthMm) * 100).toFixed(3)),
+        heightPercent: Number(((scaledFrontH / paperHeightMm) * 100).toFixed(3)),
+        rotation: 0,
+      },
+      {
+        side: "back",
+        title: "Back Side",
+        badge: "B",
+        imageUrl: backImageUrl || null,
+        isAvailable: Boolean(backImageUrl),
+        isEnhanced: isEnhancementActive(back.enhancements),
+        xMm: backX,
+        yMm: backY,
+        widthMm: scaledBackW,
+        heightMm: scaledBackH,
+        aspectRatio: backAspect,
+        xPercent: Number(((backX / paperWidthMm) * 100).toFixed(3)),
+        yPercent: Number(((backY / paperHeightMm) * 100).toFixed(3)),
+        widthPercent: Number(((scaledBackW / paperWidthMm) * 100).toFixed(3)),
+        heightPercent: Number(((scaledBackH / paperHeightMm) * 100).toFixed(3)),
+        rotation: 180, // Back document rotated 180° for horizontal center fold & lamination
+      },
+    ];
+
+    let isOverflowing = false;
+    let overflowReason: string | undefined = undefined;
+
+    if (
+      frontX < 0 ||
+      frontY < 0 ||
+      frontX + scaledFrontW > paperWidthMm + 0.1 ||
+      frontY + scaledFrontH > halfHeightMm + 0.1
+    ) {
+      isOverflowing = true;
+      overflowReason = `Front document exceeds upper half boundary or overlaps horizontal fold line (${halfHeightMm} mm). Adjust scale or margins.`;
+    }
+
+    if (
+      backX < 0 ||
+      backY < halfHeightMm - 0.1 ||
+      backX + scaledBackW > paperWidthMm + 0.1 ||
+      backY + scaledBackH > paperHeightMm + 0.1
+    ) {
+      isOverflowing = true;
+      overflowReason = `Back document exceeds lower half boundary or overlaps horizontal fold line (${halfHeightMm} mm). Adjust scale or margins.`;
+    }
+
+    const copies = sanitizeCopies(layout.copies);
+
+    return {
+      paperSize: layout.paperSize,
+      orientation: layout.orientation,
+      paperWidthMm,
+      paperHeightMm,
+      paperAspectRatio,
+      margins,
+      printableWidthMm,
+      printableHeightMm,
+      scaleMode: layout.scaleMode,
+      scaleFactor,
+      scalePercentage,
+      alignment: layout.alignment,
+      customPosition: layout.customPosition,
+      copies,
+      blockWidthMm: Math.max(scaledFrontW, scaledBackW),
+      blockHeightMm: Number((backY + scaledBackH - frontY).toFixed(2)),
+      blockPaperX: Math.min(frontX, backX),
+      blockPaperY: frontY,
+      items,
+      isOverflowing,
+      overflowReason,
+      border,
+      isFoldable4x6: true,
+      foldLineYMm: halfHeightMm,
+    };
+  }
 
   const spacingMm = 5.0; // 5 mm gap between sides in combined mode
 
@@ -711,6 +1002,7 @@ export function calculatePrintPaperLayout(options: {
       yPercent: Number(((blockPaperY / paperHeightMm) * 100).toFixed(3)),
       widthPercent: Number(((scaledFrontW / paperWidthMm) * 100).toFixed(3)),
       heightPercent: Number(((scaledFrontH / paperHeightMm) * 100).toFixed(3)),
+      rotation: 0,
     });
   } else if (mode === "back-only") {
     items.push({
@@ -729,6 +1021,7 @@ export function calculatePrintPaperLayout(options: {
       yPercent: Number(((blockPaperY / paperHeightMm) * 100).toFixed(3)),
       widthPercent: Number(((scaledBackW / paperWidthMm) * 100).toFixed(3)),
       heightPercent: Number(((scaledBackH / paperHeightMm) * 100).toFixed(3)),
+      rotation: 0,
     });
   } else {
     // Combined mode: Front + Back
@@ -749,6 +1042,7 @@ export function calculatePrintPaperLayout(options: {
       yPercent: Number(((blockPaperY / paperHeightMm) * 100).toFixed(3)),
       widthPercent: Number(((scaledFrontW / paperWidthMm) * 100).toFixed(3)),
       heightPercent: Number(((scaledFrontH / paperHeightMm) * 100).toFixed(3)),
+      rotation: 0,
     });
 
     // Back card item
@@ -776,6 +1070,7 @@ export function calculatePrintPaperLayout(options: {
       yPercent: Number(((backY / paperHeightMm) * 100).toFixed(3)),
       widthPercent: Number(((scaledBackW / paperWidthMm) * 100).toFixed(3)),
       heightPercent: Number(((scaledBackH / paperHeightMm) * 100).toFixed(3)),
+      rotation: 0,
     });
   }
 
@@ -820,6 +1115,8 @@ export function calculatePrintPaperLayout(options: {
     items,
     isOverflowing,
     overflowReason,
+    border,
+    isFoldable4x6: false,
   };
 }
 
@@ -902,6 +1199,7 @@ export function resolvePrintStudioLayout(options: {
   back: DocumentSideResult;
   isSingleSided?: boolean;
   layout?: DocumentPrintLayoutSettings;
+  layoutSettings?: DocumentPrintLayoutSettings;
 }): PrintStudioLayoutResolution {
   const {
     mode,
@@ -909,8 +1207,8 @@ export function resolvePrintStudioLayout(options: {
     front,
     back,
     isSingleSided = false,
-    layout = createDefaultPrintLayoutSettings(),
   } = options;
+  const layout = options.layout || options.layoutSettings || createDefaultPrintLayoutSettings();
 
   const frontImg = resolveActiveSideImage(front);
   const backImg = resolveActiveSideImage(back);
@@ -986,7 +1284,9 @@ export function resolvePrintStudioLayout(options: {
       sidesToRender = [resolvedFront, resolvedBack];
       allSidesAvailable = hasFront && hasBack;
       arrangementNotice =
-        arrangement === "vertical"
+        layout?.paperSize === "4x6"
+          ? "Foldable 4×6 sheet (Front on top, Back on bottom rotated 180° for horizontal center folding)"
+          : arrangement === "vertical"
           ? "Arranged vertically (Front on top, Back on bottom)"
           : "Arranged horizontally (Front on left, Back on right)";
       break;

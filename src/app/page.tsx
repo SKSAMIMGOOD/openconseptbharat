@@ -30,6 +30,7 @@ import { NotificationBanner } from "@/components/common/NotificationBanner";
 import { SearchBar } from "@/components/common/SearchBar";
 import { EmptyState } from "@/components/common/EmptyState";
 import { RecentlyUsedSection } from "@/components/dashboard/RecentlyUsedSection";
+import { SupportButton } from "@/components/support";
 import { useNotification } from "@/hooks/useNotification";
 
 const CATEGORY_FILTER_TABS: { id: "all" | ToolCategory; label: string; icon: React.ElementType }[] = [
@@ -133,7 +134,7 @@ export default function HomePage() {
             </p>
 
             {/* Actions: Primary Explore Tools & Secondary Privacy Information */}
-            <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3.5">
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3.5">
               <a
                 href="#dashboard-tools"
                 className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 rounded-xl text-sm font-semibold bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800 transition-all shadow-sm hover:shadow gap-2 group"
@@ -149,6 +150,8 @@ export default function HomePage() {
                 <ShieldCheck className="w-4 h-4 text-emerald-600" />
                 <span>Privacy Guarantee</span>
               </Link>
+
+              <SupportButton size="lg" className="w-full sm:w-auto" />
             </div>
 
             {/* Architectural Trust Points */}
@@ -385,13 +388,16 @@ export default function HomePage() {
               </p>
             </div>
 
-            <Link
-              href="/tools"
-              className="inline-flex items-center text-xs font-semibold text-brand-600 hover:text-brand-800 transition-colors gap-1.5 shrink-0"
-            >
-              <span>View dedicated catalog</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
+            <div className="flex flex-wrap items-center gap-3 shrink-0">
+              <SupportButton size="sm" />
+              <Link
+                href="/tools"
+                className="inline-flex items-center text-xs font-semibold text-brand-600 hover:text-brand-800 transition-colors gap-1.5 shrink-0"
+              >
+                <span>View dedicated catalog</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
           </div>
 
           {/* Search & Category Filter Toolbar */}

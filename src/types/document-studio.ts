@@ -60,19 +60,19 @@ export interface DocumentTypeDefinition {
  * Non-destructive pixel enhancements: Brightness, Contrast, Saturation, Sharpness, Grayscale, Invert.
  */
 export interface DocumentEnhancementSettings {
-  brightness: number; // -100 to +100, default 0
-  contrast: number; // -100 to +100, default 0
-  saturation: number; // -100 to +100, default 0
-  sharpness: number; // 0 to 100, default 0
+  brightness: number; // -100 to +100, default -6
+  contrast: number; // -100 to +100, default +33
+  saturation: number; // -100 to +100, default +33
+  sharpness: number; // 0 to 100, default +33
   grayscale: boolean; // default false
   invert: boolean; // default false
 }
 
 export const DEFAULT_ENHANCEMENT_SETTINGS: Readonly<DocumentEnhancementSettings> = {
-  brightness: 0,
-  contrast: 0,
-  saturation: 0,
-  sharpness: 0,
+  brightness: -6,
+  contrast: 33,
+  saturation: 33,
+  sharpness: 33,
   grayscale: false,
   invert: false,
 };
@@ -92,6 +92,20 @@ export function isEnhancementActive(
     settings.sharpness !== 0 ||
     settings.grayscale ||
     settings.invert
+  );
+}
+
+export function isEnhancementModified(
+  settings?: DocumentEnhancementSettings | null
+): boolean {
+  if (!settings) return false;
+  return (
+    settings.brightness !== DEFAULT_ENHANCEMENT_SETTINGS.brightness ||
+    settings.contrast !== DEFAULT_ENHANCEMENT_SETTINGS.contrast ||
+    settings.saturation !== DEFAULT_ENHANCEMENT_SETTINGS.saturation ||
+    settings.sharpness !== DEFAULT_ENHANCEMENT_SETTINGS.sharpness ||
+    Boolean(settings.grayscale) !== Boolean(DEFAULT_ENHANCEMENT_SETTINGS.grayscale) ||
+    Boolean(settings.invert) !== Boolean(DEFAULT_ENHANCEMENT_SETTINGS.invert)
   );
 }
 
@@ -360,7 +374,7 @@ export type PrintStudioMode = "front-only" | "back-only" | "combined";
 
 export type PrintStudioArrangement = "vertical" | "horizontal";
 
-export type PrintPaperSize = "a4" | "a5" | "letter" | "custom";
+export type PrintPaperSize = "a4" | "a5" | "letter" | "4x6" | "custom";
 
 export type PaperDimensionUnit = "mm" | "inch";
 
@@ -375,10 +389,11 @@ export interface CustomPaperDimensions {
   unit: PaperDimensionUnit;
 }
 
-export const STANDARD_PAPER_SIZES: Record<"a4" | "a5" | "letter", PaperSizeDimensions> = {
+export const STANDARD_PAPER_SIZES: Record<"a4" | "a5" | "letter" | "4x6", PaperSizeDimensions> = {
   a4: { widthMm: 210, heightMm: 297 },
   a5: { widthMm: 148, heightMm: 210 },
   letter: { widthMm: 215.9, heightMm: 279.4 },
+  "4x6": { widthMm: 101.6, heightMm: 152.4 },
 };
 
 export type PrintOrientation = "portrait" | "landscape";
@@ -417,6 +432,43 @@ export interface PrintCustomPosition {
 
 export type PrintScaleMode = "actual" | "fit" | "custom";
 
+/**
+ * Document Border Settings (Feature 1)
+ * Non-destructive vector/raster border applied to cropped document boundaries.
+ */
+export type BorderColorPreset = "black" | "dark-gray" | "custom";
+export type BorderThicknessPreset = "thin" | "medium" | "thick" | "custom";
+export type BorderStyle = "solid" | "dashed" | "dotted";
+
+export interface DocumentBorderSettings {
+  enabled: boolean;
+  colorPreset: BorderColorPreset;
+  color: string; // Hex color code
+  thicknessPreset: BorderThicknessPreset;
+  thicknessMm: number; // in millimeters (0.1 - 3.0 mm)
+  style: BorderStyle;
+}
+
+export const DEFAULT_BORDER_SETTINGS: Readonly<DocumentBorderSettings> = {
+  enabled: false,
+  colorPreset: "black",
+  color: "#000000",
+  thicknessPreset: "thin",
+  thicknessMm: 0.3,
+  style: "solid",
+};
+
+export const BORDER_COLOR_PRESETS: Record<"black" | "dark-gray", string> = {
+  black: "#000000",
+  "dark-gray": "#374151",
+};
+
+export const BORDER_THICKNESS_PRESETS: Record<"thin" | "medium" | "thick", number> = {
+  thin: 0.3,
+  medium: 0.5,
+  thick: 1.0,
+};
+
 export interface DocumentPrintLayoutSettings {
   paperSize: PrintPaperSize;
   customPaper: CustomPaperDimensions;
@@ -428,6 +480,7 @@ export interface DocumentPrintLayoutSettings {
   scaleMode: PrintScaleMode;
   customScalePercentage: number;
   copies: number;
+  border?: DocumentBorderSettings;
 }
 
 export const DEFAULT_PRINT_LAYOUT_SETTINGS: Readonly<DocumentPrintLayoutSettings> = {
@@ -448,6 +501,7 @@ export const DEFAULT_PRINT_LAYOUT_SETTINGS: Readonly<DocumentPrintLayoutSettings
   scaleMode: "actual",
   customScalePercentage: 100,
   copies: 1,
+  border: DEFAULT_BORDER_SETTINGS,
 };
 
 export function createDefaultPrintLayoutSettings(): DocumentPrintLayoutSettings {
@@ -462,6 +516,7 @@ export function createDefaultPrintLayoutSettings(): DocumentPrintLayoutSettings 
     scaleMode: "actual",
     customScalePercentage: 100,
     copies: 1,
+    border: { ...DEFAULT_BORDER_SETTINGS },
   };
 }
 

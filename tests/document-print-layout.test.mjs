@@ -27,6 +27,10 @@ import {
   validatePrintMarginPreset,
   validatePrintAlignment,
   validatePrintScaleMode,
+  validateBorderStyle,
+  sanitizeBorderThickness,
+  sanitizeBorderColor,
+  sanitizeBorderSettings,
   sanitizeMarginValue,
   sanitizeCustomMargins,
   sanitizeScalePercentage,
@@ -43,6 +47,9 @@ import {
   MARGIN_PRESET_VALUES,
   DEFAULT_PRINT_MARGINS,
   DEFAULT_PRINT_LAYOUT_SETTINGS,
+  DEFAULT_BORDER_SETTINGS,
+  BORDER_COLOR_PRESETS,
+  BORDER_THICKNESS_PRESETS,
   createDefaultPrintLayoutSettings,
   createDefaultPrintStudioState,
   createDefaultPrintSettings,
@@ -77,15 +84,16 @@ describe("PHASE 4: Document Studio — Print Layout Settings", () => {
   // 1. PAPER SIZE SELECTION & CUSTOM DIMENSIONS
   // =========================================================================
   describe("1. Paper Size Selection & Custom Dimensions", () => {
-    test("defines exactly 4 paper size options: A4, A5, Letter, Custom", () => {
+    test("defines exactly 5 paper size options: A4, A5, Letter, 4x6, Custom", () => {
       const ids = PRINT_PAPER_SIZE_OPTIONS.map((p) => p.id);
-      assert.deepEqual(ids, ["a4", "a5", "letter", "custom"]);
+      assert.deepEqual(ids, ["a4", "a5", "letter", "4x6", "custom"]);
     });
 
     test("validates PrintPaperSize values strictly", () => {
       assert.equal(validatePrintPaperSize("a4"), true);
       assert.equal(validatePrintPaperSize("a5"), true);
       assert.equal(validatePrintPaperSize("letter"), true);
+      assert.equal(validatePrintPaperSize("4x6"), true);
       assert.equal(validatePrintPaperSize("custom"), true);
       assert.equal(validatePrintPaperSize("legal"), false);
       assert.equal(validatePrintPaperSize(null), false);
@@ -111,6 +119,18 @@ describe("PHASE 4: Document Studio — Print Layout Settings", () => {
       assert.equal(dims.widthMm, 215.9);
       assert.equal(dims.heightMm, 279.4);
       assert.equal(Number((215.9 / 279.4).toFixed(4)), dims.aspectRatio);
+    });
+
+    test("resolves 4x6 standard paper dimensions (101.6 × 152.4 mm)", () => {
+      const dimsPortrait = getEffectivePaperDimensions("4x6", "portrait");
+      assert.equal(dimsPortrait.widthMm, 101.6);
+      assert.equal(dimsPortrait.heightMm, 152.4);
+      assert.equal(Number((101.6 / 152.4).toFixed(4)), dimsPortrait.aspectRatio);
+
+      const dimsLandscape = getEffectivePaperDimensions("4x6", "landscape");
+      assert.equal(dimsLandscape.widthMm, 152.4);
+      assert.equal(dimsLandscape.heightMm, 101.6);
+      assert.equal(Number((152.4 / 101.6).toFixed(4)), dimsLandscape.aspectRatio);
     });
 
     test("resolves Custom paper size in millimeters", () => {
@@ -696,6 +716,316 @@ describe("PHASE 4: Document Studio — Print Layout Settings", () => {
       assert.equal(res.items[0].imageUrl, null);
       assert.equal(res.items[1].isAvailable, true);
       assert.equal(res.items[1].imageUrl, "blob:http://localhost/back.png");
+    });
+  });
+
+  // =========================================================================
+  // 9. FEATURE 1: CUSTOM DOCUMENT BORDER
+  // =========================================================================
+  describe("9. Feature 1: Custom Document Border Settings & Validation", () => {
+    test("default border settings have enabled: false, solid style, thin 0.3mm, black color", () => {
+      assert.equal(DEFAULT_BORDER_SETTINGS.enabled, false);
+      assert.equal(DEFAULT_BORDER_SETTINGS.style, "solid");
+      assert.equal(DEFAULT_BORDER_SETTINGS.thicknessPreset, "thin");
+      assert.equal(DEFAULT_BORDER_SETTINGS.thicknessMm, 0.3);
+      assert.equal(DEFAULT_BORDER_SETTINGS.colorPreset, "black");
+      assert.equal(DEFAULT_BORDER_SETTINGS.color, "#000000");
+    });
+
+    test("validates border styles (solid, dashed, dotted)", () => {
+      assert.equal(validateBorderStyle("solid"), true);
+      assert.equal(validateBorderStyle("dashed"), true);
+      assert.equal(validateBorderStyle("dotted"), true);
+      assert.equal(validateBorderStyle("double"), false);
+      assert.equal(validateBorderStyle(null), false);
+      assert.equal(validateBorderStyle(undefined), false);
+    });
+
+    test("sanitizes thickness with clamping between 0.1mm and 3.0mm", () => {
+      assert.equal(sanitizeBorderThickness(0.3), 0.3);
+      assert.equal(sanitizeBorderThickness(0.5), 0.5);
+      assert.equal(sanitizeBorderThickness(1.0), 1.0);
+      assert.equal(sanitizeBorderThickness(0.01), 0.1); // clamped min
+      assert.equal(sanitizeBorderThickness(5.0), 3.0); // clamped max
+      assert.equal(sanitizeBorderThickness(-1), 0.1); // negative clamped to min
+      assert.equal(sanitizeBorderThickness(NaN), 0.3); // fallback default
+    });
+
+    test("sanitizes hex colors and validates presets", () => {
+      assert.equal(sanitizeBorderColor("#000000"), "#000000");
+      assert.equal(sanitizeBorderColor("#374151"), "#374151");
+      assert.equal(sanitizeBorderColor("#2563EB"), "#2563EB");
+      assert.equal(sanitizeBorderColor("#fff"), "#fff");
+      assert.equal(sanitizeBorderColor("invalid"), "#000000");
+      assert.equal(sanitizeBorderColor(null), "#000000");
+    });
+
+    test("sanitizes complete border settings object", () => {
+      const sanitized = sanitizeBorderSettings({
+        enabled: true,
+        style: "dashed",
+        thicknessPreset: "thick",
+        thicknessMm: 1.0,
+        colorPreset: "dark-gray",
+        color: "#374151",
+      });
+      assert.equal(sanitized.enabled, true);
+      assert.equal(sanitized.style, "dashed");
+      assert.equal(sanitized.thicknessPreset, "thick");
+      assert.equal(sanitized.thicknessMm, 1.0);
+      assert.equal(sanitized.colorPreset, "dark-gray");
+      assert.equal(sanitized.color, "#374151");
+    });
+
+    test("sanitizeBorderSettings falls back to defaults for undefined or invalid input", () => {
+      const fallback = sanitizeBorderSettings(undefined);
+      assert.deepEqual(fallback, DEFAULT_BORDER_SETTINGS);
+    });
+
+    test("calculatePrintPaperLayout preserves document border settings in layout result", () => {
+      const front = createMockSideResult();
+      const back = createMockSideResult();
+      const border = {
+        enabled: true,
+        style: "dotted",
+        thicknessPreset: "medium",
+        thicknessMm: 0.5,
+        colorPreset: "custom",
+        color: "#dc2626",
+      };
+      const layout = {
+        ...createDefaultPrintLayoutSettings(),
+        border,
+      };
+
+      const result = calculatePrintPaperLayout({
+        layout,
+        mode: "combined",
+        arrangement: "vertical",
+        front,
+        back,
+      });
+
+      assert.ok(result.border);
+      assert.equal(result.border.enabled, true);
+      assert.equal(result.border.style, "dotted");
+      assert.equal(result.border.thicknessMm, 0.5);
+      assert.equal(result.border.color, "#dc2626");
+    });
+  });
+
+  // =========================================================================
+  // 10. FEATURE 2: 4x6 DEDICATED FOLDABLE PRINT LAYOUT
+  // =========================================================================
+  describe("10. Feature 2: 4x6 Dedicated Foldable Print Layout", () => {
+    test("activates isFoldable4x6 ONLY when paperSize is 4x6 AND mode is combined", () => {
+      const front = createMockSideResult();
+      const back = createMockSideResult();
+
+      // Case 1: 4x6 with combined mode -> TRUE
+      const layout4x6 = { ...createDefaultPrintLayoutSettings(), paperSize: "4x6" };
+      const res1 = calculatePrintPaperLayout({
+        layout: layout4x6,
+        mode: "combined",
+        arrangement: "vertical",
+        front,
+        back,
+      });
+      assert.equal(res1.isFoldable4x6, true);
+      assert.equal(res1.foldLineYMm, 152.4 / 2); // 76.2 mm
+
+      // Case 2: A4 with combined mode -> FALSE
+      const layoutA4 = { ...createDefaultPrintLayoutSettings(), paperSize: "a4" };
+      const res2 = calculatePrintPaperLayout({
+        layout: layoutA4,
+        mode: "combined",
+        arrangement: "vertical",
+        front,
+        back,
+      });
+      assert.equal(res2.isFoldable4x6, false);
+
+      // Case 3: 4x6 with front-only mode -> FALSE
+      const res3 = calculatePrintPaperLayout({
+        layout: layout4x6,
+        mode: "front-only",
+        arrangement: "vertical",
+        front,
+        back,
+      });
+      assert.equal(res3.isFoldable4x6, false);
+
+      // Case 4: 4x6 with back-only mode -> FALSE
+      const res4 = calculatePrintPaperLayout({
+        layout: layout4x6,
+        mode: "back-only",
+        arrangement: "vertical",
+        front,
+        back,
+      });
+      assert.equal(res4.isFoldable4x6, false);
+    });
+
+    test("rotates BACK document 180 degrees while FRONT document remains 0 degrees", () => {
+      const front = createMockSideResult();
+      const back = createMockSideResult();
+      const layout = { ...createDefaultPrintLayoutSettings(), paperSize: "4x6" };
+
+      const result = calculatePrintPaperLayout({
+        layout,
+        mode: "combined",
+        arrangement: "vertical",
+        front,
+        back,
+      });
+
+      assert.equal(result.items.length, 2);
+      const frontItem = result.items.find((i) => i.side === "front");
+      const backItem = result.items.find((i) => i.side === "back");
+
+      assert.ok(frontItem);
+      assert.ok(backItem);
+
+      // Front upright (0 degrees)
+      assert.equal(frontItem.rotation, 0);
+
+      // Back upside down (180 degrees) for horizontal folding
+      assert.equal(backItem.rotation, 180);
+    });
+
+    test("places Front document strictly inside Upper Half and Back inside Lower Half without crossing fold line", () => {
+      const front = createMockSideResult();
+      const back = createMockSideResult();
+      const layout = { ...createDefaultPrintLayoutSettings(), paperSize: "4x6" };
+      const foldLineY = 152.4 / 2; // 76.2 mm
+
+      const result = calculatePrintPaperLayout({
+        layout,
+        mode: "combined",
+        arrangement: "vertical",
+        front,
+        back,
+      });
+
+      const frontItem = result.items.find((i) => i.side === "front");
+      const backItem = result.items.find((i) => i.side === "back");
+
+      // Front must be completely inside [0, foldLineY]
+      assert.ok(frontItem.yMm >= 0, "Front item yMm must be >= 0");
+      assert.ok(
+        frontItem.yMm + frontItem.heightMm <= foldLineY + 0.001,
+        `Front item bottom (${frontItem.yMm + frontItem.heightMm}) must not exceed fold line (${foldLineY})`
+      );
+
+      // Back must be completely inside [foldLineY, paperHeight]
+      assert.ok(
+        backItem.yMm >= foldLineY - 0.001,
+        `Back item yMm (${backItem.yMm}) must be >= fold line (${foldLineY})`
+      );
+      assert.ok(
+        backItem.yMm + backItem.heightMm <= 152.4 + 0.001,
+        `Back item bottom (${backItem.yMm + backItem.heightMm}) must not exceed paper bottom (152.4)`
+      );
+    });
+
+    test("maintains original aspect ratio for both front and back cards in 4x6 foldable mode", () => {
+      const front = createMockSideResult(); // target aspect ratio 85.6 / 53.98 = ~1.58577
+      const back = createMockSideResult();
+      const layout = { ...createDefaultPrintLayoutSettings(), paperSize: "4x6" };
+
+      const result = calculatePrintPaperLayout({
+        layout,
+        mode: "combined",
+        arrangement: "vertical",
+        front,
+        back,
+      });
+
+      const frontItem = result.items[0];
+      const backItem = result.items[1];
+
+      const expectedRatio = Number((85.6 / 53.98).toFixed(3));
+      const frontRatio = Number((frontItem.widthMm / frontItem.heightMm).toFixed(3));
+      const backRatio = Number((backItem.widthMm / backItem.heightMm).toFixed(3));
+
+      assert.equal(frontRatio, expectedRatio);
+      assert.equal(backRatio, expectedRatio);
+    });
+
+    test("centers cards independently within their respective halves when alignment is center", () => {
+      const front = createMockSideResult();
+      const back = createMockSideResult();
+      const layout = {
+        ...createDefaultPrintLayoutSettings(),
+        paperSize: "4x6",
+        alignment: "center",
+      };
+      const foldLineY = 76.2; // 152.4 / 2
+
+      const result = calculatePrintPaperLayout({
+        layout,
+        mode: "combined",
+        arrangement: "vertical",
+        front,
+        back,
+      });
+
+      const frontItem = result.items[0];
+      const backItem = result.items[1];
+
+      // Front vertical center in [0, 76.2]:
+      // Center Y should be close to 76.2 / 2 = 38.1
+      const frontCenterY = frontItem.yMm + frontItem.heightMm / 2;
+      assert.ok(Math.abs(frontCenterY - foldLineY / 2) < 2.0);
+
+      // Back vertical center in [76.2, 152.4]:
+      // Center Y should be close to 76.2 + 76.2 / 2 = 114.3
+      const backCenterY = backItem.yMm + backItem.heightMm / 2;
+      assert.ok(Math.abs(backCenterY - (foldLineY + foldLineY / 2)) < 2.0);
+    });
+
+    test("single-sided printing on 4x6 (front-only or back-only) prints upright with rotation 0", () => {
+      const front = createMockSideResult();
+      const back = createMockSideResult();
+      const layout = { ...createDefaultPrintLayoutSettings(), paperSize: "4x6" };
+
+      const frontOnlyRes = calculatePrintPaperLayout({
+        layout,
+        mode: "front-only",
+        arrangement: "vertical",
+        front,
+        back,
+      });
+      assert.equal(frontOnlyRes.items.length, 1);
+      assert.equal(frontOnlyRes.items[0].rotation, 0);
+
+      const backOnlyRes = calculatePrintPaperLayout({
+        layout,
+        mode: "back-only",
+        arrangement: "vertical",
+        front,
+        back,
+      });
+      assert.equal(backOnlyRes.items.length, 1);
+      assert.equal(backOnlyRes.items[0].rotation, 0);
+    });
+
+    test("resolvePrintStudioLayout provides informative arrangement notice for 4x6 foldable combined mode", () => {
+      const front = createMockSideResult();
+      const back = createMockSideResult();
+      const layout = { ...createDefaultPrintLayoutSettings(), paperSize: "4x6" };
+
+      const resolution = resolvePrintStudioLayout({
+        mode: "combined",
+        arrangement: "vertical",
+        layout,
+        front,
+        back,
+      });
+
+      assert.ok(resolution.arrangementNotice.includes("Foldable 4×6"));
+      assert.ok(resolution.arrangementNotice.includes("180°"));
+      assert.equal(resolution.paperLayout?.isFoldable4x6, true);
     });
   });
 });

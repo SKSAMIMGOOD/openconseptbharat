@@ -36,6 +36,7 @@ import type {
   PrintCustomPosition,
   PrintScaleMode,
   DocumentPrintLayoutSettings,
+  DocumentBorderSettings,
 } from "@/types/document-studio";
 import {
   createDefaultEnhancementSettings,
@@ -44,6 +45,7 @@ import {
   createDefaultPrintStudioState,
   createDefaultPrintLayoutSettings,
   DEFAULT_PRINT_STUDIO_STATE,
+  DEFAULT_BORDER_SETTINGS,
 } from "@/types/document-studio";
 import {
   updatePrintSettings,
@@ -279,17 +281,20 @@ export function useDocumentStudio(
             if (frontEnhancedRes) URL.revokeObjectURL(frontEnhancedRes.previewUrl);
             return prev;
           }
-          if (frontCroppedUrlRef.current) {
+          if (prev.croppedPreviewUrl && prev.croppedPreviewUrl !== frontResult.previewUrl) {
+            URL.revokeObjectURL(prev.croppedPreviewUrl);
+          }
+          if (prev.enhancedPreviewUrl && prev.enhancedPreviewUrl !== frontEnhancedRes?.previewUrl) {
+            URL.revokeObjectURL(prev.enhancedPreviewUrl);
+          }
+          if (frontCroppedUrlRef.current && frontCroppedUrlRef.current !== frontResult.previewUrl && frontCroppedUrlRef.current !== prev.croppedPreviewUrl) {
             URL.revokeObjectURL(frontCroppedUrlRef.current);
           }
-          if (frontEnhancedUrlRef.current) {
+          if (frontEnhancedUrlRef.current && frontEnhancedUrlRef.current !== frontEnhancedRes?.previewUrl && frontEnhancedUrlRef.current !== prev.enhancedPreviewUrl) {
             URL.revokeObjectURL(frontEnhancedUrlRef.current);
           }
-          if (frontEnhancedRes) {
-            frontEnhancedUrlRef.current = frontEnhancedRes.previewUrl;
-          } else {
-            frontEnhancedUrlRef.current = null;
-          }
+          frontCroppedUrlRef.current = frontResult.previewUrl;
+          frontEnhancedUrlRef.current = frontEnhancedRes?.previewUrl ?? null;
 
           return {
             ...prev,
@@ -342,17 +347,20 @@ export function useDocumentStudio(
               if (backEnhancedRes) URL.revokeObjectURL(backEnhancedRes.previewUrl);
               return prev;
             }
-            if (backCroppedUrlRef.current) {
+            if (prev.croppedPreviewUrl && prev.croppedPreviewUrl !== backResult.previewUrl) {
+              URL.revokeObjectURL(prev.croppedPreviewUrl);
+            }
+            if (prev.enhancedPreviewUrl && prev.enhancedPreviewUrl !== backEnhancedRes?.previewUrl) {
+              URL.revokeObjectURL(prev.enhancedPreviewUrl);
+            }
+            if (backCroppedUrlRef.current && backCroppedUrlRef.current !== backResult.previewUrl && backCroppedUrlRef.current !== prev.croppedPreviewUrl) {
               URL.revokeObjectURL(backCroppedUrlRef.current);
             }
-            if (backEnhancedUrlRef.current) {
+            if (backEnhancedUrlRef.current && backEnhancedUrlRef.current !== backEnhancedRes?.previewUrl && backEnhancedUrlRef.current !== prev.enhancedPreviewUrl) {
               URL.revokeObjectURL(backEnhancedUrlRef.current);
             }
-            if (backEnhancedRes) {
-              backEnhancedUrlRef.current = backEnhancedRes.previewUrl;
-            } else {
-              backEnhancedUrlRef.current = null;
-            }
+            backCroppedUrlRef.current = backResult.previewUrl;
+            backEnhancedUrlRef.current = backEnhancedRes?.previewUrl ?? null;
 
             return {
               ...prev,
@@ -443,10 +451,27 @@ export function useDocumentStudio(
         error: null,
       }));
 
-      // Revoke previous URLs
-      if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current);
-      if (frontCroppedUrlRef.current) URL.revokeObjectURL(frontCroppedUrlRef.current);
-      if (backCroppedUrlRef.current) URL.revokeObjectURL(backCroppedUrlRef.current);
+      // Revoke previous URLs safely
+      if (sourceUrlRef.current) {
+        URL.revokeObjectURL(sourceUrlRef.current);
+        sourceUrlRef.current = null;
+      }
+      if (frontCroppedUrlRef.current) {
+        URL.revokeObjectURL(frontCroppedUrlRef.current);
+        frontCroppedUrlRef.current = null;
+      }
+      if (backCroppedUrlRef.current) {
+        URL.revokeObjectURL(backCroppedUrlRef.current);
+        backCroppedUrlRef.current = null;
+      }
+      if (frontEnhancedUrlRef.current) {
+        URL.revokeObjectURL(frontEnhancedUrlRef.current);
+        frontEnhancedUrlRef.current = null;
+      }
+      if (backEnhancedUrlRef.current) {
+        URL.revokeObjectURL(backEnhancedUrlRef.current);
+        backEnhancedUrlRef.current = null;
+      }
 
       try {
         const result = await processDocumentFile(file, pageNumber);
@@ -665,10 +690,12 @@ export function useDocumentStudio(
           }
         }
 
+        const croppedUrlRef = side === "front" ? frontCroppedUrlRef : backCroppedUrlRef;
         const enhancedUrlRef = side === "front" ? frontEnhancedUrlRef : backEnhancedUrlRef;
-        if (enhancedUrlRef.current) {
+        if (enhancedUrlRef.current && enhancedUrlRef.current !== enhancedRes?.previewUrl) {
           URL.revokeObjectURL(enhancedUrlRef.current);
         }
+        croppedUrlRef.current = result.previewUrl;
         enhancedUrlRef.current = enhancedRes?.previewUrl ?? null;
 
         setSide((prev) => ({
@@ -736,10 +763,12 @@ export function useDocumentStudio(
           }
         }
 
+        const croppedUrlRef = side === "front" ? frontCroppedUrlRef : backCroppedUrlRef;
         const enhancedUrlRef = side === "front" ? frontEnhancedUrlRef : backEnhancedUrlRef;
-        if (enhancedUrlRef.current) {
+        if (enhancedUrlRef.current && enhancedUrlRef.current !== enhancedRes?.previewUrl) {
           URL.revokeObjectURL(enhancedUrlRef.current);
         }
+        croppedUrlRef.current = result.previewUrl;
         enhancedUrlRef.current = enhancedRes?.previewUrl ?? null;
 
         setSide((prev) => ({
@@ -867,12 +896,13 @@ export function useDocumentStudio(
         }
 
         if (isTargetFront) {
-          if (frontCroppedUrlRef.current) {
+          if (frontCroppedUrlRef.current && frontCroppedUrlRef.current !== result.previewUrl) {
             URL.revokeObjectURL(frontCroppedUrlRef.current);
           }
-          if (frontEnhancedUrlRef.current) {
+          if (frontEnhancedUrlRef.current && frontEnhancedUrlRef.current !== enhancedRes?.previewUrl) {
             URL.revokeObjectURL(frontEnhancedUrlRef.current);
           }
+          frontCroppedUrlRef.current = result.previewUrl;
           frontEnhancedUrlRef.current = enhancedRes?.previewUrl ?? null;
 
           setFront((prev) => ({
@@ -891,12 +921,13 @@ export function useDocumentStudio(
             activeView: "cropped",
           }));
         } else {
-          if (backCroppedUrlRef.current) {
+          if (backCroppedUrlRef.current && backCroppedUrlRef.current !== result.previewUrl) {
             URL.revokeObjectURL(backCroppedUrlRef.current);
           }
-          if (backEnhancedUrlRef.current) {
+          if (backEnhancedUrlRef.current && backEnhancedUrlRef.current !== enhancedRes?.previewUrl) {
             URL.revokeObjectURL(backEnhancedUrlRef.current);
           }
+          backCroppedUrlRef.current = result.previewUrl;
           backEnhancedUrlRef.current = enhancedRes?.previewUrl ?? null;
 
           setBack((prev) => ({
@@ -1008,7 +1039,7 @@ export function useDocumentStudio(
             newSettings
           );
 
-          if (enhancedUrlRef.current) {
+          if (enhancedUrlRef.current && enhancedUrlRef.current !== enhanced.previewUrl) {
             URL.revokeObjectURL(enhancedUrlRef.current);
           }
           enhancedUrlRef.current = enhanced.previewUrl;
@@ -1078,7 +1109,7 @@ export function useDocumentStudio(
             newSettings
           );
 
-          if (enhancedUrlRef.current) {
+          if (enhancedUrlRef.current && enhancedUrlRef.current !== enhanced.previewUrl) {
             URL.revokeObjectURL(enhancedUrlRef.current);
           }
           enhancedUrlRef.current = enhanced.previewUrl;
@@ -1100,8 +1131,9 @@ export function useDocumentStudio(
    * Resets enhancements for a single side back to factory defaults.
    * Strictly isolated: affects ONLY the specified side, never the other side.
    */
-  const resetSideEnhancements = useCallback((side: DocumentSide) => {
+  const resetSideEnhancements = useCallback(async (side: DocumentSide) => {
     const isTargetFront = side === "front";
+    const targetSide = isTargetFront ? frontRef.current : backRef.current;
     const setSide = isTargetFront ? setFront : setBack;
     const timerRef = isTargetFront ? frontEnhanceTimerRef : backEnhanceTimerRef;
     const enhancedUrlRef = isTargetFront ? frontEnhancedUrlRef : backEnhancedUrlRef;
@@ -1111,6 +1143,34 @@ export function useDocumentStudio(
       timerRef.current = null;
     }
 
+    const defaultSettings = createDefaultEnhancementSettings();
+
+    if (isEnhancementActive(defaultSettings) && targetSide.croppedPreviewUrl && targetSide.croppedDimensions) {
+      try {
+        const enhanced = await renderEnhancedFromUrl(
+          targetSide.croppedPreviewUrl,
+          targetSide.croppedDimensions.width,
+          targetSide.croppedDimensions.height,
+          defaultSettings
+        );
+        if (enhancedUrlRef.current && enhancedUrlRef.current !== enhanced.previewUrl) {
+          URL.revokeObjectURL(enhancedUrlRef.current);
+        }
+        enhancedUrlRef.current = enhanced.previewUrl;
+
+        setSide((prev) => ({
+          ...prev,
+          enhancements: defaultSettings,
+          enhancedPreviewUrl: enhanced.previewUrl,
+          enhancedBlob: enhanced.blob,
+          showBefore: false,
+        }));
+        return;
+      } catch (err) {
+        console.error(`Reset enhancement render error for ${side}:`, err);
+      }
+    }
+
     if (enhancedUrlRef.current) {
       URL.revokeObjectURL(enhancedUrlRef.current);
       enhancedUrlRef.current = null;
@@ -1118,7 +1178,7 @@ export function useDocumentStudio(
 
     setSide((prev) => ({
       ...prev,
-      enhancements: createDefaultEnhancementSettings(),
+      enhancements: defaultSettings,
       enhancedPreviewUrl: null,
       enhancedBlob: null,
       showBefore: false,
@@ -1409,6 +1469,26 @@ export function useDocumentStudio(
     });
   }, []);
 
+  const setDocumentBorder = useCallback(
+    (borderUpdates: Partial<DocumentBorderSettings>) => {
+      setPrintStudio((prev) => {
+        const currentLayout = prev.layout || createDefaultPrintLayoutSettings();
+        const currentBorder = currentLayout.border || DEFAULT_BORDER_SETTINGS;
+        return {
+          ...prev,
+          layout: {
+            ...currentLayout,
+            border: {
+              ...currentBorder,
+              ...borderUpdates,
+            },
+          },
+        };
+      });
+    },
+    []
+  );
+
   const hasAnyFile = Boolean(source.file && source.previewUrl);
 
   return {
@@ -1466,6 +1546,7 @@ export function useDocumentStudio(
     setPrintAlignment,
     setPrintScale,
     setPrintCopies,
+    setDocumentBorder,
     clearAll,
   };
 }

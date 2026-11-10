@@ -574,7 +574,11 @@ describe("PHASE 08D: Document Studio — Print Quality & Document Dimensions", (
     test("enhancement default settings remain intact and functional", () => {
       const enhance = createDefaultEnhancementSettings();
       assert.deepEqual(enhance, DEFAULT_ENHANCEMENT_SETTINGS);
-      assert.equal(isEnhancementActive(enhance), false);
+      assert.equal(enhance.brightness, -6);
+      assert.equal(enhance.contrast, 33);
+      assert.equal(enhance.saturation, 33);
+      assert.equal(enhance.sharpness, 33);
+      assert.equal(isEnhancementActive(enhance), true);
     });
 
     test("isEnhancementActive correctly detects active enhancements alongside print settings", () => {

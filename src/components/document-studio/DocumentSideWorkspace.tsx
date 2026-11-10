@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   DocumentSide,
   DocumentSideResult,
@@ -91,13 +91,19 @@ export const DocumentSideWorkspace: React.FC<DocumentSideWorkspaceProps> = ({
   const isViewingBefore = Boolean(sideResult.showBefore) && isCropped;
   const hasActiveEnhancements = isEnhancementActive(sideResult.enhancements);
 
+  const [enhancedLoadFailed, setEnhancedLoadFailed] = useState(false);
+
+  useEffect(() => {
+    setEnhancedLoadFailed(false);
+  }, [sideResult.enhancedPreviewUrl]);
+
   // Active preview image URL:
   // When cropped and not viewing full source page:
-  // - If viewing Before (or no enhancements active): show clean cropped preview
+  // - If viewing Before (or no enhancements active or enhanced load failed): show clean cropped preview
   // - If viewing After and enhancements active: show enhanced preview
   const activePreviewUrl =
     isCropped && !isViewingOriginal
-      ? isViewingBefore || !sideResult.enhancedPreviewUrl || !hasActiveEnhancements
+      ? isViewingBefore || !sideResult.enhancedPreviewUrl || !hasActiveEnhancements || enhancedLoadFailed
         ? sideResult.croppedPreviewUrl!
         : sideResult.enhancedPreviewUrl!
       : sourceFile.previewUrl;
@@ -380,6 +386,11 @@ export const DocumentSideWorkspace: React.FC<DocumentSideWorkspaceProps> = ({
                 <img
                   src={activePreviewUrl}
                   alt={`${docDef.name} ${sideTitle} preview`}
+                  onError={() => {
+                    if (activePreviewUrl === sideResult.enhancedPreviewUrl) {
+                      setEnhancedLoadFailed(true);
+                    }
+                  }}
                   className="max-w-full max-h-[240px] sm:max-h-[280px] w-auto h-auto object-contain rounded-xl shadow-md border border-surface-300/60 dark:border-surface-700 select-none transition-transform duration-200 group-hover:scale-[1.01]"
                   style={{
                     transform:

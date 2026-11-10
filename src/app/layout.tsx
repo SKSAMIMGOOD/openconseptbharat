@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { PreferencesProvider } from "@/context/PreferencesContext";
+import { WelcomeSupportPopup } from "@/components/support";
 import "@/app/globals.css";
 
 export const metadata: Metadata = {
@@ -59,6 +60,7 @@ export default function RootLayout({
           <Header />
           <div className="flex-1 flex flex-col">{children}</div>
           <Footer />
+          <WelcomeSupportPopup />
         </PreferencesProvider>
       </body>
     </html>

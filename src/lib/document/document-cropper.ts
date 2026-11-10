@@ -76,7 +76,9 @@ export function loadImageElement(url: string): Promise<HTMLImageElement> {
     }
 
     const img = new Image();
-    img.crossOrigin = "anonymous";
+    if (!url.startsWith("blob:") && !url.startsWith("data:")) {
+      img.crossOrigin = "anonymous";
+    }
 
     img.onload = () => {
       resolve(img);

@@ -43,6 +43,16 @@ import {
   isEnhancementActive,
 } from "../src/types/document-studio.ts";
 
+/** Neutral (identity) enhancement baseline with all parameters set to zero */
+const NEUTRAL_SETTINGS = {
+  brightness: 0,
+  contrast: 0,
+  saturation: 0,
+  sharpness: 0,
+  grayscale: false,
+  invert: false,
+};
+
 /** Helper: Creates a solid color test pixel buffer */
 function createSolidBuffer(width, height, r, g, b, a = 255) {
   const buf = new Uint8ClampedArray(width * height * 4);
@@ -122,24 +132,24 @@ describe("PHASE 08C — Document Studio Enhancement Controls Test Suite", () => 
   // 1. Defaults and Activation Detection
   // ---------------------------------------------------------------------------
   describe("1. Default Settings & Activity Checks", () => {
-    test("factory defaults are all zero and inactive", () => {
+    test("factory defaults match document enhancement default values", () => {
       const def = createDefaultEnhancementSettings();
-      assert.equal(def.brightness, 0);
-      assert.equal(def.contrast, 0);
-      assert.equal(def.saturation, 0);
-      assert.equal(def.sharpness, 0);
+      assert.equal(def.brightness, -6);
+      assert.equal(def.contrast, 33);
+      assert.equal(def.saturation, 33);
+      assert.equal(def.sharpness, 33);
       assert.equal(def.grayscale, false);
       assert.equal(def.invert, false);
-      assert.equal(isEnhancementActive(def), false);
+      assert.equal(isEnhancementActive(def), true);
     });
 
-    test("reports active for any non-default parameter", () => {
-      assert.equal(isEnhancementActive({ ...DEFAULT_ENHANCEMENT_SETTINGS, brightness: 10 }), true);
-      assert.equal(isEnhancementActive({ ...DEFAULT_ENHANCEMENT_SETTINGS, contrast: -5 }), true);
-      assert.equal(isEnhancementActive({ ...DEFAULT_ENHANCEMENT_SETTINGS, saturation: 20 }), true);
-      assert.equal(isEnhancementActive({ ...DEFAULT_ENHANCEMENT_SETTINGS, sharpness: 1 }), true);
-      assert.equal(isEnhancementActive({ ...DEFAULT_ENHANCEMENT_SETTINGS, grayscale: true }), true);
-      assert.equal(isEnhancementActive({ ...DEFAULT_ENHANCEMENT_SETTINGS, invert: true }), true);
+    test("reports active for any non-neutral parameter", () => {
+      assert.equal(isEnhancementActive({ ...NEUTRAL_SETTINGS, brightness: 10 }), true);
+      assert.equal(isEnhancementActive({ ...NEUTRAL_SETTINGS, contrast: -5 }), true);
+      assert.equal(isEnhancementActive({ ...NEUTRAL_SETTINGS, saturation: 20 }), true);
+      assert.equal(isEnhancementActive({ ...NEUTRAL_SETTINGS, sharpness: 1 }), true);
+      assert.equal(isEnhancementActive({ ...NEUTRAL_SETTINGS, grayscale: true }), true);
+      assert.equal(isEnhancementActive({ ...NEUTRAL_SETTINGS, invert: true }), true);
     });
 
     test("handles null or undefined safely", () => {
@@ -149,7 +159,7 @@ describe("PHASE 08C — Document Studio Enhancement Controls Test Suite", () => 
 
     test("returns untouched clone when enhancements are inactive", () => {
       const src = createSolidBuffer(10, 10, 120, 130, 140);
-      const res = applyPixelEnhancements(src, 10, 10, DEFAULT_ENHANCEMENT_SETTINGS);
+      const res = applyPixelEnhancements(src, 10, 10, NEUTRAL_SETTINGS);
       assert.equal(res.length, src.length);
       assert.deepEqual(res, src);
       // Ensure source was not mutated
@@ -164,7 +174,7 @@ describe("PHASE 08C — Document Studio Enhancement Controls Test Suite", () => 
     test("positive brightness increases pixel values proportionally", () => {
       const src = createSolidBuffer(4, 4, 100, 100, 100);
       const res = applyPixelEnhancements(src, 4, 4, {
-        ...DEFAULT_ENHANCEMENT_SETTINGS,
+        ...NEUTRAL_SETTINGS,
         brightness: 20, // +20 * 2.55 = +51
       });
 
@@ -178,7 +188,7 @@ describe("PHASE 08C — Document Studio Enhancement Controls Test Suite", () => 
     test("negative brightness decreases pixel values proportionally", () => {
       const src = createSolidBuffer(4, 4, 100, 100, 100);
       const res = applyPixelEnhancements(src, 4, 4, {
-        ...DEFAULT_ENHANCEMENT_SETTINGS,
+        ...NEUTRAL_SETTINGS,
         brightness: -20, // -20 * 2.55 = -51
       });
 
@@ -192,7 +202,7 @@ describe("PHASE 08C — Document Studio Enhancement Controls Test Suite", () => 
     test("maximum brightness (+100) clamps cleanly at 255 without overflow", () => {
       const src = createSolidBuffer(4, 4, 150, 200, 250);
       const res = applyPixelEnhancements(src, 4, 4, {
-        ...DEFAULT_ENHANCEMENT_SETTINGS,
+        ...NEUTRAL_SETTINGS,
         brightness: 100,
       });
 
@@ -204,7 +214,7 @@ describe("PHASE 08C — Document Studio Enhancement Controls Test Suite", () => 
     test("minimum brightness (-100) clamps cleanly at 0 without underflow", () => {
       const src = createSolidBuffer(4, 4, 100, 50, 10);
       const res = applyPixelEnhancements(src, 4, 4, {
-        ...DEFAULT_ENHANCEMENT_SETTINGS,
+        ...NEUTRAL_SETTINGS,
         brightness: -100,
       });
 
@@ -221,11 +231,11 @@ describe("PHASE 08C — Document Studio Enhancement Controls Test Suite", () => 
     test("preserves mid-gray (128) pivot during contrast adjustments", () => {
       const src = createSolidBuffer(4, 4, 128, 128, 128);
       const resHigh = applyPixelEnhancements(src, 4, 4, {
-        ...DEFAULT_ENHANCEMENT_SETTINGS,
+        ...NEUTRAL_SETTINGS,
         contrast: 50,
       });
       const resLow = applyPixelEnhancements(src, 4, 4, {
-        ...DEFAULT_ENHANCEMENT_SETTINGS,
+        ...NEUTRAL_SETTINGS,
         contrast: -50,
       });
 
@@ -240,7 +250,7 @@ describe("PHASE 08C — Document Studio Enhancement Controls Test Suite", () => 
       src[4] = 180; src[5] = 180; src[6] = 180;
 
       const res = applyPixelEnhancements(src, 2, 1, {
-        ...DEFAULT_ENHANCEMENT_SETTINGS,
+        ...NEUTRAL_SETTINGS,
         contrast: 30,
       });
 
@@ -256,7 +266,7 @@ describe("PHASE 08C — Document Studio Enhancement Controls Test Suite", () => 
       src[4] = 200; src[5] = 200; src[6] = 200;
 
       const res = applyPixelEnhancements(src, 2, 1, {
-        ...DEFAULT_ENHANCEMENT_SETTINGS,
+        ...NEUTRAL_SETTINGS,
         contrast: -40,
       });
 
@@ -275,7 +285,7 @@ describe("PHASE 08C — Document Studio Enhancement Controls Test Suite", () => 
       // Pure red: (255, 0, 0)
       const src = createSolidBuffer(2, 2, 255, 0, 0);
       const res = applyPixelEnhancements(src, 2, 2, {
-        ...DEFAULT_ENHANCEMENT_SETTINGS,
+        ...NEUTRAL_SETTINGS,
         saturation: -100,
       });
 
@@ -290,7 +300,7 @@ describe("PHASE 08C — Document Studio Enhancement Controls Test Suite", () => 
       // Mildly saturated orange: (200, 150, 100)
       const src = createSolidBuffer(2, 2, 200, 150, 100);
       const res = applyPixelEnhancements(src, 2, 2, {
-        ...DEFAULT_ENHANCEMENT_SETTINGS,
+        ...NEUTRAL_SETTINGS,
         saturation: 50,
       });
 
@@ -310,7 +320,7 @@ describe("PHASE 08C — Document Studio Enhancement Controls Test Suite", () => 
       // L = 0.2126*50 + 0.7152*200 + 0.0722*100 = 10.63 + 143.04 + 7.22 = 160.89 ≈ 161
       const src = createSolidBuffer(4, 4, 50, 200, 100);
       const res = applyPixelEnhancements(src, 4, 4, {
-        ...DEFAULT_ENHANCEMENT_SETTINGS,
+        ...NEUTRAL_SETTINGS,
         grayscale: true,
       });
 
@@ -323,7 +333,7 @@ describe("PHASE 08C — Document Studio Enhancement Controls Test Suite", () => 
     test("grayscale overrides saturation settings cleanly", () => {
       const src = createSolidBuffer(2, 2, 255, 0, 128);
       const res = applyPixelEnhancements(src, 2, 2, {
-        ...DEFAULT_ENHANCEMENT_SETTINGS,
+        ...NEUTRAL_SETTINGS,
         grayscale: true,
         saturation: 100, // Should be ignored in favor of grayscale
       });
@@ -340,7 +350,7 @@ describe("PHASE 08C — Document Studio Enhancement Controls Test Suite", () => 
     test("inverts all color channels: 255 - X", () => {
       const src = createSolidBuffer(4, 4, 255, 100, 0);
       const res = applyPixelEnhancements(src, 4, 4, {
-        ...DEFAULT_ENHANCEMENT_SETTINGS,
+        ...NEUTRAL_SETTINGS,
         invert: true,
       });
 
@@ -353,11 +363,11 @@ describe("PHASE 08C — Document Studio Enhancement Controls Test Suite", () => 
     test("double invert is completely identity reversible", () => {
       const src = createGradientBuffer(16, 16);
       const inv1 = applyPixelEnhancements(src, 16, 16, {
-        ...DEFAULT_ENHANCEMENT_SETTINGS,
+        ...NEUTRAL_SETTINGS,
         invert: true,
       });
       const inv2 = applyPixelEnhancements(inv1, 16, 16, {
-        ...DEFAULT_ENHANCEMENT_SETTINGS,
+        ...NEUTRAL_SETTINGS,
         invert: true,
       });
 
@@ -372,7 +382,7 @@ describe("PHASE 08C — Document Studio Enhancement Controls Test Suite", () => 
     test("sharpness 0 produces strictly identical pixels", () => {
       const src = createDocumentSimulationBuffer(120, 80);
       const res = applyPixelEnhancements(src, 120, 80, {
-        ...DEFAULT_ENHANCEMENT_SETTINGS,
+        ...NEUTRAL_SETTINGS,
         sharpness: 0,
       });
 
@@ -382,7 +392,7 @@ describe("PHASE 08C — Document Studio Enhancement Controls Test Suite", () => 
     test("sharpness enhances edge transitions of document text", () => {
       const src = createDocumentSimulationBuffer(120, 80);
       const res = applyPixelEnhancements(src, 120, 80, {
-        ...DEFAULT_ENHANCEMENT_SETTINGS,
+        ...NEUTRAL_SETTINGS,
         sharpness: 50,
       });
 
@@ -400,7 +410,7 @@ describe("PHASE 08C — Document Studio Enhancement Controls Test Suite", () => 
     test("coring threshold suppresses low-amplitude paper noise without grain amplification", () => {
       const src = createDocumentSimulationBuffer(120, 80);
       const res = applyPixelEnhancements(src, 120, 80, {
-        ...DEFAULT_ENHANCEMENT_SETTINGS,
+        ...NEUTRAL_SETTINGS,
         sharpness: 40,
       });
 
@@ -415,7 +425,7 @@ describe("PHASE 08C — Document Studio Enhancement Controls Test Suite", () => 
     test("QR code modules maintain clean distinct values without bridging", () => {
       const src = createDocumentSimulationBuffer(120, 80);
       const res = applyPixelEnhancements(src, 120, 80, {
-        ...DEFAULT_ENHANCEMENT_SETTINGS,
+        ...NEUTRAL_SETTINGS,
         sharpness: 60,
       });
 
@@ -446,9 +456,10 @@ describe("PHASE 08C — Document Studio Enhancement Controls Test Suite", () => 
       };
 
       assert.equal(isEnhancementActive(updatedFront), true);
-      assert.equal(isEnhancementActive(backState), false);
-      assert.equal(backState.brightness, 0);
-      assert.equal(backState.contrast, 0);
+      assert.equal(backState.brightness, -6);
+      assert.equal(backState.contrast, 33);
+      assert.equal(backState.saturation, 33);
+      assert.equal(backState.sharpness, 33);
       assert.equal(backState.grayscale, false);
     });
 
@@ -469,7 +480,7 @@ describe("PHASE 08C — Document Studio Enhancement Controls Test Suite", () => 
 
       assert.equal(updatedBack.sharpness, 50);
       assert.equal(updatedBack.invert, true);
-      assert.equal(frontState.sharpness, 0);
+      assert.equal(frontState.sharpness, 33);
       assert.equal(frontState.invert, false);
       assert.equal(frontState.brightness, 10);
       assert.equal(frontState.contrast, 20);
@@ -496,11 +507,13 @@ describe("PHASE 08C — Document Studio Enhancement Controls Test Suite", () => 
       // Reset Front
       front = createDefaultEnhancementSettings();
 
-      // Front is reset
-      assert.equal(front.brightness, 0);
-      assert.equal(front.contrast, 0);
+      // Front is reset to default values (-6, +33, +33, +33)
+      assert.equal(front.brightness, -6);
+      assert.equal(front.contrast, 33);
+      assert.equal(front.saturation, 33);
+      assert.equal(front.sharpness, 33);
       assert.equal(front.grayscale, false);
-      assert.equal(isEnhancementActive(front), false);
+      assert.equal(isEnhancementActive(front), true);
 
       // Back is completely preserved
       assert.equal(back.brightness, -10);
@@ -531,11 +544,13 @@ describe("PHASE 08C — Document Studio Enhancement Controls Test Suite", () => 
       // Reset Back
       back = createDefaultEnhancementSettings();
 
-      // Back is reset
-      assert.equal(back.brightness, 0);
-      assert.equal(back.sharpness, 0);
+      // Back is reset to default values (-6, +33, +33, +33)
+      assert.equal(back.brightness, -6);
+      assert.equal(back.contrast, 33);
+      assert.equal(back.saturation, 33);
+      assert.equal(back.sharpness, 33);
       assert.equal(back.grayscale, false);
-      assert.equal(isEnhancementActive(back), false);
+      assert.equal(isEnhancementActive(back), true);
 
       // Front is completely preserved
       assert.equal(front.brightness, 45);
@@ -549,7 +564,7 @@ describe("PHASE 08C — Document Studio Enhancement Controls Test Suite", () => 
   // 9. Reversibility & Non-Destructive Processing
   // ---------------------------------------------------------------------------
   describe("9. Non-Destructive Reversibility", () => {
-    test("re-applying default settings restores identical pixel buffer", () => {
+    test("re-applying neutral settings restores identical pixel buffer", () => {
       const src = createDocumentSimulationBuffer(100, 60);
       const originalCopy = new Uint8ClampedArray(src);
 
@@ -568,8 +583,8 @@ describe("PHASE 08C — Document Studio Enhancement Controls Test Suite", () => 
       // 2. Original input remains completely untouched
       assert.deepEqual(src, originalCopy);
 
-      // 3. Resetting back to default reproduces clean copy
-      const reverted = applyPixelEnhancements(src, 100, 60, DEFAULT_ENHANCEMENT_SETTINGS);
+      // 3. Resetting back to neutral reproduces clean copy
+      const reverted = applyPixelEnhancements(src, 100, 60, NEUTRAL_SETTINGS);
       assert.deepEqual(reverted, originalCopy);
     });
   });

@@ -15,10 +15,12 @@ import type {
   PrintAlignment,
   PrintScaleMode,
   DocumentPrintLayoutSettings,
+  DocumentBorderSettings,
 } from "@/types/document-studio";
 import {
   DEFAULT_PRINT_LAYOUT_SETTINGS,
   createDefaultPrintLayoutSettings,
+  DEFAULT_BORDER_SETTINGS,
 } from "@/types/document-studio";
 import {
   PRINT_STUDIO_MODES,
@@ -65,6 +67,7 @@ import {
   Eye,
   CheckCircle2,
   AlertTriangle,
+  Square,
 } from "lucide-react";
 
 export interface DocumentPrintStudioProps {
@@ -154,6 +157,19 @@ export const DocumentPrintStudio: React.FC<DocumentPrintStudioProps> = ({
   const resolutionCheck = firstPlacedItem
     ? checkSourceResolutionAdequacy(firstPlacedItem, firstPlacedSide, front.printSettings?.dpi || 300)
     : undefined;
+
+  // Border Settings (Feature 1)
+  const activeBorder: DocumentBorderSettings =
+    activeLayout.border || DEFAULT_BORDER_SETTINGS;
+
+  const handleBorderChange = (updates: Partial<DocumentBorderSettings>) => {
+    updateLayout({
+      border: {
+        ...activeBorder,
+        ...updates,
+      },
+    });
+  };
 
   // Handlers for Custom Paper
   const handleCustomPaperChange = (field: "width" | "height", valStr: string) => {
@@ -457,6 +473,235 @@ export const DocumentPrintStudio: React.FC<DocumentPrintStudioProps> = ({
           )}
 
           {/* =========================================================================
+              FEATURE 1: DOCUMENT BORDER CONFIGURATION SECTION
+             ========================================================================= */}
+          <div
+            id="document-border-section"
+            data-testid="document-border-section"
+            className="p-4 sm:p-5 rounded-xl bg-surface-50/70 dark:bg-surface-800/40 border border-surface-200/80 dark:border-surface-700/60 space-y-4"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-xs sm:text-sm font-extrabold text-surface-900 dark:text-surface-100 flex items-center gap-2 tracking-tight">
+                  <Square className="w-4 h-4 text-brand-600 dark:text-brand-400" />
+                  <span>DOCUMENT BORDER</span>
+                </h3>
+                <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">
+                  Surround final cropped document with a crisp vector border (inside visible boundaries)
+                </p>
+              </div>
+
+              {/* Border Toggle: Enable Border / Disable Border */}
+              <div className="inline-flex items-center gap-1 p-1 bg-surface-200/70 dark:bg-surface-700 rounded-xl shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleBorderChange({ enabled: true })}
+                  data-testid="border-toggle-enable"
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-2xs",
+                    activeBorder.enabled
+                      ? "bg-brand-600 text-white shadow-sm"
+                      : "text-surface-600 dark:text-surface-300 hover:text-surface-900 dark:hover:text-surface-100"
+                  )}
+                >
+                  Enable Border
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleBorderChange({ enabled: false })}
+                  data-testid="border-toggle-disable"
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-2xs",
+                    !activeBorder.enabled
+                      ? "bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 shadow-2xs font-bold"
+                      : "text-surface-600 dark:text-surface-300 hover:text-surface-900 dark:hover:text-surface-100"
+                  )}
+                >
+                  Disable Border
+                </button>
+              </div>
+            </div>
+
+            {/* Controls only shown when border is enabled */}
+            {activeBorder.enabled && (
+              <div
+                data-testid="border-controls-container"
+                className="pt-3 border-t border-surface-200/60 dark:border-surface-700/50 grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in duration-150"
+              >
+                {/* 1. Border Color */}
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold text-surface-700 dark:text-surface-300 uppercase tracking-wider block">
+                    Border Color
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Black */}
+                    <button
+                      type="button"
+                      onClick={() => handleBorderChange({ colorPreset: "black", color: "#000000" })}
+                      data-testid="border-color-black"
+                      className={cn(
+                        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border shadow-2xs",
+                        activeBorder.colorPreset === "black"
+                          ? "bg-surface-900 text-white border-surface-900 ring-2 ring-brand-400/30"
+                          : "bg-white dark:bg-surface-700 text-surface-700 dark:text-surface-200 border-surface-200 dark:border-surface-600 hover:bg-surface-100"
+                      )}
+                    >
+                      <span className="w-2.5 h-2.5 rounded-full bg-black border border-white/30" />
+                      <span>Black</span>
+                    </button>
+
+                    {/* Dark Gray */}
+                    <button
+                      type="button"
+                      onClick={() => handleBorderChange({ colorPreset: "dark-gray", color: "#374151" })}
+                      data-testid="border-color-dark-gray"
+                      className={cn(
+                        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border shadow-2xs",
+                        activeBorder.colorPreset === "dark-gray"
+                          ? "bg-surface-700 text-white border-surface-700 ring-2 ring-brand-400/30"
+                          : "bg-white dark:bg-surface-700 text-surface-700 dark:text-surface-200 border-surface-200 dark:border-surface-600 hover:bg-surface-100"
+                      )}
+                    >
+                      <span className="w-2.5 h-2.5 rounded-full bg-gray-600 border border-white/30" />
+                      <span>Dark Gray</span>
+                    </button>
+
+                    {/* Custom Color with Color Picker */}
+                    <div
+                      className={cn(
+                        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border shadow-2xs transition-all",
+                        activeBorder.colorPreset === "custom"
+                          ? "border-brand-500 ring-2 ring-brand-400/20 bg-white dark:bg-surface-700"
+                          : "border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-700"
+                      )}
+                    >
+                      <input
+                        type="color"
+                        value={activeBorder.color}
+                        onChange={(e) => handleBorderChange({ colorPreset: "custom", color: e.target.value })}
+                        data-testid="border-color-picker"
+                        className="w-5 h-5 rounded cursor-pointer border-0 bg-transparent p-0"
+                        title="Pick custom color"
+                        aria-label="Custom color picker"
+                      />
+                      <span className="text-[11px] font-mono font-bold text-surface-800 dark:text-surface-200 uppercase">
+                        {activeBorder.colorPreset === "custom" ? activeBorder.color : "Custom"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Border Thickness */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-surface-700 dark:text-surface-300 uppercase tracking-wider block">
+                      Border Thickness
+                    </label>
+                    <span className="text-[11px] font-mono font-bold text-brand-600 dark:text-brand-400">
+                      {activeBorder.thicknessMm} mm
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleBorderChange({ thicknessPreset: "thin", thicknessMm: 0.3 })}
+                      data-testid="border-thickness-thin"
+                      className={cn(
+                        "px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border shadow-2xs",
+                        activeBorder.thicknessPreset === "thin" && activeBorder.thicknessMm === 0.3
+                          ? "bg-brand-600 text-white border-brand-600 shadow-sm"
+                          : "bg-white dark:bg-surface-700 text-surface-700 dark:text-surface-200 border-surface-200 dark:border-surface-600 hover:bg-surface-100"
+                      )}
+                      title="Thin: 0.3 mm"
+                    >
+                      Thin (0.3mm)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleBorderChange({ thicknessPreset: "medium", thicknessMm: 0.5 })}
+                      data-testid="border-thickness-medium"
+                      className={cn(
+                        "px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border shadow-2xs",
+                        activeBorder.thicknessPreset === "medium" && activeBorder.thicknessMm === 0.5
+                          ? "bg-brand-600 text-white border-brand-600 shadow-sm"
+                          : "bg-white dark:bg-surface-700 text-surface-700 dark:text-surface-200 border-surface-200 dark:border-surface-600 hover:bg-surface-100"
+                      )}
+                      title="Medium: 0.5 mm"
+                    >
+                      Medium (0.5mm)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleBorderChange({ thicknessPreset: "thick", thicknessMm: 1.0 })}
+                      data-testid="border-thickness-thick"
+                      className={cn(
+                        "px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border shadow-2xs",
+                        activeBorder.thicknessPreset === "thick" && activeBorder.thicknessMm === 1.0
+                          ? "bg-brand-600 text-white border-brand-600 shadow-sm"
+                          : "bg-white dark:bg-surface-700 text-surface-700 dark:text-surface-200 border-surface-200 dark:border-surface-600 hover:bg-surface-100"
+                      )}
+                      title="Thick: 1.0 mm"
+                    >
+                      Thick (1.0mm)
+                    </button>
+
+                    {/* Custom Thickness Input (0.1–3.0 mm) */}
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min="0.1"
+                        max="3.0"
+                        step="0.1"
+                        value={activeBorder.thicknessMm}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          const safe = isNaN(val) ? 0.3 : Math.min(3.0, Math.max(0.1, val));
+                          handleBorderChange({
+                            thicknessPreset: "custom",
+                            thicknessMm: Number(safe.toFixed(2)),
+                          });
+                        }}
+                        data-testid="border-thickness-custom-input"
+                        className="w-16 px-2 py-1 text-xs rounded-md border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-700 text-surface-900 dark:text-surface-100 font-mono text-center focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        aria-label="Custom Border Thickness in mm"
+                      />
+                      <span className="text-[10px] font-semibold text-surface-500">mm</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Border Style */}
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold text-surface-700 dark:text-surface-300 uppercase tracking-wider block">
+                    Border Style
+                  </label>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {(["solid", "dashed", "dotted"] as const).map((styleOpt) => {
+                      const isStyleActive = activeBorder.style === styleOpt;
+                      return (
+                        <button
+                          key={styleOpt}
+                          type="button"
+                          onClick={() => handleBorderChange({ style: styleOpt })}
+                          data-testid={`border-style-${styleOpt}`}
+                          className={cn(
+                            "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border shadow-2xs capitalize",
+                            isStyleActive
+                              ? "bg-brand-600 text-white border-brand-600 shadow-sm"
+                              : "bg-white dark:bg-surface-700 text-surface-700 dark:text-surface-200 border-surface-200 dark:border-surface-600 hover:bg-surface-100"
+                          )}
+                        >
+                          {styleOpt}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* =========================================================================
               CONTROLS SECTION
              ========================================================================= */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -634,6 +879,19 @@ export const DocumentPrintStudio: React.FC<DocumentPrintStudioProps> = ({
                       <option value="inch">inches</option>
                     </select>
                   </div>
+                </div>
+              )}
+
+              {/* Feature 2: Dedicated 4x6 Foldable Front/Back Layout Badge */}
+              {paperLayout.isFoldable4x6 && (
+                <div
+                  data-testid="foldable-4x6-info-badge"
+                  className="pt-2 border-t border-surface-200/60 dark:border-surface-700/50 flex items-start gap-1.5 text-[11px] text-brand-700 dark:text-brand-300 bg-brand-50/50 dark:bg-brand-950/30 p-2 rounded-lg border border-brand-200/60 dark:border-brand-800/40"
+                >
+                  <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-brand-600" />
+                  <span>
+                    <strong>Foldable 4×6 Layout:</strong> Front in top half (upright), Back in bottom half (rotated 180° for horizontal center folding and lamination).
+                  </span>
                 </div>
               )}
             </div>
@@ -1036,6 +1294,21 @@ export const DocumentPrintStudio: React.FC<DocumentPrintStudioProps> = ({
                       </span>
                     </div>
 
+                    {/* Feature 2: 4x6 Center Horizontal Fold Line Reference (Layout Reference only, not printed) */}
+                    {paperLayout.isFoldable4x6 && paperLayout.foldLineYMm && (
+                      <div
+                        data-testid="foldable-4x6-fold-line"
+                        className="absolute left-0 right-0 pointer-events-none border-t border-dashed border-amber-500/90 z-20 flex items-center justify-center"
+                        style={{
+                          top: `${(paperLayout.foldLineYMm / paperLayout.paperHeightMm) * 100}%`,
+                        }}
+                      >
+                        <span className="bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-800 text-[8px] font-bold px-2 py-0.5 rounded shadow-2xs -mt-2">
+                          Horizontal Fold Line (Center 50%)
+                        </span>
+                      </div>
+                    )}
+
                     {/* Placed Document Items on Paper */}
                     {paperLayout.items.map((item) => {
                       return (
@@ -1048,6 +1321,8 @@ export const DocumentPrintStudio: React.FC<DocumentPrintStudioProps> = ({
                             top: `${item.yPercent}%`,
                             width: `${item.widthPercent}%`,
                             height: `${item.heightPercent}%`,
+                            transform: item.rotation ? `rotate(${item.rotation}deg)` : undefined,
+                            transformOrigin: "center center",
                           }}
                         >
                           <div className="w-full h-full rounded border border-surface-300 bg-surface-50 shadow-xs overflow-hidden flex flex-col relative group">
@@ -1055,6 +1330,9 @@ export const DocumentPrintStudio: React.FC<DocumentPrintStudioProps> = ({
                             <div className="absolute top-0.5 left-0.5 z-10 flex items-center gap-1 bg-surface-900/80 text-white text-[8px] font-extrabold px-1 py-0.5 rounded shadow-2xs">
                               <span>{item.badge}</span>
                               <span className="text-[7px] opacity-80">{item.title}</span>
+                              {item.rotation === 180 && (
+                                <span className="text-[6px] bg-amber-500 text-surface-950 font-black px-1 rounded">180°</span>
+                              )}
                             </div>
 
                             <div className="absolute bottom-0.5 right-0.5 z-10 bg-surface-900/80 text-white text-[7px] font-mono px-1 py-0.5 rounded shadow-2xs">
@@ -1074,6 +1352,33 @@ export const DocumentPrintStudio: React.FC<DocumentPrintStudioProps> = ({
                                 <span className="text-xs font-bold">{item.badge}</span>
                                 <span className="text-[8px] mt-0.5">Not Available</span>
                               </div>
+                            )}
+
+                            {/* Feature 1: Crisp Vector Document Border Inside Visible Boundaries */}
+                            {paperLayout.border?.enabled && (
+                              <svg
+                                data-testid={`sheet-item-border-${item.side}`}
+                                className="absolute inset-0 w-full h-full pointer-events-none z-20"
+                                viewBox={`0 0 ${item.widthMm} ${item.heightMm}`}
+                                preserveAspectRatio="none"
+                              >
+                                <rect
+                                  x={paperLayout.border.thicknessMm / 2}
+                                  y={paperLayout.border.thicknessMm / 2}
+                                  width={Math.max(0, item.widthMm - paperLayout.border.thicknessMm)}
+                                  height={Math.max(0, item.heightMm - paperLayout.border.thicknessMm)}
+                                  fill="none"
+                                  stroke={paperLayout.border.color}
+                                  strokeWidth={paperLayout.border.thicknessMm}
+                                  strokeDasharray={
+                                    paperLayout.border.style === "dashed"
+                                      ? "2.5,1.5"
+                                      : paperLayout.border.style === "dotted"
+                                      ? "0.6,1.2"
+                                      : undefined
+                                  }
+                                />
+                              </svg>
                             )}
                           </div>
                         </div>
@@ -1118,6 +1423,7 @@ export const DocumentPrintStudio: React.FC<DocumentPrintStudioProps> = ({
                       <SidePreviewCard
                         sideInfo={layoutResolution.sidesToRender[0]}
                         docName={docDef.name}
+                        border={paperLayout.border}
                       />
                     </div>
                   )}
@@ -1127,6 +1433,7 @@ export const DocumentPrintStudio: React.FC<DocumentPrintStudioProps> = ({
                       <SidePreviewCard
                         sideInfo={layoutResolution.sidesToRender[0]}
                         docName={docDef.name}
+                        border={paperLayout.border}
                       />
                     </div>
                   )}
@@ -1144,6 +1451,7 @@ export const DocumentPrintStudio: React.FC<DocumentPrintStudioProps> = ({
                         <SidePreviewCard
                           sideInfo={layoutResolution.sidesToRender[0]}
                           docName={docDef.name}
+                          border={paperLayout.border}
                         />
                       </div>
 
@@ -1164,6 +1472,7 @@ export const DocumentPrintStudio: React.FC<DocumentPrintStudioProps> = ({
                         <SidePreviewCard
                           sideInfo={layoutResolution.sidesToRender[1]}
                           docName={docDef.name}
+                          border={paperLayout.border}
                         />
                       </div>
                     </div>
@@ -1211,9 +1520,10 @@ export const DocumentPrintStudio: React.FC<DocumentPrintStudioProps> = ({
 interface SidePreviewCardProps {
   sideInfo: ReturnType<typeof resolvePrintStudioLayout>["sidesToRender"][number];
   docName: string;
+  border?: DocumentBorderSettings;
 }
 
-const SidePreviewCard: React.FC<SidePreviewCardProps> = ({ sideInfo, docName }) => {
+const SidePreviewCard: React.FC<SidePreviewCardProps> = ({ sideInfo, docName, border }) => {
   const isFront = sideInfo.side === "front";
   const { isAvailable, imageUrl, printSettings, isEnhanced, emptyReason } = sideInfo;
 
@@ -1301,6 +1611,33 @@ const SidePreviewCard: React.FC<SidePreviewCardProps> = ({ sideInfo, docName }) 
           className="w-full h-full object-contain rounded-lg select-none pointer-events-none"
           loading="eager"
         />
+
+        {/* Feature 1: Document Border Preview Overlay */}
+        {border?.enabled && (
+          <svg
+            data-testid={`card-item-border-${sideInfo.side}`}
+            className="absolute inset-0 w-full h-full pointer-events-none z-10"
+            viewBox={`0 0 ${printSettings.widthMm} ${printSettings.heightMm}`}
+            preserveAspectRatio="none"
+          >
+            <rect
+              x={border.thicknessMm / 2}
+              y={border.thicknessMm / 2}
+              width={Math.max(0, printSettings.widthMm - border.thicknessMm)}
+              height={Math.max(0, printSettings.heightMm - border.thicknessMm)}
+              fill="none"
+              stroke={border.color}
+              strokeWidth={border.thicknessMm}
+              strokeDasharray={
+                border.style === "dashed"
+                  ? "2.5,1.5"
+                  : border.style === "dotted"
+                  ? "0.6,1.2"
+                  : undefined
+              }
+            />
+          </svg>
+        )}
       </div>
 
       <div className="flex items-center justify-between text-[10px] text-surface-500 dark:text-surface-400 pt-1">

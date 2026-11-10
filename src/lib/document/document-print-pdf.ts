@@ -11,7 +11,7 @@
  * 7. Clean semantic filename generator
  */
 
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, rgb } from "pdf-lib";
 import type {
   DocumentSideResult,
   DocumentPrintSettings,
@@ -259,6 +259,9 @@ export function getPageSizeCss(
   if (paperSize === "letter") {
     return orientation === "landscape" ? "letter landscape" : "letter portrait";
   }
+  if (paperSize === "4x6") {
+    return orientation === "landscape" ? "6in 4in" : "4in 6in";
+  }
   return `${paperWidthMm}mm ${paperHeightMm}mm`;
 }
 
@@ -277,6 +280,25 @@ export function loadImageElement(url: string): Promise<HTMLImageElement> {
     img.onerror = () => reject(new Error(`Failed to load image from URL: ${url}`));
     img.src = url;
   });
+}
+
+/**
+ * Converts a hex color string (#000000, #374151) to 0-1 RGB components for pdf-lib.
+ */
+function hexToRgb01(hex: string): { r: number; g: number; b: number } {
+  let clean = hex.replace("#", "").trim();
+  if (clean.length === 3) {
+    clean = clean.split("").map((c) => c + c).join("");
+  }
+  const intVal = parseInt(clean, 16);
+  if (isNaN(intVal)) {
+    return { r: 0, g: 0, b: 0 };
+  }
+  return {
+    r: ((intVal >> 16) & 255) / 255,
+    g: ((intVal >> 8) & 255) / 255,
+    b: (intVal & 255) / 255,
+  };
 }
 
 /**
@@ -308,7 +330,7 @@ export async function renderMasterDocumentCanvas(options: {
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, sheetWidthPx, sheetHeightPx);
 
-  // 2. Render each document side at its exact physical position
+  // 2. Render each document side at its exact physical position with rotation and border
   for (const item of paperLayout.items) {
     if (!item.imageUrl) continue;
 
@@ -319,7 +341,38 @@ export async function renderMasterDocumentCanvas(options: {
       const destW = Math.round((item.widthMm / 25.4) * dpi);
       const destH = Math.round((item.heightMm / 25.4) * dpi);
 
+      ctx.save();
+
+      // Apply 180° rotation for 4x6 foldable back document if specified
+      if (item.rotation) {
+        const centerX = destX + destW / 2;
+        const centerY = destY + destH / 2;
+        ctx.translate(centerX, centerY);
+        ctx.rotate((item.rotation * Math.PI) / 180);
+        ctx.translate(-centerX, -centerY);
+      }
+
       ctx.drawImage(img, destX, destY, destW, destH);
+
+      // Render document border inside the visible document boundaries if enabled
+      if (paperLayout.border?.enabled) {
+        const bwPx = (paperLayout.border.thicknessMm / 25.4) * dpi;
+        ctx.save();
+        ctx.strokeStyle = paperLayout.border.color;
+        ctx.lineWidth = bwPx;
+        if (paperLayout.border.style === "dashed") {
+          ctx.setLineDash([(2.5 / 25.4) * dpi, (1.5 / 25.4) * dpi]);
+        } else if (paperLayout.border.style === "dotted") {
+          ctx.setLineDash([(0.6 / 25.4) * dpi, (1.2 / 25.4) * dpi]);
+        } else {
+          ctx.setLineDash([]);
+        }
+        // Inner stroke strictly inside the document boundaries
+        ctx.strokeRect(destX + bwPx / 2, destY + bwPx / 2, destW - bwPx, destH - bwPx);
+        ctx.restore();
+      }
+
+      ctx.restore();
     } catch (err) {
       console.error(`Failed to draw item ${item.side}:`, err);
     }
@@ -429,6 +482,37 @@ export async function generatePrintReadyPdf(options: {
         width: pageWidthPt,
         height: pageHeightPt,
       });
+
+      // Render crisp vector border overlay directly into PDF page
+      if (paperLayout.border?.enabled) {
+        const bwPt = (paperLayout.border.thicknessMm / 25.4) * 72;
+        const { r, g, b } = hexToRgb01(paperLayout.border.color);
+        let borderDashArray: number[] | undefined = undefined;
+        if (paperLayout.border.style === "dashed") {
+          borderDashArray = [(2.5 / 25.4) * 72, (1.5 / 25.4) * 72];
+        } else if (paperLayout.border.style === "dotted") {
+          borderDashArray = [(0.6 / 25.4) * 72, (1.2 / 25.4) * 72];
+        }
+
+        for (const item of paperLayout.items) {
+          if (!item.isAvailable && !item.imageUrl) continue;
+          const xPt = (item.xMm / 25.4) * 72;
+          const yPt = ((paperLayout.paperHeightMm - item.yMm - item.heightMm) / 25.4) * 72;
+          const wPt = (item.widthMm / 25.4) * 72;
+          const hPt = (item.heightMm / 25.4) * 72;
+
+          page.drawRectangle({
+            x: xPt + bwPt / 2,
+            y: yPt + bwPt / 2,
+            width: Math.max(0, wPt - bwPt),
+            height: Math.max(0, hPt - bwPt),
+            borderWidth: bwPt,
+            borderColor: rgb(r, g, b),
+            color: undefined,
+            borderDashArray,
+          });
+        }
+      }
     }
 
     // 7. Save document to bytes

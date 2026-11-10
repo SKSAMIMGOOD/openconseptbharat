@@ -497,6 +497,14 @@ describe("PHASE 3: Document Studio — Print Studio & Print Mode Selection", () 
       const side = createMockSideResult({
         croppedPreviewUrl: "blob:http://localhost/unenhanced.png",
         enhancedPreviewUrl: null,
+        enhancements: {
+          brightness: 0,
+          contrast: 0,
+          saturation: 0,
+          sharpness: 0,
+          grayscale: false,
+          invert: false,
+        },
       });
 
       const res = resolveActiveSideImage(side);
@@ -672,7 +680,11 @@ describe("PHASE 3: Document Studio — Print Studio & Print Mode Selection", () 
   describe("9. Non-Regression of Existing Core Features", () => {
     test("existing enhancement creation and detection remain functional", () => {
       const settings = createDefaultEnhancementSettings();
-      assert.equal(isEnhancementActive(settings), false);
+      assert.equal(settings.brightness, -6);
+      assert.equal(settings.contrast, 33);
+      assert.equal(settings.saturation, 33);
+      assert.equal(settings.sharpness, 33);
+      assert.equal(isEnhancementActive(settings), true);
 
       settings.invert = true;
       assert.equal(isEnhancementActive(settings), true);

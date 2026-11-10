@@ -165,6 +165,21 @@ export const DocumentPrintPreviewModal: React.FC<DocumentPrintPreviewModalProps>
                 </span>
               </div>
 
+              {/* Feature 2: 4x6 Fold Line Reference (Horizontal Center Fold) */}
+              {paperLayout.isFoldable4x6 && paperLayout.foldLineYMm && (
+                <div
+                  data-testid="modal-foldable-4x6-fold-line"
+                  className="absolute left-0 right-0 pointer-events-none border-t border-dashed border-amber-500/90 z-20 flex items-center justify-center"
+                  style={{
+                    top: `${(paperLayout.foldLineYMm / paperLayout.paperHeightMm) * 100}%`,
+                  }}
+                >
+                  <span className="bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-800 text-[8px] font-bold px-2 py-0.5 rounded shadow-2xs -mt-2">
+                    Horizontal Fold Line (Center 50%)
+                  </span>
+                </div>
+              )}
+
               {/* Placed Items */}
               {paperLayout.items.map((item) => (
                 <div
@@ -175,12 +190,17 @@ export const DocumentPrintPreviewModal: React.FC<DocumentPrintPreviewModalProps>
                     top: `${item.yPercent}%`,
                     width: `${item.widthPercent}%`,
                     height: `${item.heightPercent}%`,
+                    transform: item.rotation ? `rotate(${item.rotation}deg)` : undefined,
+                    transformOrigin: "center center",
                   }}
                 >
                   <div className="w-full h-full rounded border border-surface-300 bg-surface-50 shadow-xs overflow-hidden flex flex-col relative">
                     <div className="absolute top-0.5 left-0.5 z-10 flex items-center gap-1 bg-surface-900/80 text-white text-[8px] font-extrabold px-1 py-0.5 rounded shadow-2xs">
                       <span>{item.badge}</span>
                       <span className="text-[7px] opacity-80">{item.title}</span>
+                      {item.rotation === 180 && (
+                        <span className="text-[6px] bg-amber-500 text-surface-950 font-black px-1 rounded">180°</span>
+                      )}
                     </div>
 
                     <div className="absolute bottom-0.5 right-0.5 z-10 bg-surface-900/80 text-white text-[7px] font-mono px-1 py-0.5 rounded shadow-2xs">
@@ -200,6 +220,33 @@ export const DocumentPrintPreviewModal: React.FC<DocumentPrintPreviewModalProps>
                         <span className="text-[8px] mt-0.5">Not Available</span>
                       </div>
                     )}
+
+                    {/* Feature 1: Vector Document Border inside visible boundaries */}
+                    {paperLayout.border?.enabled && (
+                      <svg
+                        data-testid={`modal-item-border-${item.side}`}
+                        className="absolute inset-0 w-full h-full pointer-events-none z-20"
+                        viewBox={`0 0 ${item.widthMm} ${item.heightMm}`}
+                        preserveAspectRatio="none"
+                      >
+                        <rect
+                          x={paperLayout.border.thicknessMm / 2}
+                          y={paperLayout.border.thicknessMm / 2}
+                          width={Math.max(0, item.widthMm - paperLayout.border.thicknessMm)}
+                          height={Math.max(0, item.heightMm - paperLayout.border.thicknessMm)}
+                          fill="none"
+                          stroke={paperLayout.border.color}
+                          strokeWidth={paperLayout.border.thicknessMm}
+                          strokeDasharray={
+                            paperLayout.border.style === "dashed"
+                              ? "2.5,1.5"
+                              : paperLayout.border.style === "dotted"
+                              ? "0.6,1.2"
+                              : undefined
+                          }
+                        />
+                      </svg>
+                    )}
                   </div>
                 </div>
               ))}
@@ -212,13 +259,13 @@ export const DocumentPrintPreviewModal: React.FC<DocumentPrintPreviewModalProps>
           </div>
 
           {/* Print Specifications Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 text-xs">
             <div className="p-3 rounded-xl bg-surface-50 dark:bg-surface-800/60 border border-surface-200 dark:border-surface-700">
               <span className="text-[10px] text-surface-500 uppercase tracking-wider block font-semibold">
                 Paper Size
               </span>
               <span className="font-bold text-surface-900 dark:text-surface-100 mt-0.5 block">
-                {paperLayout.paperSize.toUpperCase()} ({paperLayout.orientation})
+                {paperLayout.paperSize === "4x6" ? "4×6" : paperLayout.paperSize.toUpperCase()} ({paperLayout.orientation})
               </span>
             </div>
 
@@ -246,6 +293,17 @@ export const DocumentPrintPreviewModal: React.FC<DocumentPrintPreviewModalProps>
               </span>
               <span className="font-bold text-surface-900 dark:text-surface-100 mt-0.5 block">
                 {dpi} DPI • {paperLayout.copies} {paperLayout.copies === 1 ? "Copy" : "Copies"}
+              </span>
+            </div>
+
+            <div className="p-3 rounded-xl bg-surface-50 dark:bg-surface-800/60 border border-surface-200 dark:border-surface-700">
+              <span className="text-[10px] text-surface-500 uppercase tracking-wider block font-semibold">
+                Document Border
+              </span>
+              <span className="font-bold text-surface-900 dark:text-surface-100 mt-0.5 block">
+                {paperLayout.border?.enabled
+                  ? `${paperLayout.border.thicknessMm}mm ${paperLayout.border.style}`
+                  : "Disabled"}
               </span>
             </div>
           </div>

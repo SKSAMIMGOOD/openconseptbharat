@@ -321,6 +321,12 @@ describe("PHASE 5: Document Studio — Actual Printing & Print-Ready PDF Generat
       assert.equal(pageHeightPt, 595.2756);
     });
 
+    test("calculates exact PDF points for 4x6 inch paper (288.0 × 432.0 pt)", () => {
+      const { pageWidthPt, pageHeightPt } = getPaperDimensionsInPoints(101.6, 152.4);
+      assert.equal(pageWidthPt, 288.0);
+      assert.equal(pageHeightPt, 432.0);
+    });
+
     test("calculates exact PDF points for custom paper size (100 × 150 mm)", () => {
       const { pageWidthPt, pageHeightPt } = getPaperDimensionsInPoints(100, 150);
       assert.equal(pageWidthPt, 283.4646);
@@ -345,6 +351,11 @@ describe("PHASE 5: Document Studio — Actual Printing & Print-Ready PDF Generat
     test("generates Letter portrait and landscape CSS @page sizes", () => {
       assert.equal(getPageSizeCss("letter", "portrait", 215.9, 279.4), "letter portrait");
       assert.equal(getPageSizeCss("letter", "landscape", 279.4, 215.9), "letter landscape");
+    });
+
+    test("generates 4x6 inch portrait and landscape CSS @page sizes", () => {
+      assert.equal(getPageSizeCss("4x6", "portrait", 101.6, 152.4), "4in 6in");
+      assert.equal(getPageSizeCss("4x6", "landscape", 152.4, 101.6), "6in 4in");
     });
 
     test("generates custom paper size in millimeters for CSS @page", () => {
@@ -487,6 +498,109 @@ describe("PHASE 5: Document Studio — Actual Printing & Print-Ready PDF Generat
           message: /Front side document is missing/,
         }
       );
+    });
+
+    test("generates exact 4x6 inch PDF (288.0 × 432.0 pt) with 4x6 paper size", async () => {
+      const layout = { ...createDefaultPrintLayoutSettings(), paperSize: "4x6" };
+      const front = createMockSideResult();
+      const back = createMockSideResult();
+
+      const paperLayout = calculatePrintPaperLayout({
+        layout,
+        mode: "combined",
+        arrangement: "vertical",
+        front,
+        back,
+      });
+
+      assert.equal(paperLayout.isFoldable4x6, true);
+
+      const pdfResult = await generatePrintReadyPdf({
+        paperLayout,
+        front,
+        back,
+        isSingleSided: false,
+        docDef: { id: "aadhaar", name: "Aadhaar Card" },
+        dpi: 300,
+        imageBytes: SAMPLE_JPEG_BYTES,
+      });
+
+      assert.equal(pdfResult.pageWidthPt, 288.0);
+      assert.equal(pdfResult.pageHeightPt, 432.0);
+      assert.equal(pdfResult.pageCount, 1);
+      assert.ok(pdfResult.fileName.includes("4x6-portrait"));
+    });
+
+    test("generates PDF with custom document vector border enabled (solid, dashed, dotted)", async () => {
+      const front = createMockSideResult();
+      const back = createMockSideResult();
+
+      // Test solid border
+      const layoutSolid = {
+        ...createDefaultPrintLayoutSettings(),
+        paperSize: "a4",
+        border: {
+          enabled: true,
+          style: "solid",
+          thicknessPreset: "medium",
+          thicknessMm: 0.5,
+          colorPreset: "black",
+          color: "#000000",
+        },
+      };
+
+      const paperLayoutSolid = calculatePrintPaperLayout({
+        layout: layoutSolid,
+        mode: "combined",
+        arrangement: "vertical",
+        front,
+        back,
+      });
+
+      const pdfSolid = await generatePrintReadyPdf({
+        paperLayout: paperLayoutSolid,
+        front,
+        back,
+        isSingleSided: false,
+        imageBytes: SAMPLE_JPEG_BYTES,
+      });
+
+      assert.ok(pdfSolid.sizeBytes > 500);
+      assert.equal(pdfSolid.pageCount, 1);
+
+      // Test dashed border with custom color
+      const layoutDashed = {
+        ...createDefaultPrintLayoutSettings(),
+        paperSize: "4x6",
+        border: {
+          enabled: true,
+          style: "dashed",
+          thicknessPreset: "thick",
+          thicknessMm: 1.0,
+          colorPreset: "custom",
+          color: "#2563EB",
+        },
+      };
+
+      const paperLayoutDashed = calculatePrintPaperLayout({
+        layout: layoutDashed,
+        mode: "combined",
+        arrangement: "vertical",
+        front,
+        back,
+      });
+
+      const pdfDashed = await generatePrintReadyPdf({
+        paperLayout: paperLayoutDashed,
+        front,
+        back,
+        isSingleSided: false,
+        imageBytes: SAMPLE_JPEG_BYTES,
+      });
+
+      assert.ok(pdfDashed.sizeBytes > 500);
+      assert.equal(pdfDashed.pageWidthPt, 288.0);
+      assert.equal(pdfDashed.pageHeightPt, 432.0);
     });
   });
 
