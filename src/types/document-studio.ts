@@ -355,6 +355,22 @@ export interface DocumentAutoDetectState {
   confidence?: number;
 }
 
+export type PdfPasswordStatus =
+  | "idle"
+  | "required"
+  | "verifying"
+  | "incorrect"
+  | "error";
+
+export interface PdfPasswordPromptState {
+  sessionId: number;
+  status: PdfPasswordStatus;
+  fileName: string | null;
+  fileSizeFormatted: string | null;
+  error: string | null;
+  attemptCount: number;
+}
+
 export interface DocumentStudioState {
   selectedDocType: DocumentTypeId;
   customSidesMode: CustomSidesMode;
@@ -363,6 +379,7 @@ export interface DocumentStudioState {
   front: DocumentSideResult;
   back: DocumentSideResult;
   autoDetectStatus: DocumentAutoDetectState;
+  pdfPassword?: PdfPasswordPromptState;
   printSettings?: DocumentPrintSettings;
   printStudio?: DocumentPrintStudioState;
 }

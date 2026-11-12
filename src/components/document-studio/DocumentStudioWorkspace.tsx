@@ -8,6 +8,7 @@ import { DocumentStudioControls } from "./DocumentStudioControls";
 import { DocumentEnhancementPanel } from "./DocumentEnhancementPanel";
 import { DocumentPrintSettingsPanel } from "./DocumentPrintSettingsPanel";
 import { DocumentPrintStudio } from "./DocumentPrintStudio";
+import { PdfPasswordPrompt } from "./PdfPasswordPrompt";
 import {
   ALLOWED_DOCUMENT_EXTENSIONS,
   MAX_DOCUMENT_FILE_SIZE_MB,
@@ -109,11 +110,15 @@ export const DocumentStudioWorkspace: React.FC<DocumentStudioWorkspaceProps> = (
     availableSides,
     hasAnyFile,
     isSingleSided,
+    supportsPasswordPdf,
+    pdfPassword,
     sourceLayoutMode,
     setDocumentType,
     setCustomSidesMode,
     setSourceLayoutMode,
     uploadDocumentFile,
+    submitPdfPassword,
+    cancelPasswordPrompt,
     changePdfPage,
     openCropEditor,
     closeCropEditor,
@@ -266,6 +271,24 @@ export const DocumentStudioWorkspace: React.FC<DocumentStudioWorkspaceProps> = (
                 </span>
               </div>
             </div>
+
+            {supportsPasswordPdf && pdfPassword.status !== "idle" && (
+              <PdfPasswordPrompt
+                promptState={pdfPassword}
+                onUnlock={submitPdfPassword}
+                onCancel={cancelPasswordPrompt}
+              />
+            )}
+
+            {state.source.error && pdfPassword.status === "idle" && (
+              <div
+                role="alert"
+                className="w-full rounded-2xl border border-rose-200 dark:border-rose-800/70 bg-rose-50/80 dark:bg-rose-950/30 px-4 py-3.5 text-xs text-rose-800 dark:text-rose-200 flex items-start gap-2.5 shadow-subtle"
+              >
+                <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+                <span>{state.source.error}</span>
+              </div>
+            )}
           </section>
         </div>
       )}
@@ -273,6 +296,15 @@ export const DocumentStudioWorkspace: React.FC<DocumentStudioWorkspaceProps> = (
       {/* 2. Uploaded Document Active Workspace */}
       {hasAnyFile && (
         <div className="w-full space-y-3.5 sm:space-y-4">
+          {state.source.error && (
+            <div
+              role="alert"
+              className="w-full rounded-2xl border border-rose-200 dark:border-rose-800/70 bg-rose-50/80 dark:bg-rose-950/30 px-4 py-3 text-xs text-rose-800 dark:text-rose-200 flex items-start gap-2.5 shadow-subtle"
+            >
+              <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+              <span>{state.source.error}</span>
+            </div>
+          )}
           {/* Top Control Bar */}
           <div className="bg-white dark:bg-surface-800/90 rounded-2xl border border-surface-200 dark:border-surface-700/80 px-3.5 py-2.5 sm:px-4 sm:py-3 shadow-subtle flex flex-col lg:flex-row lg:items-center justify-between gap-3">
             {/* Left: Document Info */}

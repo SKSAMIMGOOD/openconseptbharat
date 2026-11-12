@@ -21,6 +21,7 @@ import type {
   DocumentSideResult,
   DocumentStudioState,
   DocumentAutoDetectState,
+  PdfPasswordPromptState,
   DocumentDimensions,
   DocumentEnhancementSettings,
   DocumentPrintSettings,
@@ -59,10 +60,18 @@ import {
   getDocumentTypeDefinition,
   getAvailableSides,
   isSideActive,
+  supportsPasswordProtectedPdf,
 } from "@/constants/document-studio";
 import {
+  validateDocumentFile,
   processDocumentFile,
+  openPdfDocumentSession,
+  renderPdfDocumentPageToBlob,
   renderPdfPageToBlob,
+  classifyPdfLoadError,
+  formatFileSize,
+  type PdfDocumentSession,
+  type PdfJsDocumentProxy,
 } from "@/lib/document/document-processor";
 import {
   detectDualDocumentBoundaries,
@@ -90,6 +99,15 @@ const createEmptySource = (): DocumentSourceFile => ({
   currentPage: 1,
   isLoading: false,
   error: null,
+});
+
+const createIdlePdfPasswordState = (sessionId: number = 0): PdfPasswordPromptState => ({
+  sessionId,
+  status: "idle",
+  fileName: null,
+  fileSizeFormatted: null,
+  error: null,
+  attemptCount: 0,
 });
 
 const createEmptySideResult = (
@@ -138,6 +156,9 @@ export function useDocumentStudio(
   const [autoDetectStatus, setAutoDetectStatus] = useState<DocumentAutoDetectState>({
     status: "idle",
   });
+  const [pdfPassword, setPdfPasswordState] = useState<PdfPasswordPromptState>(() =>
+    createIdlePdfPasswordState(0)
+  );
   const [printStudio, setPrintStudio] = useState<DocumentPrintStudioState>(() =>
     createDefaultPrintStudioState(isSingleSided)
   );
@@ -146,6 +167,16 @@ export function useDocumentStudio(
   const initialFrontCropRef = useRef<CropCoordinates | null>(null);
   const initialBackCropRef = useRef<CropCoordinates | null>(null);
   const vectorInfoRef = useRef<VectorPdfInspectionResult | null>(null);
+
+  // Ephemeral PDF.js document & password session refs (zero persistent storage)
+  const pendingPdfSessionRef = useRef<PdfDocumentSession | null>(null);
+  const pendingPdfFileRef = useRef<File | null>(null);
+  const pendingPdfPageRef = useRef<number>(1);
+  const activePdfDocRef = useRef<PdfJsDocumentProxy | null>(null);
+  const isUnlockingRef = useRef<boolean>(false);
+  const uploadRequestIdRef = useRef<number>(0);
+  const selectedDocTypeRef = useRef<DocumentTypeId>(selectedDocType);
+  selectedDocTypeRef.current = selectedDocType;
 
   // Track active Object URLs to guarantee revocation on unmount, replace, or reset
   const sourceUrlRef = useRef<string | null>(null);
@@ -170,18 +201,57 @@ export function useDocumentStudio(
   frontEnhancedUrlRef.current = front.enhancedPreviewUrl ?? null;
   backEnhancedUrlRef.current = back.enhancedPreviewUrl ?? null;
 
-  // Cleanup all object URLs and timers on unmount
+  const releasePdfResources = useCallback(() => {
+    const pendingSession = pendingPdfSessionRef.current;
+    pendingPdfSessionRef.current = null;
+    pendingPdfFileRef.current = null;
+    pendingPdfPageRef.current = 1;
+    isUnlockingRef.current = false;
+
+    if (pendingSession) {
+      void pendingSession.destroy();
+    }
+
+    const activeDoc = activePdfDocRef.current;
+    activePdfDocRef.current = null;
+    if (activeDoc) {
+      void activeDoc.destroy?.();
+    }
+  }, []);
+
+  const revokeAllObjectUrls = useCallback(() => {
+    if (sourceUrlRef.current) {
+      URL.revokeObjectURL(sourceUrlRef.current);
+      sourceUrlRef.current = null;
+    }
+    if (frontCroppedUrlRef.current) {
+      URL.revokeObjectURL(frontCroppedUrlRef.current);
+      frontCroppedUrlRef.current = null;
+    }
+    if (backCroppedUrlRef.current) {
+      URL.revokeObjectURL(backCroppedUrlRef.current);
+      backCroppedUrlRef.current = null;
+    }
+    if (frontEnhancedUrlRef.current) {
+      URL.revokeObjectURL(frontEnhancedUrlRef.current);
+      frontEnhancedUrlRef.current = null;
+    }
+    if (backEnhancedUrlRef.current) {
+      URL.revokeObjectURL(backEnhancedUrlRef.current);
+      backEnhancedUrlRef.current = null;
+    }
+  }, []);
+
+  // Cleanup all object URLs, timers, and PDF.js references on unmount
   useEffect(() => {
     return () => {
-      if (sourceUrlRef.current) URL.revokeObjectURL(sourceUrlRef.current);
-      if (frontCroppedUrlRef.current) URL.revokeObjectURL(frontCroppedUrlRef.current);
-      if (backCroppedUrlRef.current) URL.revokeObjectURL(backCroppedUrlRef.current);
-      if (frontEnhancedUrlRef.current) URL.revokeObjectURL(frontEnhancedUrlRef.current);
-      if (backEnhancedUrlRef.current) URL.revokeObjectURL(backEnhancedUrlRef.current);
+      uploadRequestIdRef.current += 1;
+      revokeAllObjectUrls();
+      releasePdfResources();
       if (frontEnhanceTimerRef.current) clearTimeout(frontEnhanceTimerRef.current);
       if (backEnhanceTimerRef.current) clearTimeout(backEnhanceTimerRef.current);
     };
-  }, []);
+  }, [releasePdfResources, revokeAllObjectUrls]);
 
   const availableSides = getAvailableSides(currentDocDef, customSidesMode);
 
@@ -408,10 +478,20 @@ export function useDocumentStudio(
    */
   const setDocumentType = useCallback(
     async (docType: DocumentTypeId) => {
+      selectedDocTypeRef.current = docType;
       setSelectedDocType(docType);
       if (docType !== "voter-id") {
         vectorInfoRef.current = null;
       }
+
+      // Never expose or retain a pending PDF password session when switching to unsupported tools
+      if (!supportsPasswordProtectedPdf(docType) && pendingPdfSessionRef.current) {
+        uploadRequestIdRef.current += 1;
+        releasePdfResources();
+        setPdfPasswordState(createIdlePdfPasswordState(uploadRequestIdRef.current));
+        setSource(createEmptySource());
+      }
+
       const newDef = getDocumentTypeDefinition(docType);
       const newAspect = newDef.targetDimensions?.aspectRatio ?? null;
       const isSingle = !newDef.supportedSides.includes("back");
@@ -436,7 +516,100 @@ export function useDocumentStudio(
         setBack((prev) => ({ ...prev, targetAspectRatio: newAspect }));
       }
     },
-    [source.previewUrl, source.dimensions, executeDetectionAndCropping]
+    [source.previewUrl, source.dimensions, executeDetectionAndCropping, releasePdfResources]
+  );
+
+  /**
+   * Shared helper: renders the selected page from a loaded/unlocked PDF.js document,
+   * updates source state, and invokes the automatic document detection & cropping pipeline.
+   */
+  const finalizeLoadedPdfDocument = useCallback(
+    async (
+      pdfDoc: PdfJsDocumentProxy,
+      pageCount: number,
+      file: File,
+      requestedPage: number,
+      requestId: number
+    ) => {
+      const activeDocType = selectedDocTypeRef.current;
+      const typeDef = getDocumentTypeDefinition(activeDocType);
+      const activeTargetAspect = typeDef.targetDimensions?.aspectRatio ?? null;
+      const activeSingleSided = !typeDef.supportedSides.includes("back");
+
+      let rendered: { blob: Blob; width: number; height: number; pageNumber: number };
+      try {
+        rendered = await renderPdfDocumentPageToBlob(pdfDoc, requestedPage);
+      } catch (err) {
+        await pdfDoc.destroy?.();
+        throw err;
+      }
+
+      if (requestId !== uploadRequestIdRef.current) {
+        await pdfDoc.destroy?.();
+        return;
+      }
+
+      const previewUrl = URL.createObjectURL(rendered.blob);
+      sourceUrlRef.current = previewUrl;
+      activePdfDocRef.current = pdfDoc;
+
+      // If PDF, inspect for vector embedded image placements ONLY for Voter ID!
+      if (activeDocType === "voter-id") {
+        try {
+          const arrayBuffer = await file.arrayBuffer();
+          vectorInfoRef.current = await inspectVectorVoterIdPdf(
+            arrayBuffer,
+            rendered.width,
+            rendered.height
+          );
+        } catch (e) {
+          console.warn("PDF vector inspection notice:", e);
+          vectorInfoRef.current = null;
+        }
+      } else {
+        vectorInfoRef.current = null;
+      }
+
+      if (requestId !== uploadRequestIdRef.current) {
+        URL.revokeObjectURL(previewUrl);
+        sourceUrlRef.current = null;
+        if (activePdfDocRef.current === pdfDoc) {
+          activePdfDocRef.current = null;
+        }
+        await pdfDoc.destroy?.();
+        return;
+      }
+
+      setPdfPasswordState(createIdlePdfPasswordState(requestId));
+      setSource({
+        file,
+        fileType: "pdf",
+        previewUrl,
+        dimensions: {
+          width: rendered.width,
+          height: rendered.height,
+          aspectRatio: rendered.width / rendered.height,
+        },
+        fileSizeFormatted: formatFileSize(file.size),
+        fileName: file.name,
+        pageCount,
+        currentPage: rendered.pageNumber,
+        isLoading: false,
+        error: null,
+      });
+
+      // Automatically detect and crop both sides using document-specific strategy
+      await executeDetectionAndCropping(
+        previewUrl,
+        rendered.width,
+        rendered.height,
+        activeTargetAspect,
+        activeSingleSided,
+        undefined,
+        activeDocType
+      );
+    },
+    [executeDetectionAndCropping]
   );
 
   /**
@@ -445,88 +618,266 @@ export function useDocumentStudio(
    */
   const uploadDocumentFile = useCallback(
     async (file: File, pageNumber: number = 1) => {
-      setSource((prev) => ({
-        ...prev,
+      const requestId = ++uploadRequestIdRef.current;
+
+      // Release previous PDF sessions/documents and revoke active URLs safely
+      releasePdfResources();
+      revokeAllObjectUrls();
+      if (frontEnhanceTimerRef.current) {
+        clearTimeout(frontEnhanceTimerRef.current);
+        frontEnhanceTimerRef.current = null;
+      }
+      if (backEnhanceTimerRef.current) {
+        clearTimeout(backEnhanceTimerRef.current);
+        backEnhanceTimerRef.current = null;
+      }
+      initialFrontCropRef.current = null;
+      initialBackCropRef.current = null;
+      vectorInfoRef.current = null;
+
+      setPdfPasswordState(createIdlePdfPasswordState(requestId));
+      setFront(createEmptySideResult(targetAspect, selectedDocTypeRef.current));
+      setBack(createEmptySideResult(targetAspect, selectedDocTypeRef.current));
+      setAutoDetectStatus({ status: "idle" });
+      setSource({
+        ...createEmptySource(),
         isLoading: true,
         error: null,
-      }));
-
-      // Revoke previous URLs safely
-      if (sourceUrlRef.current) {
-        URL.revokeObjectURL(sourceUrlRef.current);
-        sourceUrlRef.current = null;
-      }
-      if (frontCroppedUrlRef.current) {
-        URL.revokeObjectURL(frontCroppedUrlRef.current);
-        frontCroppedUrlRef.current = null;
-      }
-      if (backCroppedUrlRef.current) {
-        URL.revokeObjectURL(backCroppedUrlRef.current);
-        backCroppedUrlRef.current = null;
-      }
-      if (frontEnhancedUrlRef.current) {
-        URL.revokeObjectURL(frontEnhancedUrlRef.current);
-        frontEnhancedUrlRef.current = null;
-      }
-      if (backEnhancedUrlRef.current) {
-        URL.revokeObjectURL(backEnhancedUrlRef.current);
-        backEnhancedUrlRef.current = null;
-      }
+      });
 
       try {
-        const result = await processDocumentFile(file, pageNumber);
+        const validation = await validateDocumentFile(file);
+        if (requestId !== uploadRequestIdRef.current) return;
 
-        // If PDF, inspect for vector embedded image placements ONLY for Voter ID!
-        if (result.fileType === "pdf" && selectedDocType === "voter-id") {
-          try {
-            const arrayBuffer = await file.arrayBuffer();
-            vectorInfoRef.current = await inspectVectorVoterIdPdf(
-              arrayBuffer,
-              result.dimensions.width,
-              result.dimensions.height
-            );
-          } catch (e) {
-            console.warn("PDF vector inspection notice:", e);
-            vectorInfoRef.current = null;
-          }
-        } else {
-          vectorInfoRef.current = null;
+        if (!validation.isValid || !validation.fileType) {
+          throw new Error(validation.error || "File validation failed.");
         }
 
+        if (validation.fileType === "image") {
+          const result = await processDocumentFile(file, pageNumber);
+          if (requestId !== uploadRequestIdRef.current) {
+            URL.revokeObjectURL(result.previewUrl);
+            return;
+          }
+
+          sourceUrlRef.current = result.previewUrl;
+          setSource({
+            file: result.file,
+            fileType: result.fileType,
+            previewUrl: result.previewUrl,
+            dimensions: result.dimensions,
+            fileSizeFormatted: result.fileSizeFormatted,
+            fileName: result.fileName,
+            pageCount: result.pageCount,
+            currentPage: result.currentPage,
+            isLoading: false,
+            error: null,
+          });
+
+          const activeDocType = selectedDocTypeRef.current;
+          const activeDef = getDocumentTypeDefinition(activeDocType);
+          await executeDetectionAndCropping(
+            result.previewUrl,
+            result.dimensions.width,
+            result.dimensions.height,
+            activeDef.targetDimensions?.aspectRatio ?? null,
+            !activeDef.supportedSides.includes("back"),
+            undefined,
+            activeDocType
+          );
+          return;
+        }
+
+        // PDF upload: open interactive PDF.js session to detect normal vs password-protected PDFs
+        const sessionResult = await openPdfDocumentSession(file);
+        if (requestId !== uploadRequestIdRef.current) {
+          if (sessionResult.status === "loaded") {
+            await sessionResult.pdfDoc.destroy?.();
+          } else {
+            await sessionResult.session.destroy();
+          }
+          return;
+        }
+
+        if (sessionResult.status === "loaded") {
+          await finalizeLoadedPdfDocument(
+            sessionResult.pdfDoc,
+            sessionResult.pageCount,
+            file,
+            pageNumber,
+            requestId
+          );
+          return;
+        }
+
+        // Password-protected PDF detected
+        if (!supportsPasswordProtectedPdf(selectedDocTypeRef.current)) {
+          await sessionResult.session.destroy();
+          setPdfPasswordState(createIdlePdfPasswordState(requestId));
+          setSource({
+            ...createEmptySource(),
+            isLoading: false,
+            error:
+              "Password-protected PDFs are only supported for PAN Card, Aadhaar Card, and Custom Document.",
+          });
+          return;
+        }
+
+        pendingPdfSessionRef.current = sessionResult.session;
+        pendingPdfFileRef.current = file;
+        pendingPdfPageRef.current = pageNumber;
+
         setSource({
-          file: result.file,
-          fileType: result.fileType,
-          previewUrl: result.previewUrl,
-          dimensions: result.dimensions,
-          fileSizeFormatted: result.fileSizeFormatted,
-          fileName: result.fileName,
-          pageCount: result.pageCount,
-          currentPage: result.currentPage,
+          ...createEmptySource(),
           isLoading: false,
           error: null,
         });
-
-        // Automatically detect and crop both sides using document-specific strategy
-        await executeDetectionAndCropping(
-          result.previewUrl,
-          result.dimensions.width,
-          result.dimensions.height,
-          targetAspect,
-          isSingleSided,
-          undefined,
-          selectedDocType
-        );
+        setPdfPasswordState({
+          sessionId: requestId,
+          status: "required",
+          fileName: file.name,
+          fileSizeFormatted: formatFileSize(file.size),
+          error: null,
+          attemptCount: 0,
+        });
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Failed to process document file.";
-        setSource((prev) => ({
-          ...prev,
+        if (requestId !== uploadRequestIdRef.current) return;
+        const classified = classifyPdfLoadError(err);
+        setPdfPasswordState(createIdlePdfPasswordState(requestId));
+        setSource({
+          ...createEmptySource(),
           isLoading: false,
-          error: msg,
-        }));
+          error: classified.message,
+        });
       }
     },
-    [targetAspect, isSingleSided, selectedDocType, executeDetectionAndCropping]
+    [
+      targetAspect,
+      executeDetectionAndCropping,
+      finalizeLoadedPdfDocument,
+      releasePdfResources,
+      revokeAllObjectUrls,
+    ]
   );
+
+  /**
+   * Submits a password for the currently pending password-protected PDF without re-uploading.
+   * Returns true if unlocking succeeded, false otherwise.
+   */
+  const submitPdfPassword = useCallback(
+    async (password: string): Promise<boolean> => {
+      if (isUnlockingRef.current) return false;
+      if (!supportsPasswordProtectedPdf(selectedDocTypeRef.current)) return false;
+
+      const session = pendingPdfSessionRef.current;
+      const pendingFile = pendingPdfFileRef.current;
+      if (!session || !pendingFile) return false;
+
+      if (!password || password.trim().length === 0) {
+        setPdfPasswordState((prev) => ({
+          ...prev,
+          status: prev.attemptCount > 0 ? "incorrect" : "required",
+          error: "Please enter the PDF password.",
+        }));
+        return false;
+      }
+
+      const requestId = uploadRequestIdRef.current;
+      isUnlockingRef.current = true;
+      setPdfPasswordState((prev) => ({
+        ...prev,
+        status: "verifying",
+        error: null,
+      }));
+
+      try {
+        const unlockResult = await session.submitPassword(password);
+        if (requestId !== uploadRequestIdRef.current) {
+          if (unlockResult.status === "unlocked") {
+            await unlockResult.pdfDoc.destroy?.();
+          }
+          return false;
+        }
+
+        if (unlockResult.status === "incorrect-password") {
+          setPdfPasswordState((prev) => ({
+            ...prev,
+            status: "incorrect",
+            error: "Incorrect password. Please try again.",
+            attemptCount: prev.attemptCount + 1,
+          }));
+          return false;
+        }
+
+        if (unlockResult.status === "empty-password") {
+          setPdfPasswordState((prev) => ({
+            ...prev,
+            status: prev.attemptCount > 0 ? "incorrect" : "required",
+            error: unlockResult.message,
+          }));
+          return false;
+        }
+
+        if (unlockResult.status === "unlocked") {
+          const targetPage = pendingPdfPageRef.current;
+          pendingPdfSessionRef.current = null;
+          pendingPdfFileRef.current = null;
+          pendingPdfPageRef.current = 1;
+
+          await finalizeLoadedPdfDocument(
+            unlockResult.pdfDoc,
+            unlockResult.pageCount,
+            pendingFile,
+            targetPage,
+            requestId
+          );
+          return true;
+        }
+
+        if (unlockResult.status === "cancelled") {
+          setPdfPasswordState(createIdlePdfPasswordState(requestId));
+          return false;
+        }
+
+        if (unlockResult.status === "error") {
+          releasePdfResources();
+          setPdfPasswordState(createIdlePdfPasswordState(requestId));
+          setSource({
+            ...createEmptySource(),
+            isLoading: false,
+            error: unlockResult.message,
+          });
+          return false;
+        }
+
+        return false;
+      } catch (err) {
+        if (requestId !== uploadRequestIdRef.current) return false;
+        const classified = classifyPdfLoadError(err);
+        releasePdfResources();
+        setPdfPasswordState(createIdlePdfPasswordState(requestId));
+        setSource({
+          ...createEmptySource(),
+          isLoading: false,
+          error: classified.message,
+        });
+        return false;
+      } finally {
+        isUnlockingRef.current = false;
+      }
+    },
+    [finalizeLoadedPdfDocument, releasePdfResources]
+  );
+
+  /**
+   * Cancels and removes a pending password-protected PDF without leaving temporary state behind.
+   */
+  const cancelPasswordPrompt = useCallback(() => {
+    const requestId = ++uploadRequestIdRef.current;
+    releasePdfResources();
+    setPdfPasswordState(createIdlePdfPasswordState(requestId));
+    setSource(createEmptySource());
+  }, [releasePdfResources]);
 
   /**
    * Changes the active page of a multi-page PDF document.
@@ -539,21 +890,21 @@ export function useDocumentStudio(
       setSource((prev) => ({ ...prev, isLoading: true, error: null }));
 
       try {
-        const { blob, width, height } = await renderPdfPageToBlob(
-          source.file,
-          newPage
-        );
+        const rendered = activePdfDocRef.current
+          ? await renderPdfDocumentPageToBlob(activePdfDocRef.current, newPage)
+          : await renderPdfPageToBlob(source.file, newPage);
 
         if (source.previewUrl) URL.revokeObjectURL(source.previewUrl);
-        const newPreviewUrl = URL.createObjectURL(blob);
+        const newPreviewUrl = URL.createObjectURL(rendered.blob);
+        sourceUrlRef.current = newPreviewUrl;
 
         setSource((prev) => ({
           ...prev,
           previewUrl: newPreviewUrl,
           dimensions: {
-            width,
-            height,
-            aspectRatio: width / height,
+            width: rendered.width,
+            height: rendered.height,
+            aspectRatio: rendered.width / rendered.height,
           },
           currentPage: newPage,
           isLoading: false,
@@ -562,14 +913,14 @@ export function useDocumentStudio(
 
         await executeDetectionAndCropping(
           newPreviewUrl,
-          width,
-          height,
+          rendered.width,
+          rendered.height,
           targetAspect,
           isSingleSided
         );
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Failed to render PDF page.";
-        setSource((prev) => ({ ...prev, isLoading: false, error: msg }));
+        const classified = classifyPdfLoadError(err);
+        setSource((prev) => ({ ...prev, isLoading: false, error: classified.message }));
       }
     },
     [source.file, source.fileType, source.pageCount, source.previewUrl, targetAspect, isSingleSided, executeDetectionAndCropping]
@@ -1244,26 +1595,9 @@ export function useDocumentStudio(
    * Completely resets the Document Studio and revokes all active object URLs.
    */
   const clearAll = useCallback(() => {
-    if (sourceUrlRef.current) {
-      URL.revokeObjectURL(sourceUrlRef.current);
-      sourceUrlRef.current = null;
-    }
-    if (frontCroppedUrlRef.current) {
-      URL.revokeObjectURL(frontCroppedUrlRef.current);
-      frontCroppedUrlRef.current = null;
-    }
-    if (backCroppedUrlRef.current) {
-      URL.revokeObjectURL(backCroppedUrlRef.current);
-      backCroppedUrlRef.current = null;
-    }
-    if (frontEnhancedUrlRef.current) {
-      URL.revokeObjectURL(frontEnhancedUrlRef.current);
-      frontEnhancedUrlRef.current = null;
-    }
-    if (backEnhancedUrlRef.current) {
-      URL.revokeObjectURL(backEnhancedUrlRef.current);
-      backEnhancedUrlRef.current = null;
-    }
+    const requestId = ++uploadRequestIdRef.current;
+    releasePdfResources();
+    revokeAllObjectUrls();
     if (frontEnhanceTimerRef.current) {
       clearTimeout(frontEnhanceTimerRef.current);
       frontEnhanceTimerRef.current = null;
@@ -1275,12 +1609,13 @@ export function useDocumentStudio(
     initialFrontCropRef.current = null;
     initialBackCropRef.current = null;
     vectorInfoRef.current = null;
+    setPdfPasswordState(createIdlePdfPasswordState(requestId));
     setSource(createEmptySource());
     setFront(createEmptySideResult(targetAspect, selectedDocType));
     setBack(createEmptySideResult(targetAspect, selectedDocType));
     setAutoDetectStatus({ status: "idle" });
     setPrintStudio(createDefaultPrintStudioState(isSingleSided));
-  }, [targetAspect, selectedDocType, isSingleSided]);
+  }, [targetAspect, selectedDocType, isSingleSided, releasePdfResources, revokeAllObjectUrls]);
 
   /**
    * Phase 08D — Document Print Quality & Dimensions Settings
@@ -1490,6 +1825,7 @@ export function useDocumentStudio(
   );
 
   const hasAnyFile = Boolean(source.file && source.previewUrl);
+  const supportsPasswordPdf = supportsPasswordProtectedPdf(selectedDocType);
 
   return {
     state: {
@@ -1500,6 +1836,7 @@ export function useDocumentStudio(
       front,
       back,
       autoDetectStatus,
+      pdfPassword,
       printSettings: front.printSettings,
       printStudio,
     } as DocumentStudioState,
@@ -1507,12 +1844,16 @@ export function useDocumentStudio(
     availableSides,
     hasAnyFile,
     isSingleSided,
+    supportsPasswordPdf,
+    pdfPassword,
     sourceLayoutMode,
     printStudio,
     setDocumentType,
     setCustomSidesMode,
     setSourceLayoutMode,
     uploadDocumentFile,
+    submitPdfPassword,
+    cancelPasswordPrompt,
     changePdfPage,
     openCropEditor,
     closeCropEditor,

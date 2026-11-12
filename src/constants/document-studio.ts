@@ -298,6 +298,23 @@ export const DOCUMENT_TYPES: DocumentTypeDefinition[] = [
 export const DEFAULT_DOCUMENT_TYPE_ID: DocumentTypeId = "aadhaar";
 
 /**
+ * Document types that support client-side password-protected PDF unlocking.
+ * Strictly scoped to PAN Card, Aadhaar Card, and Custom Document.
+ */
+export const PASSWORD_PROTECTED_PDF_SUPPORTED_DOC_TYPES: ReadonlyArray<DocumentTypeId> = [
+  "pan",
+  "aadhaar",
+  "custom",
+];
+
+/**
+ * Checks whether a document type supports password-protected PDF unlocking.
+ */
+export function supportsPasswordProtectedPdf(docType: DocumentTypeId): boolean {
+  return PASSWORD_PROTECTED_PDF_SUPPORTED_DOC_TYPES.includes(docType);
+}
+
+/**
  * Retrieves a document type definition by ID with fallback to Aadhaar.
  */
 export function getDocumentTypeDefinition(id: DocumentTypeId): DocumentTypeDefinition {
