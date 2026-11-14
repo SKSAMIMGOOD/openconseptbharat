@@ -11,6 +11,16 @@ export interface PrintContainerProps {
   pageImages?: string[] | string | null;
   /** Semantic label for accessibility and image alt */
   alt?: string;
+  /**
+   * Optional scope class appended to #printable-sheet-container so tool-specific
+   * print styles can be isolated without affecting shared tools.
+   */
+  scopeClassName?: string;
+  /**
+   * Optional exact physical CSS dimensions for `.print-page` (e.g., `210mm × 297mm` or `4in × 6in`).
+   * Omit to preserve default shared stylesheet sizing for Document Studio and Multiple Photo Maker.
+   */
+  pagePhysicalSize?: { width: string; height: string };
 }
 
 /**
@@ -26,6 +36,8 @@ export interface PrintContainerProps {
 export const PrintContainer: React.FC<PrintContainerProps> = ({
   pageImages,
   alt = "Printable Sheet",
+  scopeClassName,
+  pagePhysicalSize,
 }) => {
   const [mounted, setMounted] = useState(false);
 
@@ -46,12 +58,19 @@ export const PrintContainer: React.FC<PrintContainerProps> = ({
   }
 
   return createPortal(
-    <div id="printable-sheet-container" aria-hidden="true">
+    <div
+      id="printable-sheet-container"
+      className={scopeClassName}
+      aria-hidden="true"
+    >
       {images.map((src, index) => (
         <div
           key={index}
           className="print-page"
           style={{
+            ...(pagePhysicalSize
+              ? { width: pagePhysicalSize.width, height: pagePhysicalSize.height }
+              : undefined),
             pageBreakInside: "avoid",
             breakInside: "avoid",
             overflow: "hidden",

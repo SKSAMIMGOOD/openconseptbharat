@@ -14,10 +14,14 @@ export const SUPPORTED_DPI_PRESETS: readonly StandardDpiPreset[] = [
 ] as const;
 
 /**
- * Default calculation parameters.
+ * Default calculation parameters (A4 default: 27 mm × 32 mm / exact print 26.94 × 32.33 mm; 4×6 default: 27.94 × 34.29 mm).
  */
-export const DEFAULT_PHOTO_WIDTH_MM = 35;
-export const DEFAULT_PHOTO_HEIGHT_MM = 45;
+export const DEFAULT_A4_PHOTO_WIDTH_MM = 26.94;
+export const DEFAULT_A4_PHOTO_HEIGHT_MM = 32.33;
+export const DEFAULT_4X6_PHOTO_WIDTH_MM = 27.94;
+export const DEFAULT_4X6_PHOTO_HEIGHT_MM = 34.29;
+export const DEFAULT_PHOTO_WIDTH_MM = 26.94;
+export const DEFAULT_PHOTO_HEIGHT_MM = 32.33;
 export const DEFAULT_DPI = 300;
 
 /**
@@ -34,12 +38,32 @@ export const MAX_DPI = 2400; // Archival scanner upper boundary
  */
 export const PHOTO_DIMENSION_PRESETS: PhotoDimensionPreset[] = [
   {
+    id: "a4_compact_default",
+    name: "27 mm × 32 mm",
+    countryOrStandard: "A4 Photo Sheet Standard (27 × 32 mm)",
+    description: "A4 compact photo dimension: 27 mm × 32 mm (exact physical print 26.94 × 32.33 mm, target resolution 318 × 382 px at 300 DPI)",
+    category: "standard",
+    widthMm: 26.94,
+    heightMm: 32.33,
+    defaultDpi: 300,
+  },
+  {
+    id: "compact_default",
+    name: "Default Compact (1.1 × 1.35 in)",
+    countryOrStandard: "4×6 Photo Sheet Standard (27.94 × 34.29 mm)",
+    description: "Compact photo dimension: 1.1 × 1.35 inches (27.94 × 34.29 mm) with locked 11:13.5 aspect ratio",
+    category: "standard",
+    widthMm: 27.94,
+    heightMm: 34.29,
+    defaultDpi: 300,
+  },
+  {
     id: "custom",
     name: "Custom Size",
     description: "Freely specify custom physical dimensions and DPI",
     category: "custom",
-    widthMm: 35,
-    heightMm: 45,
+    widthMm: 27.94,
+    heightMm: 34.29,
     defaultDpi: 300,
   },
   {

@@ -19,6 +19,8 @@ import {
   EXTENDED_PHOTO_PRESETS,
   ALL_PHOTO_PRESETS,
   DEFAULT_PRESET,
+  DEFAULT_A4_PRESET,
+  DEFAULT_4X6_PRESET,
 } from '../src/constants/crop-presets.ts';
 
 import {
@@ -41,14 +43,28 @@ describe('PHASE 03C: Passport Photo Presets & Interactive Crop Editor Test Suite
 
   // 1. Predefined Presets
   describe('1. Predefined Photo Presets Specification', () => {
-    it('contains all 4 required initial presets with strictly typed properties', () => {
-      assert.equal(INITIAL_PHOTO_PRESETS.length, 4);
+    it('contains all 6 required initial presets with strictly typed properties', () => {
+      assert.equal(INITIAL_PHOTO_PRESETS.length, 6);
 
       const ids = INITIAL_PHOTO_PRESETS.map((p) => p.id);
+      assert.ok(ids.includes('a4-compact-27x32'));
+      assert.ok(ids.includes('compact-1.1x1.35'));
       assert.ok(ids.includes('passport-35-45'));
       assert.ok(ids.includes('portrait-40-50'));
       assert.ok(ids.includes('square-2x2-inch'));
       assert.ok(ids.includes('custom'));
+    });
+
+    it('verifies default compact (1.1 × 1.35 in) competitor-style preset geometry', () => {
+      const compact = INITIAL_PHOTO_PRESETS.find((p) => p.id === 'compact-1.1x1.35');
+      assert.ok(compact);
+      assert.equal(compact.width, 1.1);
+      assert.equal(compact.height, 1.35);
+      assert.equal(compact.unit, 'inch');
+      assert.ok(Math.abs(compact.aspectRatio - 1.1 / 1.35) < 0.0001);
+      assert.equal(compact.isOfficial, false);
+      assert.equal(DEFAULT_4X6_PRESET.id, 'compact-1.1x1.35');
+      assert.equal(DEFAULT_A4_PRESET.id, 'a4-compact-27x32');
     });
 
     it('verifies 35 × 45 mm passport-style preset geometry', () => {

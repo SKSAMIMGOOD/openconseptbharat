@@ -154,6 +154,7 @@ describe("PRINTING BUG FIX & MULTI-TOOL PAGINATION VERIFICATION", () => {
           margins: config.margins,
           spacing: config.spacing,
           cutGuides: config.cutGuides,
+          maxColumnLimit: 4,
         },
         { widthMm: 27.94, heightMm: 34.29 }
       );
@@ -238,7 +239,7 @@ describe("PRINTING BUG FIX & MULTI-TOOL PAGINATION VERIFICATION", () => {
       };
 
       const baseLayout = calculatePhotoSheetLayout(sheetConfig, photoDimensionsMm);
-      const maxCap = baseLayout.maxCapacity; // 24
+      const maxCap = baseLayout.maxCapacity; // 30 on A4 portrait (5 cols × 6 rows)
       const req = 36;
       const totalSheets = Math.ceil(req / maxCap);
 
@@ -249,14 +250,14 @@ describe("PRINTING BUG FIX & MULTI-TOOL PAGINATION VERIFICATION", () => {
         { ...sheetConfig, copies: maxCap },
         photoDimensionsMm
       );
-      assert.equal(sheet1Layout.totalPhotos, 24, "Sheet 1 must have 24 photos (full)");
+      assert.equal(sheet1Layout.totalPhotos, maxCap, `Sheet 1 must have ${maxCap} photos (full)`);
 
       // Sheet 2
       const sheet2Layout = calculatePhotoSheetLayout(
         { ...sheetConfig, copies: req - maxCap },
         photoDimensionsMm
       );
-      assert.equal(sheet2Layout.totalPhotos, 12, "Sheet 2 must have 12 photos");
+      assert.equal(sheet2Layout.totalPhotos, req - maxCap, `Sheet 2 must have ${req - maxCap} photos`);
     });
   });
 

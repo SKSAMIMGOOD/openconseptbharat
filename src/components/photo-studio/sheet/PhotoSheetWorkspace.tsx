@@ -5,6 +5,7 @@ import {
   PhotoSheetConfig,
   SheetPaperSize,
   SheetExportFormat,
+  SheetExportResult,
   SheetCalculationResult,
 } from "@/types/photo-sheet";
 import {
@@ -17,16 +18,29 @@ import {
   renderMasterSheetCanvas,
 } from "@/lib/photo-studio/sheet-renderer";
 import {
-  exportSheetAsPdf,
   exportMultiSheetAsPdf,
   exportSheetAsImage,
   downloadSheet,
 } from "@/lib/photo-studio/sheet-exporter";
+import { exportCanvasToBlob } from "@/lib/image/exporter";
+import {
+  PHOTO_STUDIO_PRINT_SCOPE_CLASS,
+  PHOTO_STUDIO_PRINT_STYLE_ID,
+  injectScopedPrintPageStyle,
+  nextAnimationFrame,
+  removeScopedPrintPageStyle,
+  resolvePhotoStudioPageGeometry,
+  waitForPrintImagesReady,
+} from "@/lib/photo-studio/print-workflow";
 import { SheetControlsPanel } from "./SheetControlsPanel";
 import { SheetPreviewPanel } from "./SheetPreviewPanel";
 import { PrintPreviewModal } from "./PrintPreviewModal";
 import { PrintContainer } from "@/components/common/PrintContainer";
-import { releaseCanvasBuffer, revokeObjectUrlSafely } from "@/lib/utils/memory";
+import {
+  createTrackedObjectURL,
+  releaseCanvasBuffer,
+  revokeObjectUrlSafely,
+} from "@/lib/utils/memory";
 import { usePreferences } from "@/hooks/usePreferences";
 import {
   Crop,
@@ -81,12 +95,17 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
     userPreferences.defaultJpegQuality || 0.95
   );
   const [isExporting, setIsExporting] = useState<boolean>(false);
-  const [exportMessage, setExportMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [exportMessage, setExportMessage] = useState<{
+    type: "success" | "error" | "info";
+    text: string;
+    canDownloadPdfFallback?: boolean;
+  } | null>(null);
   const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState<boolean>(false);
   const [modalPageIndex, setModalPageIndex] = useState<number>(0);
   const [printImageUrls, setPrintImageUrls] = useState<string[]>([]);
   const printImageUrlsRef = useRef<string[]>([]);
   printImageUrlsRef.current = printImageUrls;
+  const afterPrintCleanupRef = useRef<(() => void) | null>(null);
 
   // Scaled preview canvas ref
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -110,14 +129,20 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
           ...DEFAULT_A4_SHEET_CONFIG,
           paperSize: "a4",
           dpi: prev.dpi,
-          copies: Math.max(prev.copies, 24),
+          copies:
+            prev.copies === 12 || prev.copies === 8 || prev.copies === 6 || prev.copies === 24
+              ? 56
+              : prev.copies,
         }));
       } else {
         setSheetConfig((prev) => ({
           ...DEFAULT_PHOTO_SHEET_CONFIG,
           paperSize: "4x6",
           dpi: prev.dpi,
-          copies: Math.min(prev.copies, 8),
+          copies:
+            prev.copies === 56 || prev.copies === 24 || prev.copies === 8 || prev.copies === 6
+              ? 12
+              : Math.min(prev.copies, 12),
         }));
       }
     }
@@ -142,9 +167,14 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
     [onPaperSizeChange, onDpiChange]
   );
 
-  // Clean up print image URL object URLs on unmount
+  // Clean up print image URLs, afterprint listener, and scoped @page style on unmount
   useEffect(() => {
     return () => {
+      if (afterPrintCleanupRef.current && typeof window !== "undefined") {
+        window.removeEventListener("afterprint", afterPrintCleanupRef.current);
+        afterPrintCleanupRef.current = null;
+      }
+      removeScopedPrintPageStyle(PHOTO_STUDIO_PRINT_STYLE_ID);
       printImageUrlsRef.current.forEach((url) => {
         if (url && url.startsWith("blob:")) {
           revokeObjectUrlSafely(url);
@@ -153,13 +183,46 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
     };
   }, []);
 
+  // Calculate effective photo dimensions and preset name per paper size defaults
+  const effectivePhotoDimensions = useMemo(() => {
+    if (
+      sheetConfig.paperSize === "a4" &&
+      (presetName === "27 mm × 32 mm" || presetName === "Default Compact (1.1 × 1.35 in)")
+    ) {
+      return { width: 26.94, height: 32.33 };
+    }
+    if (
+      sheetConfig.paperSize === "4x6" &&
+      (presetName === "27 mm × 32 mm" || presetName === "Default Compact (1.1 × 1.35 in)")
+    ) {
+      return { width: 27.94, height: 34.29 };
+    }
+    return photoDimensionsMm;
+  }, [sheetConfig.paperSize, presetName, photoDimensionsMm]);
+
+  const effectivePresetName = useMemo(() => {
+    if (
+      sheetConfig.paperSize === "a4" &&
+      (presetName === "Default Compact (1.1 × 1.35 in)" || presetName === "27 mm × 32 mm")
+    ) {
+      return "27 mm × 32 mm";
+    }
+    if (
+      sheetConfig.paperSize === "4x6" &&
+      (presetName === "27 mm × 32 mm" || presetName === "Default Compact (1.1 × 1.35 in)")
+    ) {
+      return "Default Compact (1.1 × 1.35 in)";
+    }
+    return presetName;
+  }, [sheetConfig.paperSize, presetName]);
+
   // Calculate layout whenever config or photo dimensions change
   const layout: SheetCalculationResult = useMemo(() => {
     return calculatePhotoSheetLayout(sheetConfig, {
-      widthMm: photoDimensionsMm.width,
-      heightMm: photoDimensionsMm.height,
+      widthMm: effectivePhotoDimensions.width,
+      heightMm: effectivePhotoDimensions.height,
     });
-  }, [sheetConfig, photoDimensionsMm]);
+  }, [sheetConfig, effectivePhotoDimensions]);
 
   // Multi-sheet pagination for Photo Studio:
   // If copies fit on 1 sheet, exactly 1 sheet is generated.
@@ -173,12 +236,12 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
       const pageCopies = Math.min(maxCap, req - p * maxCap);
       const pageLayout = calculatePhotoSheetLayout(
         { ...sheetConfig, copies: pageCopies },
-        { widthMm: photoDimensionsMm.width, heightMm: photoDimensionsMm.height }
+        { widthMm: effectivePhotoDimensions.width, heightMm: effectivePhotoDimensions.height }
       );
       pages.push({ pageIndex: p, totalPages: total, layout: pageLayout });
     }
     return pages;
-  }, [sheetConfig, layout.maxCapacity, photoDimensionsMm]);
+  }, [sheetConfig, layout.maxCapacity, effectivePhotoDimensions]);
 
   // Render scaled preview canvas in real-time
   useEffect(() => {
@@ -206,35 +269,45 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
     );
   }, [croppedCanvas, layout, sheetConfig.cutGuides]);
 
-  // Handle Export Download
+  // Shared calibrated PDF generator used by Download PDF and PDF-first Print Sheet
+  const generateMultiSheetPrintPdf = useCallback(async (): Promise<SheetExportResult> => {
+    if (!croppedCanvas) {
+      throw new Error("Cropped photograph is not ready.");
+    }
+    return exportMultiSheetAsPdf(
+      multiSheetPages.map((p) => ({ imageSource: croppedCanvas, layout: p.layout })),
+      sheetConfig,
+      {
+        format: "application/pdf",
+        quality: jpegQuality,
+        includeCutGuides: sheetConfig.cutGuides.includeInExport,
+      }
+    );
+  }, [croppedCanvas, multiSheetPages, sheetConfig, jpegQuality]);
+
+  // Handle Export Download (multi-page calibrated PDF or high-resolution raster image)
   const handleExport = useCallback(async () => {
-    if (!croppedCanvas || layout.totalPhotos === 0 || layout.isOverflowing) {
+    if (!croppedCanvas || layout.totalPhotos === 0 || layout.isOverflowing || isExporting) {
       return;
     }
 
     setIsExporting(true);
     setExportMessage(null);
 
-    const isA4 = (layout.paperSize || "a4") === "a4";
-    const paperName = isA4 ? "A4" : "4×6″";
-    const pageDimText = isA4 ? "210 × 297 mm" : "6 × 4 inches";
+    const pageGeometry = resolvePhotoStudioPageGeometry(
+      layout.paperSize || "a4",
+      sheetConfig.orientation
+    );
+    const paperName = (layout.paperSize || "a4") === "a4" ? "A4" : "4×6″";
 
     try {
       if (exportFormat === "application/pdf") {
-        const result = await exportSheetAsPdf(
-          croppedCanvas,
-          layout,
-          sheetConfig,
-          {
-            format: "application/pdf",
-            quality: jpegQuality,
-            includeCutGuides: sheetConfig.cutGuides.includeInExport,
-          }
-        );
+        const result = await generateMultiSheetPrintPdf();
         downloadSheet(result);
+        const totalSheets = result.pageCount ?? multiSheetPages.length;
         setExportMessage({
           type: "success",
-          text: `Print-ready ${paperName} PDF exported successfully (${result.fileName}). Exact page dimensions: ${pageDimText} (${result.pageWidthPt} × ${result.pageHeightPt} pt).`,
+          text: `Print-ready ${paperName} PDF exported successfully (${result.fileName}). Exact page dimensions: ${pageGeometry.dimensionsLabel} (${result.pageWidthPt} × ${result.pageHeightPt} pt). Total sheets: ${totalSheets}.`,
         });
       } else {
         const result = await exportSheetAsImage(
@@ -261,32 +334,38 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
     } finally {
       setIsExporting(false);
     }
-  }, [croppedCanvas, layout, sheetConfig, exportFormat, jpegQuality]);
+  }, [
+    croppedCanvas,
+    layout,
+    sheetConfig,
+    exportFormat,
+    jpegQuality,
+    isExporting,
+    multiSheetPages.length,
+    generateMultiSheetPrintPdf,
+  ]);
 
-  // Handle Direct Export as PDF (Vector-sized print document)
+  // Handle Direct Export as PDF (Calibrated multi-page print document)
   const handleExportPdf = useCallback(async () => {
-    if (!croppedCanvas || layout.totalPhotos === 0 || layout.isOverflowing) return;
+    if (!croppedCanvas || layout.totalPhotos === 0 || layout.isOverflowing || isExporting) {
+      return;
+    }
 
     setIsExporting(true);
     setExportMessage(null);
-    const isA4 = (layout.paperSize || "a4") === "a4";
-    const paperName = isA4 ? "A4" : "4×6″";
-    const pageDimText = isA4 ? "210 × 297 mm" : "6 × 4 inches";
+    const pageGeometry = resolvePhotoStudioPageGeometry(
+      layout.paperSize || "a4",
+      sheetConfig.orientation
+    );
+    const paperName = (layout.paperSize || "a4") === "a4" ? "A4" : "4×6″";
 
     try {
-      const result = await exportMultiSheetAsPdf(
-        multiSheetPages.map((p) => ({ imageSource: croppedCanvas, layout: p.layout })),
-        sheetConfig,
-        {
-          format: "application/pdf",
-          quality: jpegQuality,
-          includeCutGuides: sheetConfig.cutGuides.includeInExport,
-        }
-      );
+      const result = await generateMultiSheetPrintPdf();
       downloadSheet(result);
+      const totalSheets = result.pageCount ?? multiSheetPages.length;
       setExportMessage({
         type: "success",
-        text: `Print-ready ${paperName} PDF exported successfully (${result.fileName}). Exact page dimensions: ${pageDimText} (${result.pageWidthPt} × ${result.pageHeightPt} pt). Total sheets: ${multiSheetPages.length}.`,
+        text: `Print-ready ${paperName} PDF exported successfully (${result.fileName}). Exact page dimensions: ${pageGeometry.dimensionsLabel} (${result.pageWidthPt} × ${result.pageHeightPt} pt). Total sheets: ${totalSheets}.`,
       });
     } catch (err) {
       setExportMessage({
@@ -296,9 +375,16 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
     } finally {
       setIsExporting(false);
     }
-  }, [croppedCanvas, layout, sheetConfig, jpegQuality, multiSheetPages]);
+  }, [
+    croppedCanvas,
+    layout,
+    sheetConfig.orientation,
+    isExporting,
+    multiSheetPages.length,
+    generateMultiSheetPrintPdf,
+  ]);
 
-  // Handle Direct Sheet Print (Browser Print Dialog with calibrated @page styling)
+  // Restored Direct Browser Printing Workflow: prepares sheet HTML in print container and invokes window.print()
   const handlePrintSheet = useCallback(async () => {
     if (!croppedCanvas || layout.totalPhotos === 0 || layout.isOverflowing || isExporting) {
       return;
@@ -307,7 +393,11 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
     setIsExporting(true);
     setExportMessage(null);
 
-    // Clean up previous print image URLs
+    if (afterPrintCleanupRef.current && typeof window !== "undefined") {
+      window.removeEventListener("afterprint", afterPrintCleanupRef.current);
+      afterPrintCleanupRef.current = null;
+    }
+
     printImageUrlsRef.current.forEach((url) => {
       if (url && url.startsWith("blob:")) {
         revokeObjectUrlSafely(url);
@@ -315,10 +405,12 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
     });
 
     const renderedUrls: string[] = [];
-    const createdCanvases: (HTMLCanvasElement | OffscreenCanvas)[] = [];
 
     try {
-      // Render master canvas for each page in multiSheetPages
+      // Allow any closing modal (e.g. 1:1 Print Preview modal) to flush before rendering print DOM
+      await nextAnimationFrame();
+      await nextAnimationFrame();
+
       for (const page of multiSheetPages) {
         const masterCanvas = renderMasterSheetCanvas(
           croppedCanvas,
@@ -326,57 +418,69 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
           sheetConfig.cutGuides,
           sheetConfig.cutGuides.includeInExport
         );
-        createdCanvases.push(masterCanvas);
 
-        let dataUrl: string;
-        if (masterCanvas instanceof HTMLCanvasElement) {
-          dataUrl = masterCanvas.toDataURL("image/jpeg", 0.98);
-        } else {
-          const blob = await masterCanvas.convertToBlob({ type: "image/jpeg", quality: 0.98 });
-          dataUrl = URL.createObjectURL(blob);
+        try {
+          const jpegBlob = await exportCanvasToBlob(masterCanvas, {
+            format: "image/jpeg",
+            quality: 0.98,
+            backgroundColor: "#ffffff",
+            dpi: page.layout.dpi,
+          });
+          renderedUrls.push(createTrackedObjectURL(jpegBlob));
+        } finally {
+          releaseCanvasBuffer(masterCanvas);
         }
-        renderedUrls.push(dataUrl);
       }
 
+      const pageGeometry = resolvePhotoStudioPageGeometry(
+        layout.paperSize || "a4",
+        sheetConfig.orientation
+      );
+
+      injectScopedPrintPageStyle(pageGeometry.pageSizeCss, PHOTO_STUDIO_PRINT_STYLE_ID);
       setPrintImageUrls(renderedUrls);
 
-      // Dynamically set top-level @page rule for paper size and 0 margin
-      const isA4 = (layout.paperSize || "a4") === "a4";
-      const isLandscape = sheetConfig.orientation === "landscape";
-      const pageSizeCss = isA4
-        ? isLandscape
-          ? "A4 landscape"
-          : "A4 portrait"
-        : isLandscape
-        ? "6in 4in"
-        : "4in 6in";
+      await waitForPrintImagesReady({
+        expectedCount: renderedUrls.length,
+        getContainer: () =>
+          document.querySelector(
+            `#printable-sheet-container.${PHOTO_STUDIO_PRINT_SCOPE_CLASS}`
+          ),
+      });
 
-      let styleEl = document.getElementById("dynamic-print-page-style") as HTMLStyleElement | null;
-      if (!styleEl) {
-        styleEl = document.createElement("style");
-        styleEl.id = "dynamic-print-page-style";
-        document.head.appendChild(styleEl);
-      }
-      styleEl.innerHTML = `@page { size: ${pageSizeCss}; margin: 0 !important; }`;
-
-      // Trigger print after layout synchronization
-      setTimeout(() => {
-        window.print();
+      const cleanupAfterPrint = () => {
+        if (afterPrintCleanupRef.current && typeof window !== "undefined") {
+          window.removeEventListener("afterprint", afterPrintCleanupRef.current);
+          afterPrintCleanupRef.current = null;
+        }
+        removeScopedPrintPageStyle(PHOTO_STUDIO_PRINT_STYLE_ID);
+        renderedUrls.forEach((url) => revokeObjectUrlSafely(url));
+        setPrintImageUrls([]);
         setIsExporting(false);
-      }, 300);
+      };
+
+      afterPrintCleanupRef.current = cleanupAfterPrint;
+      if (typeof window !== "undefined") {
+        window.addEventListener("afterprint", cleanupAfterPrint, { once: true });
+      }
+
+      // Invoke native browser print dialog in the current tab
+      window.print();
+      setIsExporting(false);
     } catch (err) {
-      console.error("Print generation failed:", err);
+      console.error("Direct browser print preparation failed:", err);
+      removeScopedPrintPageStyle(PHOTO_STUDIO_PRINT_STYLE_ID);
+      renderedUrls.forEach((url) => revokeObjectUrlSafely(url));
+      setPrintImageUrls([]);
       setExportMessage({
         type: "error",
-        text: err instanceof Error ? err.message : "Failed to prepare sheet for printing.",
+        text:
+          err instanceof Error
+            ? `Failed to prepare print preview: ${err.message}. You can download the calibrated PDF instead.`
+            : "Failed to prepare print preview. You can download the calibrated PDF instead.",
+        canDownloadPdfFallback: true,
       });
       setIsExporting(false);
-    } finally {
-      for (const c of createdCanvases) {
-        if (c instanceof HTMLCanvasElement) {
-          releaseCanvasBuffer(c);
-        }
-      }
     }
   }, [croppedCanvas, layout, sheetConfig, isExporting, multiSheetPages]);
 
@@ -429,27 +533,48 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
           </span>
           <span className="text-surface-300">•</span>
           <span className="text-surface-600">
-            {presetName} ({photoDimensionsMm.width} × {photoDimensionsMm.height} mm)
+            {effectivePresetName} ({effectivePhotoDimensions.width} × {effectivePhotoDimensions.height} mm)
           </span>
         </div>
       </div>
 
-      {/* Export Feedback Banner */}
+      {/* Export & Print Feedback Banner */}
       {exportMessage && (
         <div
           className={cn(
             "p-4 rounded-2xl border flex items-start gap-3 shadow-sm animate-in fade-in text-xs",
             exportMessage.type === "success"
               ? "bg-emerald-50 border-emerald-200 text-emerald-950"
+              : exportMessage.type === "info"
+              ? "bg-amber-50 border-amber-200 text-amber-950"
               : "bg-rose-50 border-rose-200 text-rose-950"
           )}
         >
           {exportMessage.type === "success" ? (
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
           ) : (
-            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+            <AlertCircle
+              className={cn(
+                "w-4 h-4 shrink-0 mt-0.5",
+                exportMessage.type === "info" ? "text-amber-600" : "text-rose-600"
+              )}
+            />
           )}
-          <div className="flex-1 min-w-0 font-medium">{exportMessage.text}</div>
+          <div className="flex-1 min-w-0 space-y-2">
+            <div className="font-medium">{exportMessage.text}</div>
+            {exportMessage.canDownloadPdfFallback && (
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleExportPdf}
+                  disabled={isExporting}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-brand-600 text-white font-semibold hover:bg-brand-700 transition-colors disabled:opacity-50"
+                >
+                  Download Calibrated PDF
+                </button>
+              </div>
+            )}
+          </div>
           <button
             type="button"
             onClick={() => setExportMessage(null)}
@@ -467,8 +592,8 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
           <SheetControlsPanel
             config={sheetConfig}
             layout={layout}
-            photoPresetName={presetName}
-            photoDimensionsMm={photoDimensionsMm}
+            photoPresetName={effectivePresetName}
+            photoDimensionsMm={effectivePhotoDimensions}
             exportFormat={exportFormat}
             jpegQuality={jpegQuality}
             isExporting={isExporting}
@@ -518,10 +643,18 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
         isExporting={isExporting}
       />
 
-      {/* Unified Portaled Printable Container (attached to document.body, isolated from app layout) */}
+      {/* Unified Portaled Printable Container for Direct Browser Printing (scoped to Photo Studio) */}
       <PrintContainer
         pageImages={printImageUrls}
         alt="Photo Sheet"
+        scopeClassName={PHOTO_STUDIO_PRINT_SCOPE_CLASS}
+        pagePhysicalSize={(() => {
+          const geom = resolvePhotoStudioPageGeometry(
+            layout.paperSize || "a4",
+            sheetConfig.orientation
+          );
+          return { width: geom.widthCss, height: geom.heightCss };
+        })()}
       />
     </div>
   );

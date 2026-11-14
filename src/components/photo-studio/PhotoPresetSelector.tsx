@@ -165,6 +165,12 @@ export const PhotoPresetSelector: React.FC<PhotoPresetSelectorProps> = ({
     if (preset.id === "custom") {
       updateCustomPreset(customWidth, customHeight, customUnit, dpi);
     } else {
+      if (preset.id === "compact-1.1x1.35" || preset.id === "a4-compact-27x32") {
+        setIsAspectLocked(true);
+        if (cropMode !== "fixed") {
+          onCropModeToggle("fixed");
+        }
+      }
       onPresetChange(preset);
       setCustomWidth(preset.width);
       setCustomHeight(preset.height);
@@ -199,9 +205,17 @@ export const PhotoPresetSelector: React.FC<PhotoPresetSelectorProps> = ({
       setCustomWidth(parsed);
 
       let targetHeight = customHeight;
-      if (isAspectLocked && customWidth > 0 && customHeight > 0) {
-        const currentRatio = customWidth / customHeight;
-        targetHeight = Number((parsed / currentRatio).toFixed(2));
+      const effectiveRatio =
+        selectedPreset.id === "a4-compact-27x32"
+          ? 26.94 / 32.33
+          : selectedPreset.id === "compact-1.1x1.35"
+          ? 1.1 / 1.35
+          : isAspectLocked && customWidth > 0 && customHeight > 0
+          ? customWidth / customHeight
+          : null;
+
+      if (effectiveRatio) {
+        targetHeight = Number((parsed / effectiveRatio).toFixed(2));
         setCustomHeight(targetHeight);
         setHeightStr(String(targetHeight));
       }
@@ -218,9 +232,17 @@ export const PhotoPresetSelector: React.FC<PhotoPresetSelectorProps> = ({
       setCustomHeight(parsed);
 
       let targetWidth = customWidth;
-      if (isAspectLocked && customWidth > 0 && customHeight > 0) {
-        const currentRatio = customWidth / customHeight;
-        targetWidth = Number((parsed * currentRatio).toFixed(2));
+      const effectiveRatio =
+        selectedPreset.id === "a4-compact-27x32"
+          ? 26.94 / 32.33
+          : selectedPreset.id === "compact-1.1x1.35"
+          ? 1.1 / 1.35
+          : isAspectLocked && customWidth > 0 && customHeight > 0
+          ? customWidth / customHeight
+          : null;
+
+      if (effectiveRatio) {
+        targetWidth = Number((parsed * effectiveRatio).toFixed(2));
         setCustomWidth(targetWidth);
         setWidthStr(String(targetWidth));
       }
@@ -284,7 +306,18 @@ export const PhotoPresetSelector: React.FC<PhotoPresetSelectorProps> = ({
         {/* Fixed Aspect Ratio vs Free Crop Toggle */}
         <button
           type="button"
-          onClick={() => onCropModeToggle(cropMode === "fixed" ? "free" : "fixed")}
+          onClick={() => {
+            if (
+              selectedPreset.id === "a4-compact-27x32" ||
+              selectedPreset.id === "compact-1.1x1.35"
+            ) {
+              // Unlocking ratio on default compact requires switching to Custom Size mode
+              updateCustomPreset(customWidth, customHeight, customUnit, dpi);
+              onCropModeToggle("free");
+              return;
+            }
+            onCropModeToggle(cropMode === "fixed" ? "free" : "fixed");
+          }}
           className={cn(
             "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border shadow-sm",
             cropMode === "fixed"
@@ -292,7 +325,11 @@ export const PhotoPresetSelector: React.FC<PhotoPresetSelectorProps> = ({
               : "bg-surface-100 text-surface-700 border-surface-200 hover:bg-surface-200"
           )}
           title={
-            cropMode === "fixed"
+            selectedPreset.id === "a4-compact-27x32"
+              ? "Default 27 × 32 mm has a locked aspect ratio. Clicking unlocks into Custom Size mode."
+              : selectedPreset.id === "compact-1.1x1.35"
+              ? "Default Compact has a locked 11:13.5 ratio. Clicking unlocks into Custom Size mode."
+              : cropMode === "fixed"
               ? "Aspect ratio is locked. Click to enable freeform cropping."
               : "Freeform crop active. Click to lock aspect ratio."
           }
@@ -303,7 +340,13 @@ export const PhotoPresetSelector: React.FC<PhotoPresetSelectorProps> = ({
           {cropMode === "fixed" ? (
             <>
               <Lock className="w-3.5 h-3.5 text-brand-600" />
-              <span>Aspect Locked</span>
+              <span>
+                {selectedPreset.id === "a4-compact-27x32"
+                  ? "Locked (27:32)"
+                  : selectedPreset.id === "compact-1.1x1.35"
+                  ? "Locked (11:13.5)"
+                  : "Aspect Locked"}
+              </span>
             </>
           ) : (
             <>
@@ -341,14 +384,40 @@ export const PhotoPresetSelector: React.FC<PhotoPresetSelectorProps> = ({
                 )}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <span className="text-xs font-bold text-surface-900 leading-snug">
-                    {preset.id === "custom" ? "Custom Dimensions" : preset.name}
-                  </span>
-                  {isSelected && (
-                    <span className="p-0.5 rounded-full bg-brand-600 text-white shrink-0 mt-0.5">
-                      <Check className="w-3 h-3 stroke-[3]" />
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs font-bold text-surface-900 leading-snug">
+                      {preset.id === "custom" ? "Custom Dimensions" : preset.name}
                     </span>
-                  )}
+                    {preset.id === "a4-compact-27x32" && (
+                      <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-brand-600 text-white rounded-md shadow-xs">
+                        Default
+                      </span>
+                    )}
+                    {preset.id === "compact-1.1x1.35" && (
+                      <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-surface-600 text-white rounded-md shadow-xs">
+                        Default (4×6)
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                    {preset.id === "a4-compact-27x32" && (
+                      <span className="px-1.5 py-0.5 text-[9px] font-semibold bg-emerald-100 text-emerald-800 rounded-md flex items-center gap-0.5 border border-emerald-200">
+                        <Lock className="w-2.5 h-2.5" />
+                        <span>27:32</span>
+                      </span>
+                    )}
+                    {preset.id === "compact-1.1x1.35" && (
+                      <span className="px-1.5 py-0.5 text-[9px] font-semibold bg-emerald-100 text-emerald-800 rounded-md flex items-center gap-0.5 border border-emerald-200">
+                        <Lock className="w-2.5 h-2.5" />
+                        <span>11:13.5</span>
+                      </span>
+                    )}
+                    {isSelected && (
+                      <span className="p-0.5 rounded-full bg-brand-600 text-white shrink-0">
+                        <Check className="w-3 h-3 stroke-[3]" />
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2 text-[11px] font-mono text-surface-500">
                   <span className="font-semibold text-surface-700">
@@ -427,7 +496,17 @@ export const PhotoPresetSelector: React.FC<PhotoPresetSelectorProps> = ({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setIsAspectLocked(!isAspectLocked)}
+              onClick={() => {
+                if (
+                  selectedPreset.id === "a4-compact-27x32" ||
+                  selectedPreset.id === "compact-1.1x1.35"
+                ) {
+                  updateCustomPreset(customWidth, customHeight, customUnit, dpi);
+                  setIsAspectLocked(false);
+                  return;
+                }
+                setIsAspectLocked(!isAspectLocked);
+              }}
               className={cn(
                 "px-2 py-0.5 rounded-lg text-[10px] font-semibold border flex items-center gap-1 transition-all",
                 isAspectLocked
@@ -435,7 +514,11 @@ export const PhotoPresetSelector: React.FC<PhotoPresetSelectorProps> = ({
                   : "bg-surface-100 text-surface-500 border-surface-200"
               )}
               title={
-                isAspectLocked
+                selectedPreset.id === "a4-compact-27x32"
+                  ? "Aspect ratio is locked to 26.94:32.33. Click to switch to Custom Size mode and unlock."
+                  : selectedPreset.id === "compact-1.1x1.35"
+                  ? "Aspect ratio is locked to 11:13.5. Click to switch to Custom Size mode and unlock."
+                  : isAspectLocked
                   ? "Aspect ratio is locked: width & height adjust proportionally"
                   : "Aspect ratio unlocked: width & height can change independently"
               }
@@ -443,7 +526,13 @@ export const PhotoPresetSelector: React.FC<PhotoPresetSelectorProps> = ({
               {isAspectLocked ? (
                 <>
                   <Lock className="w-2.5 h-2.5" />
-                  <span>Proportional</span>
+                  <span>
+                    {selectedPreset.id === "a4-compact-27x32"
+                      ? "Locked (27:32)"
+                      : selectedPreset.id === "compact-1.1x1.35"
+                      ? "Locked (11:13.5)"
+                      : "Proportional"}
+                  </span>
                 </>
               ) : (
                 <>

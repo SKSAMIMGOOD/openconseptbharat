@@ -20,6 +20,32 @@ import type { PhotoPreset } from "@/types/crop-preset";
  */
 export const INITIAL_PHOTO_PRESETS: readonly PhotoPreset[] = [
   {
+    id: "a4-compact-27x32",
+    name: "27 mm × 32 mm",
+    width: 26.94,
+    height: 32.33,
+    unit: "mm",
+    aspectRatio: 26.94 / 32.33,
+    description:
+      "A4 compact photo dimension: 27 mm × 32 mm (exact physical print 26.94 × 32.33 mm, target resolution 318 × 382 px at 300 DPI). High-density layout fitting 56 photos (7 cols × 8 rows) on A4.",
+    category: "standard",
+    isOfficial: false,
+    countryOrStandard: "A4 Photo Sheet Standard (27 × 32 mm)",
+  },
+  {
+    id: "compact-1.1x1.35",
+    name: "Default Compact (1.1 × 1.35 in)",
+    width: 1.1,
+    height: 1.35,
+    unit: "inch",
+    aspectRatio: 1.1 / 1.35, // 11:13.5 (~0.8148)
+    description:
+      "Competitor-style compact photo proportion: 1.1 × 1.35 inches (27.94 × 34.29 mm) with locked 11:13.5 aspect ratio. High-density layout fitting 12 photos on 4×6.",
+    category: "standard",
+    isOfficial: false,
+    countryOrStandard: "4×6 Photo Sheet Standard (1.1 × 1.35 in)",
+  },
+  {
     id: "passport-35-45",
     name: "Passport-style photo (35 × 45 mm)",
     width: 35,
@@ -140,8 +166,10 @@ export const ALL_PHOTO_PRESETS: readonly PhotoPreset[] = [
 ] as const;
 
 /**
- * Default preset selected on initial load: Standard Passport-style 35 × 45 mm.
+ * Default preset selected on initial load: A4 Compact 27 × 32 mm.
  */
+export const DEFAULT_A4_PRESET: PhotoPreset = INITIAL_PHOTO_PRESETS[0];
+export const DEFAULT_4X6_PRESET: PhotoPreset = INITIAL_PHOTO_PRESETS[1];
 export const DEFAULT_PRESET: PhotoPreset = INITIAL_PHOTO_PRESETS[0];
 
 /**

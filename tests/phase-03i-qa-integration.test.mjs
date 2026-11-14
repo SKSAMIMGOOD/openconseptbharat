@@ -331,7 +331,7 @@ describe("PHASE 03I: Final QA & Integration Test Suite", () => {
       assert.equal(landscape.pageHeightPt, 595.2756);
     });
 
-    test("arranges 24 passport photos on A4 portrait sheet (4 cols × 6 rows, strictly top-aligned)", () => {
+    test("arranges 24 passport photos on A4 portrait sheet (5 cols × 5 rows, strictly top-aligned)", () => {
       const config = {
         ...DEFAULT_A4_SHEET_CONFIG,
         paperSize: "a4",
@@ -344,8 +344,8 @@ describe("PHASE 03I: Final QA & Integration Test Suite", () => {
       const layout = calculatePhotoSheetLayout(config, photoDimensions);
 
       assert.equal(layout.isOverflowing, false);
-      assert.equal(layout.activeColumns, 4);
-      assert.equal(layout.activeRows, 6);
+      assert.equal(layout.activeColumns, 5);
+      assert.equal(layout.activeRows, 5);
       assert.equal(layout.totalPhotos, 24);
 
       // Top margin must be preserved without vertical centering on A4
@@ -355,8 +355,8 @@ describe("PHASE 03I: Final QA & Integration Test Suite", () => {
       // Verify row 1 and row 2 vertical coordinates
       const row1 = layout.placements.filter((p) => p.row === 0);
       const row2 = layout.placements.filter((p) => p.row === 1);
-      assert.equal(row1.length, 4);
-      assert.equal(row2.length, 4);
+      assert.equal(row1.length, 5);
+      assert.equal(row2.length, 5);
 
       const expectedRow2Y = config.margins.topMm + 45 + config.spacing.verticalMm;
       assert.ok(Math.abs(row2[0].yMm - expectedRow2Y) < 0.01);

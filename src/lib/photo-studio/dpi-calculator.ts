@@ -146,6 +146,8 @@ export function getFriendlyAspectRatioName(ratio: number): string {
   if (!ratio || isNaN(ratio) || !isFinite(ratio) || ratio <= 0) return "1:1";
 
   const commonRatios: Array<{ name: string; value: number }> = [
+    { name: "27:32 Compact", value: 26.94 / 32.33 }, // ~0.8333 (A4 compact standard)
+    { name: "11:13.5 Compact", value: 1.1 / 1.35 }, // ~0.8148
     { name: "1:1 Square", value: 1.0 },
     { name: "35:45 Passport", value: 35 / 45 }, // ~0.778
     { name: "45:35 Landscape", value: 45 / 35 }, // ~1.286

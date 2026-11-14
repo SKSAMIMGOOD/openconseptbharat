@@ -72,7 +72,7 @@ describe('BUG FIX VERIFICATION: A4 Photo Sheet Grid Layout & Spacing Test Suite'
   // CASE 2: Eight photographs in two rows
   // =========================================================================
   describe('Case 2: Eight photographs in two rows', () => {
-    it('places exactly 8 photographs in two complete rows of 4 columns each', () => {
+    it('places 8 photographs across 2 rows (Row 1: 5 photos, Row 2: 3 photos) on 5-column A4 grid', () => {
       const layout = calculatePhotoSheetLayout(
         {
           ...DEFAULT_A4_SHEET_CONFIG,
@@ -86,27 +86,27 @@ describe('BUG FIX VERIFICATION: A4 Photo Sheet Grid Layout & Spacing Test Suite'
       );
 
       assert.equal(layout.totalPhotos, 8);
-      assert.equal(layout.activeColumns, 4);
+      assert.equal(layout.activeColumns, 5);
       assert.equal(layout.activeRows, 2);
       assert.equal(layout.placements.length, 8);
 
-      // Row 1: Photos 0..3
-      for (let i = 0; i < 4; i++) {
+      // Row 1: Photos 0..4
+      for (let i = 0; i < 5; i++) {
         const p = layout.placements[i];
         assert.equal(p.row, 0);
         assert.equal(p.col, i);
         assert.equal(p.yMm, 6.0);
       }
 
-      // Row 2: Photos 4..7
+      // Row 2: Photos 5..7
       const expectedRow1Y = 6.0 + 45.0 + 1.5; // 52.5 mm
-      for (let i = 4; i < 8; i++) {
+      for (let i = 5; i < 8; i++) {
         const p = layout.placements[i];
-        const col = i - 4;
+        const col = i - 5;
         assert.equal(p.row, 1);
         assert.equal(p.col, col);
         assert.equal(p.yMm, expectedRow1Y);
-        // Column alignment: Photo 4 must align horizontally with Photo 0, Photo 5 with Photo 1, etc.
+        // Column alignment: Photo 5 must align horizontally with Photo 0, Photo 6 with Photo 1, etc.
         assert.equal(p.xMm, layout.placements[col].xMm);
       }
     });
@@ -116,7 +116,7 @@ describe('BUG FIX VERIFICATION: A4 Photo Sheet Grid Layout & Spacing Test Suite'
   // CASE 3: Six photographs in two rows
   // =========================================================================
   describe('Case 3: Six photographs in two rows', () => {
-    it('places 4 photos in Row 1 and 2 photos in Row 2 without stretching the incomplete row', () => {
+    it('places 5 photos in Row 1 and 1 photo in Row 2 without stretching the incomplete row', () => {
       const layout = calculatePhotoSheetLayout(
         {
           ...DEFAULT_A4_SHEET_CONFIG,
@@ -130,62 +130,58 @@ describe('BUG FIX VERIFICATION: A4 Photo Sheet Grid Layout & Spacing Test Suite'
       );
 
       assert.equal(layout.totalPhotos, 6);
-      assert.equal(layout.activeColumns, 4);
+      assert.equal(layout.activeColumns, 5);
       assert.equal(layout.activeRows, 2);
       assert.equal(layout.placements.length, 6);
 
-      // Row 1: Photos 0, 1, 2, 3
+      // Row 1: Photos 0, 1, 2, 3, 4
       assert.deepEqual(
-        layout.placements.slice(0, 4).map((p) => ({ row: p.row, col: p.col })),
+        layout.placements.slice(0, 5).map((p) => ({ row: p.row, col: p.col })),
         [
           { row: 0, col: 0 },
           { row: 0, col: 1 },
           { row: 0, col: 2 },
           { row: 0, col: 3 },
+          { row: 0, col: 4 },
         ]
       );
 
-      // Row 2: Photos 4, 5 (col 0 and col 1)
+      // Row 2: Photo 5 (col 0)
       assert.deepEqual(
-        layout.placements.slice(4, 6).map((p) => ({ row: p.row, col: p.col })),
+        layout.placements.slice(5, 6).map((p) => ({ row: p.row, col: p.col })),
         [
           { row: 1, col: 0 },
-          { row: 1, col: 1 },
         ]
       );
 
       // Verify incomplete row does NOT stretch across the page:
-      // Photo 4 is at same X as Photo 0
-      assert.equal(layout.placements[4].xMm, layout.placements[0].xMm);
-      // Photo 5 is at same X as Photo 1
-      assert.equal(layout.placements[5].xMm, layout.placements[1].xMm);
-      // Inter-photo horizontal spacing between Photo 4 and Photo 5 is strictly 1.5 mm
-      const gap = layout.placements[5].xMm - (layout.placements[4].xMm + layout.placements[4].widthMm);
-      assert.equal(Number(gap.toFixed(3)), 1.5);
+      // Photo 5 is at same X as Photo 0
+      assert.equal(layout.placements[5].xMm, layout.placements[0].xMm);
     });
   });
 
   // =========================================================================
-  // CASE 4: Maximum four-column enforcement
+  // CASE 4: True Geometric Column Capacity (No Artificial 4-Column Limit)
   // =========================================================================
-  describe('Case 4: Maximum four-column enforcement', () => {
-    it('never renders 5 or more photos in a single row even when sheet width permits', () => {
-      // 35mm photos on A4 portrait (198mm available width can physically hold 5 columns)
+  describe('Case 4: True Geometric Column Capacity (No Artificial 4-Column Limit)', () => {
+    it('supports more than 4 columns when paper width permits (5 cols for 35mm on A4 portrait, 7 cols on landscape)', () => {
+      // 35mm photos on A4 portrait (198mm available width physically holds 5 columns)
       const layoutPortrait = calculatePhotoSheetLayout(
         {
           ...DEFAULT_A4_SHEET_CONFIG,
           paperSize: 'a4',
           orientation: 'portrait',
-          copies: 24,
+          margins: { topMm: 6, bottomMm: 6, leftMm: 6, rightMm: 6, uniform: true },
+          spacing: { horizontalMm: 1.5, verticalMm: 1.5, uniform: true },
+          copies: 30,
         },
         { widthMm: 35, heightMm: 45 }
       );
 
-      assert.equal(layoutPortrait.maxColumns, 4);
-      assert.ok(layoutPortrait.activeColumns <= 4);
-      for (const p of layoutPortrait.placements) {
-        assert.ok(p.col <= 3, `Column index ${p.col} must not exceed 3 (max 4 columns)`);
-      }
+      assert.equal(layoutPortrait.maxColumns, 5);
+      assert.equal(layoutPortrait.activeColumns, 5);
+      assert.equal(layoutPortrait.maxRows, 6);
+      assert.equal(layoutPortrait.maxCapacity, 30);
 
       // Small 20mm stamp photos on A4 portrait (198mm available can physically hold 9 columns)
       const layoutStamps = calculatePhotoSheetLayout(
@@ -198,48 +194,89 @@ describe('BUG FIX VERIFICATION: A4 Photo Sheet Grid Layout & Spacing Test Suite'
         { widthMm: 20, heightMm: 25 }
       );
 
-      assert.equal(layoutStamps.maxColumns, 4);
-      assert.ok(layoutStamps.activeColumns <= 4);
-      for (const p of layoutStamps.placements) {
-        assert.ok(p.col <= 3, `Stamp column index ${p.col} must not exceed 3`);
-      }
+      assert.equal(layoutStamps.maxColumns, 9);
+      assert.equal(layoutStamps.activeColumns, 9);
 
-      // 35mm photos on A4 landscape (285mm available can physically hold 7 columns)
+      // 35mm photos on A4 landscape (285mm available can physically hold 7 columns with 6mm margins)
       const layoutLandscape = calculatePhotoSheetLayout(
         {
           ...DEFAULT_A4_SHEET_CONFIG,
           paperSize: 'a4',
           orientation: 'landscape',
-          copies: 16,
+          margins: { topMm: 6, bottomMm: 6, leftMm: 6, rightMm: 6, uniform: true },
+          copies: 28,
         },
         { widthMm: 35, heightMm: 45 }
       );
 
-      assert.equal(layoutLandscape.maxColumns, 4);
-      assert.ok(layoutLandscape.activeColumns <= 4);
-      for (const p of layoutLandscape.placements) {
-        assert.ok(p.col <= 3, `Landscape column index ${p.col} must not exceed 3`);
-      }
+      assert.equal(layoutLandscape.maxColumns, 7);
+      assert.equal(layoutLandscape.activeColumns, 7);
+      assert.equal(layoutLandscape.maxRows, 4);
+      assert.equal(layoutLandscape.maxCapacity, 28);
     });
 
-    it('enforces maximum 4 columns in manual mode even if user inputs more', () => {
+    it('calculates 7 columns for compact (27.94 × 34.29 mm) photos on A4 portrait when margins permit', () => {
+      // 210 mm paper width with 2 mm left/right margins leaves 206 mm available width.
+      // 7 compact photos across: 7 × 27.94 + 6 × 1.5 = 204.58 mm <= 206 mm.
+      const layoutCompactPermitted = calculatePhotoSheetLayout(
+        {
+          ...DEFAULT_A4_SHEET_CONFIG,
+          paperSize: 'a4',
+          orientation: 'portrait',
+          margins: { topMm: 5, bottomMm: 5, leftMm: 2, rightMm: 2, uniform: false },
+          spacing: { horizontalMm: 1.5, verticalMm: 1.5, uniform: true },
+          copies: 56,
+        },
+        { widthMm: 27.94, heightMm: 34.29 }
+      );
+
+      assert.equal(layoutCompactPermitted.maxColumns, 7);
+      assert.equal(layoutCompactPermitted.maxRows, 8);
+      assert.equal(layoutCompactPermitted.maxCapacity, 56);
+      assert.equal(layoutCompactPermitted.isOverflowing, false);
+    });
+
+    it('correctly reduces column count when margin configuration exceeds available width for 7 columns', () => {
+      // With default 6 mm margins on each side (12 mm total, 198 mm available):
+      // 7 × 27.94 + 6 × 1.5 = 204.58 mm > 198 mm.
+      // Therefore, the grid correctly reduces to 6 columns without silently shrinking margins.
+      const layoutCompactRestricted = calculatePhotoSheetLayout(
+        {
+          ...DEFAULT_A4_SHEET_CONFIG,
+          paperSize: 'a4',
+          orientation: 'portrait',
+          margins: { topMm: 6, bottomMm: 6, leftMm: 6, rightMm: 6, uniform: true },
+          spacing: { horizontalMm: 1.5, verticalMm: 1.5, uniform: true },
+          copies: 48,
+        },
+        { widthMm: 27.94, heightMm: 34.29 }
+      );
+
+      assert.equal(layoutCompactRestricted.maxColumns, 6);
+      assert.equal(layoutCompactRestricted.maxRows, 8);
+      assert.equal(layoutCompactRestricted.maxCapacity, 48);
+      assert.equal(layoutCompactRestricted.isOverflowing, false);
+    });
+
+    it('supports custom manual columns beyond 4 when layout physically fits', () => {
       const layoutManual = calculatePhotoSheetLayout(
         {
           ...DEFAULT_A4_SHEET_CONFIG,
           paperSize: 'a4',
           orientation: 'portrait',
           layoutMode: 'manual',
-          manualCols: 8, // Request 8 columns
-          manualRows: 3,
-          copies: 12,
+          manualCols: 5, // Request 5 columns (physically fits 35mm photos on A4)
+          manualRows: 6,
+          margins: { topMm: 6, bottomMm: 6, leftMm: 6, rightMm: 6, uniform: true },
+          spacing: { horizontalMm: 1.5, verticalMm: 1.5, uniform: true },
+          copies: 30,
         },
         { widthMm: 35, heightMm: 45 }
       );
 
-      assert.equal(layoutManual.activeColumns, 4);
-      for (const p of layoutManual.placements) {
-        assert.ok(p.col <= 3);
-      }
+      assert.equal(layoutManual.activeColumns, 5);
+      assert.equal(layoutManual.isOverflowing, false);
+      assert.equal(layoutManual.placements.length, 30);
     });
   });
 
@@ -288,10 +325,10 @@ describe('BUG FIX VERIFICATION: A4 Photo Sheet Grid Layout & Spacing Test Suite'
 
       // Row 0: y = 8.0
       assert.equal(layout.placements[0].yMm, topMargin);
-      // Row 1: y = 8.0 + 45.0 + 2.5 = 55.5
-      assert.equal(layout.placements[4].yMm, topMargin + photoH + vGap);
-      // Row 2: y = 8.0 + 2 * (45.0 + 2.5) = 103.0
-      assert.equal(layout.placements[8].yMm, topMargin + 2 * (photoH + vGap));
+      // Row 1 (first photo is index 5 in a 5-column grid): y = 8.0 + 45.0 + 2.5 = 55.5
+      assert.equal(layout.placements[5].yMm, topMargin + photoH + vGap);
+      // Row 2 (first photo is index 10 in a 5-column grid): y = 8.0 + 2 * (45.0 + 2.5) = 103.0
+      assert.equal(layout.placements[10].yMm, topMargin + 2 * (photoH + vGap));
     });
   });
 
@@ -299,16 +336,16 @@ describe('BUG FIX VERIFICATION: A4 Photo Sheet Grid Layout & Spacing Test Suite'
   // CASE 6: Minimum horizontal spacing
   // =========================================================================
   describe('Case 6: Minimum horizontal spacing', () => {
-    it('applies default 1.5 mm horizontal spacing between adjacent photos', () => {
+    it('applies default horizontal spacing between adjacent photos (2.6 mm for A4 compact default)', () => {
       const layout = calculatePhotoSheetLayout(
         DEFAULT_A4_SHEET_CONFIG,
-        { widthMm: 35, heightMm: 45 }
+        { widthMm: 26.94, heightMm: 32.33 }
       );
 
       const p0 = layout.placements[0];
       const p1 = layout.placements[1];
       const hGap = p1.xMm - (p0.xMm + p0.widthMm);
-      assert.equal(Number(hGap.toFixed(3)), 1.5);
+      assert.equal(Number(hGap.toFixed(2)), 2.6);
     });
 
     it('allows reducing horizontal spacing down to 0 mm without photo overlap', () => {
@@ -350,16 +387,16 @@ describe('BUG FIX VERIFICATION: A4 Photo Sheet Grid Layout & Spacing Test Suite'
   // CASE 7: Minimum vertical spacing
   // =========================================================================
   describe('Case 7: Minimum vertical spacing', () => {
-    it('applies default 1.5 mm vertical spacing between consecutive rows', () => {
+    it('applies default vertical spacing between consecutive rows (2.8 mm for A4 compact default)', () => {
       const layout = calculatePhotoSheetLayout(
         DEFAULT_A4_SHEET_CONFIG,
-        { widthMm: 35, heightMm: 45 }
+        { widthMm: 26.94, heightMm: 32.33 }
       );
 
       const pRow0 = layout.placements[0];
-      const pRow1 = layout.placements[4];
+      const pRow1 = layout.placements[7]; // Index 7 is first photo of Row 1 in 7-column grid
       const vGap = pRow1.yMm - (pRow0.yMm + pRow0.heightMm);
-      assert.equal(Number(vGap.toFixed(3)), 1.5);
+      assert.equal(Number(vGap.toFixed(2)), 2.8);
     });
 
     it('allows reducing vertical spacing down to 0 mm without row overlap', () => {
@@ -375,7 +412,7 @@ describe('BUG FIX VERIFICATION: A4 Photo Sheet Grid Layout & Spacing Test Suite'
       );
 
       const pRow0 = layout.placements[0];
-      const pRow1 = layout.placements[4];
+      const pRow1 = layout.placements[5]; // Index 5 is the first photo of Row 1 in a 5-column grid
       assert.equal(pRow1.yMm, pRow0.yMm + pRow0.heightMm);
       assert.ok(pRow0.yMm + pRow0.heightMm <= pRow1.yMm); // No overlap
     });
@@ -385,7 +422,7 @@ describe('BUG FIX VERIFICATION: A4 Photo Sheet Grid Layout & Spacing Test Suite'
   // CASE 8: A4 portrait
   // =========================================================================
   describe('Case 8: A4 portrait geometry and arrangement', () => {
-    it('calculates accurate portrait dimensions (210 × 297 mm, 2480 × 3508 px at 300 DPI, 24 photo capacity)', () => {
+    it('calculates accurate portrait dimensions (210 × 297 mm, 2480 × 3508 px at 300 DPI, 56 photo capacity with 27×32 mm)', () => {
       const dims = calculateSheetDimensions('portrait', 300, 'a4');
       assert.equal(dims.widthMm, 210.0);
       assert.equal(dims.heightMm, 297.0);
@@ -400,14 +437,14 @@ describe('BUG FIX VERIFICATION: A4 Photo Sheet Grid Layout & Spacing Test Suite'
           paperSize: 'a4',
           orientation: 'portrait',
         },
-        { widthMm: 35, heightMm: 45 }
+        { widthMm: 26.94, heightMm: 32.33 }
       );
 
-      assert.equal(layout.maxColumns, 4);
-      assert.equal(layout.maxRows, 6);
-      assert.equal(layout.maxCapacity, 24);
-      assert.equal(layout.effectiveMarginLeftMm, 6.0);
-      assert.equal(layout.effectiveMarginTopMm, 6.0);
+      assert.equal(layout.maxColumns, 7);
+      assert.equal(layout.maxRows, 8);
+      assert.equal(layout.maxCapacity, 56);
+      assert.equal(Number(layout.effectiveMarginLeftMm.toFixed(2)), 2.91);
+      assert.equal(layout.effectiveMarginTopMm, 3.1);
     });
   });
 
@@ -415,7 +452,7 @@ describe('BUG FIX VERIFICATION: A4 Photo Sheet Grid Layout & Spacing Test Suite'
   // CASE 9: A4 landscape
   // =========================================================================
   describe('Case 9: A4 landscape geometry and arrangement', () => {
-    it('calculates accurate landscape dimensions (297 × 210 mm, 3508 × 2480 px at 300 DPI, 16 photo capacity)', () => {
+    it('calculates accurate landscape dimensions (297 × 210 mm, 3508 × 2480 px at 300 DPI, 28 photo capacity)', () => {
       const dims = calculateSheetDimensions('landscape', 300, 'a4');
       assert.equal(dims.widthMm, 297.0);
       assert.equal(dims.heightMm, 210.0);
@@ -429,14 +466,16 @@ describe('BUG FIX VERIFICATION: A4 Photo Sheet Grid Layout & Spacing Test Suite'
           ...DEFAULT_A4_SHEET_CONFIG,
           paperSize: 'a4',
           orientation: 'landscape',
+          margins: { topMm: 6, bottomMm: 6, leftMm: 6, rightMm: 6, uniform: true },
+          spacing: { horizontalMm: 1.5, verticalMm: 1.5, uniform: true },
           copies: 16,
         },
         { widthMm: 35, heightMm: 45 }
       );
 
-      assert.equal(layout.maxColumns, 4);
+      assert.equal(layout.maxColumns, 7);
       assert.equal(layout.maxRows, 4);
-      assert.equal(layout.maxCapacity, 16);
+      assert.equal(layout.maxCapacity, 28);
       assert.equal(layout.totalPhotos, 16);
       assert.equal(layout.effectiveMarginLeftMm, 6.0);
       assert.equal(layout.effectiveMarginTopMm, 6.0);
@@ -481,7 +520,7 @@ describe('BUG FIX VERIFICATION: A4 Photo Sheet Grid Layout & Spacing Test Suite'
       assert.equal(layout.maxCapacity, 20);
     });
 
-    it('enforces max 4 columns for small 25 × 25 mm photos', () => {
+    it('calculates true geometric columns for small 25 × 25 mm photos (7 cols × 10 rows = 70 photos)', () => {
       const layout = calculatePhotoSheetLayout(
         {
           ...DEFAULT_A4_SHEET_CONFIG,
@@ -492,7 +531,9 @@ describe('BUG FIX VERIFICATION: A4 Photo Sheet Grid Layout & Spacing Test Suite'
         { widthMm: 25, heightMm: 25 }
       );
 
-      assert.equal(layout.maxColumns, 4);
+      assert.equal(layout.maxColumns, 7);
+      assert.equal(layout.maxRows, 10);
+      assert.equal(layout.maxCapacity, 70);
     });
   });
 
@@ -500,7 +541,7 @@ describe('BUG FIX VERIFICATION: A4 Photo Sheet Grid Layout & Spacing Test Suite'
   // CASE 11: Capacity calculation
   // =========================================================================
   describe('Case 11: Capacity calculation and warning', () => {
-    it('implements min(4, floor((availW + gap) / (photoW + gap))) and floor((availH + gap) / (photoH + gap))', () => {
+    it('implements floor((availW + gap) / (photoW + gap)) and floor((availH + gap) / (photoH + gap)) without artificial clamping', () => {
       const { maxCols, maxRows, maxCapacity } = calculateMaxSheetCapacity(
         210.0,
         297.0,
@@ -511,11 +552,11 @@ describe('BUG FIX VERIFICATION: A4 Photo Sheet Grid Layout & Spacing Test Suite'
         { topMm: 6, bottomMm: 6, leftMm: 6, rightMm: 6 }
       );
 
-      // availableWidth = 210 - 12 = 198 mm -> floor((198 + 1.5) / 36.5) = floor(199.5 / 36.5) = 5 -> min(4, 5) = 4
-      assert.equal(maxCols, 4);
+      // availableWidth = 210 - 12 = 198 mm -> floor((198 + 1.5) / 36.5) = floor(199.5 / 36.5) = 5
+      assert.equal(maxCols, 5);
       // availableHeight = 297 - 12 = 285 mm -> floor((285 + 1.5) / 46.5) = floor(286.5 / 46.5) = 6
       assert.equal(maxRows, 6);
-      assert.equal(maxCapacity, 24);
+      assert.equal(maxCapacity, 30);
     });
 
     it('warns clearly and never silently discards requested copies when count exceeds capacity', () => {
@@ -524,17 +565,17 @@ describe('BUG FIX VERIFICATION: A4 Photo Sheet Grid Layout & Spacing Test Suite'
           ...DEFAULT_A4_SHEET_CONFIG,
           paperSize: 'a4',
           orientation: 'portrait',
-          copies: 40, // 40 requested, but capacity is 24
+          copies: 65, // 65 requested, but capacity is 56
         },
-        { widthMm: 35, heightMm: 45 }
+        { widthMm: 26.94, heightMm: 32.33 }
       );
 
-      assert.equal(layout.requestedCopies, 40);
-      assert.equal(layout.maxCapacity, 24);
-      assert.equal(layout.totalPhotos, 24);
+      assert.equal(layout.requestedCopies, 65);
+      assert.equal(layout.maxCapacity, 56);
+      assert.equal(layout.totalPhotos, 56);
       assert.equal(layout.copiesExceedCapacity, true);
-      assert.equal(layout.exceededByCount, 16);
-      assert.ok(layout.capacityWarningMessage?.includes('Requested copy count (40) exceeds maximum sheet capacity (24 photos)'));
+      assert.equal(layout.exceededByCount, 9);
+      assert.ok(layout.capacityWarningMessage?.includes('Requested copy count (65) exceeds maximum sheet capacity (56 photos)'));
     });
   });
 
@@ -590,8 +631,8 @@ describe('BUG FIX VERIFICATION: A4 Photo Sheet Grid Layout & Spacing Test Suite'
 
       // Placements in JPEG use exact same layout coordinates
       assert.equal(layout.placements.length, 6);
-      assert.equal(layout.placements[0].xPx, Math.round((6.0 / MM_PER_INCH) * 300));
-      assert.equal(layout.placements[0].yPx, Math.round((6.0 / MM_PER_INCH) * 300));
+      assert.equal(layout.placements[0].xPx, Math.round((2.91 / MM_PER_INCH) * 300));
+      assert.equal(layout.placements[0].yPx, Math.round((3.1 / MM_PER_INCH) * 300));
     });
   });
 
@@ -747,13 +788,13 @@ describe('BUG FIX VERIFICATION: A4 Photo Sheet Grid Layout & Spacing Test Suite'
       const capA4 = calculateMaxSheetCapacity(210.0, 297.0, 35, 45, 1.5, 1.5, { topMm: 6, bottomMm: 6, leftMm: 6, rightMm: 6 });
 
       assert.equal(cap4x6.maxCapacity, 8); // 4 cols × 2 rows = 8 photos on 4x6
-      assert.equal(capA4.maxCapacity, 24); // 4 cols × 6 rows = 24 photos on A4
+      assert.equal(capA4.maxCapacity, 30); // 5 cols × 6 rows = 30 photos on A4
       assert.ok(capA4.maxCapacity > cap4x6.maxCapacity);
     });
 
     it('preserves center alignment support for 4x6 while keeping A4 top-left aligned', () => {
       const layout4x6 = calculatePhotoSheetLayout(
-        { ...DEFAULT_PHOTO_SHEET_CONFIG, paperSize: '4x6', centerAlignment: true, copies: 1 },
+        { ...DEFAULT_PHOTO_SHEET_CONFIG, paperSize: '4x6', orientation: 'landscape', paperWidthInches: 6.0, paperHeightInches: 4.0, centerAlignment: true, copies: 1 },
         { widthMm: 35, heightMm: 45 }
       );
       const layoutA4 = calculatePhotoSheetLayout(
@@ -766,8 +807,8 @@ describe('BUG FIX VERIFICATION: A4 Photo Sheet Grid Layout & Spacing Test Suite'
       assert.ok(Math.abs(layout4x6.placements[0].yMm - 28.3) < 0.1);
 
       // A4 stays strictly top-left aligned at margin
-      assert.equal(layoutA4.placements[0].xMm, 6.0);
-      assert.equal(layoutA4.placements[0].yMm, 6.0);
+      assert.equal(Number(layoutA4.placements[0].xMm.toFixed(2)), 2.91);
+      assert.equal(layoutA4.placements[0].yMm, 3.1);
     });
   });
 

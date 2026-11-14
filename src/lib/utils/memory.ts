@@ -45,15 +45,23 @@ export function revokeAllTrackedObjectURLs(): void {
   activeObjectUrls.clear();
 }
 
+export type ReleasableCanvas = HTMLCanvasElement | OffscreenCanvas;
+
 /**
- * Cleans up an HTMLCanvasElement by resetting its dimensions and clearing the 2D context.
+ * Cleans up an HTMLCanvasElement or OffscreenCanvas by clearing its 2D context
+ * and resetting its dimensions to zero so backing bitmap memory can be reclaimed.
  */
-export function releaseCanvasBuffer(canvas: HTMLCanvasElement | null): void {
+export function releaseCanvasBuffer(canvas: ReleasableCanvas | null | undefined): void {
   if (!canvas) return;
   try {
-    const ctx = canvas.getContext("2d");
-    if (ctx) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (typeof canvas.getContext === "function") {
+      const ctx = canvas.getContext("2d") as
+        | CanvasRenderingContext2D
+        | OffscreenCanvasRenderingContext2D
+        | null;
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
     }
     canvas.width = 0;
     canvas.height = 0;

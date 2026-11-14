@@ -155,66 +155,66 @@ export const DEFAULT_CUT_GUIDES = {
   includeInExport: true,
 };
 
-/** Default margins in millimeters for 4x6 */
+/** Default margins in millimeters for 4x6 (competitor target: ~3 mm minimum outer margins) */
 export const DEFAULT_SHEET_MARGINS = {
-  topMm: 4,
-  bottomMm: 4,
-  leftMm: 4,
-  rightMm: 4,
+  topMm: 3,
+  bottomMm: 3,
+  leftMm: 3,
+  rightMm: 3,
   uniform: true,
 };
 
-/** Default margins in millimeters for A4 (account for printer mechanical feed margins) */
+/** Default margins in millimeters for A4 (27 × 32 mm high-density 56-photo default layout) */
 export const DEFAULT_A4_SHEET_MARGINS = {
-  topMm: 6,
-  bottomMm: 6,
-  leftMm: 6,
-  rightMm: 6,
-  uniform: true,
+  topMm: 3.1,
+  bottomMm: 15.66,
+  leftMm: 2.91,
+  rightMm: 2.91,
+  uniform: false,
 };
 
-/** Maximum columns allowed per row on A4 photo sheet */
+/** Maximum columns allowed per row on A4 photo sheet (legacy constant retained for compatibility) */
 export const MAX_A4_COLUMNS = 4;
 
-/** Default spacing between photos in millimeters for A4 paper (1.5 mm standard) */
+/** Default spacing between photos in millimeters for A4 paper (competitor-measured 2.6 mm horiz, 2.8 mm vert) */
 export const DEFAULT_A4_SHEET_SPACING = {
-  horizontalMm: 3.5,
-  verticalMm: 3.5,
-  uniform: true,
+  horizontalMm: 2.6,
+  verticalMm: 2.8,
+  uniform: false,
 };
 
-/** Default spacing between photos in millimeters for 4x6 paper (2.0 mm standard) */
+/** Default spacing between photos in millimeters for 4x6 paper (competitor-measured targets: 2.7 mm horiz, 2.8 mm vert) */
 export const DEFAULT_4X6_SHEET_SPACING = {
-  horizontalMm: 2,
-  verticalMm: 2,
-  uniform: true,
+  horizontalMm: 2.7,
+  verticalMm: 2.8,
+  uniform: false,
 };
 
 /** Default spacing between photos in millimeters */
 export const DEFAULT_SHEET_SPACING = {
-  horizontalMm: 3.5,
-  verticalMm: 3.5,
+  horizontalMm: 1.5,
+  verticalMm: 1.5,
   uniform: true,
 };
 
-/** Default 4x6 Photo Sheet Configuration */
+/** Default 4x6 Photo Sheet Configuration (Competitor compact: 3 cols × 4 rows = 12 photos) */
 export const DEFAULT_PHOTO_SHEET_CONFIG: PhotoSheetConfig = {
   paperSize: "4x6",
-  orientation: "landscape",
-  paperWidthInches: SHEET_4X6_LONG_EDGE_INCHES, // 6.0 in
-  paperHeightInches: SHEET_4X6_SHORT_EDGE_INCHES, // 4.0 in
+  orientation: "portrait",
+  paperWidthInches: SHEET_4X6_SHORT_EDGE_INCHES, // 4.0 in
+  paperHeightInches: SHEET_4X6_LONG_EDGE_INCHES, // 6.0 in
   dpi: DEFAULT_SHEET_DPI, // 300 DPI
   layoutMode: "auto",
-  manualRows: 2,
-  manualCols: 4,
-  copies: 8,
+  manualRows: 4,
+  manualCols: 3,
+  copies: 12,
   centerAlignment: true,
-  margins: { ...DEFAULT_SHEET_MARGINS },
-  spacing: { ...DEFAULT_4X6_SHEET_SPACING },
+  margins: { ...DEFAULT_SHEET_MARGINS }, // 3 mm uniform
+  spacing: { ...DEFAULT_4X6_SHEET_SPACING }, // 2.7 mm horiz, 2.8 mm vert
   cutGuides: { ...DEFAULT_CUT_GUIDES },
 };
 
-/** Default A4 Photo Sheet Configuration (Phase 03E Layout Correction) */
+/** Default A4 Photo Sheet Configuration (Competitor compact: 7 cols × 8 rows = 56 photos) */
 export const DEFAULT_A4_SHEET_CONFIG: PhotoSheetConfig = {
   paperSize: "a4",
   orientation: "portrait",
@@ -222,11 +222,11 @@ export const DEFAULT_A4_SHEET_CONFIG: PhotoSheetConfig = {
   paperHeightInches: SHEET_A4_LONG_EDGE_INCHES, // ~11.6929 in
   dpi: DEFAULT_SHEET_DPI, // 300 DPI
   layoutMode: "auto",
-  manualRows: 6,
-  manualCols: 4, // Strict maximum 4 columns
-  copies: 6,
+  manualRows: 8,
+  manualCols: 7,
+  copies: 56,
   centerAlignment: false, // Top-left printable region (never vertically or horizontally centered)
-  margins: { ...DEFAULT_A4_SHEET_MARGINS },
-  spacing: { ...DEFAULT_A4_SHEET_SPACING }, // 1.5 mm default spacing
+  margins: { ...DEFAULT_A4_SHEET_MARGINS }, // 2.91 mm left/right, 3.1 mm top, 15.66 mm bottom
+  spacing: { ...DEFAULT_A4_SHEET_SPACING }, // 2.6 mm horiz, 2.8 mm vert
   cutGuides: { ...DEFAULT_CUT_GUIDES },
 };

@@ -22,7 +22,6 @@ import {
   DEFAULT_SHEET_MARGINS,
   DEFAULT_A4_SHEET_SPACING,
   DEFAULT_4X6_SHEET_SPACING,
-  MAX_A4_COLUMNS,
   MIN_SHEET_DPI,
   MAX_SHEET_DPI,
 } from "@/constants/photo-sheet";
@@ -91,23 +90,29 @@ export const SheetControlsPanel: React.FC<SheetControlsPanelProps> = ({
           margins: { ...DEFAULT_A4_SHEET_MARGINS },
           spacing: { ...DEFAULT_A4_SHEET_SPACING },
           centerAlignment: false,
-          copies: Math.max(prev.copies, 24),
-          manualRows: 6,
-          manualCols: 4,
+          copies:
+            prev.copies === 12 || prev.copies === 8 || prev.copies === 6 || prev.copies === 24
+              ? 56
+              : prev.copies,
+          manualRows: 8,
+          manualCols: 7,
         };
       } else {
         return {
           ...prev,
           paperSize: "4x6",
-          orientation: "landscape",
-          paperWidthInches: SHEET_4X6_LONG_EDGE_INCHES,
-          paperHeightInches: SHEET_4X6_SHORT_EDGE_INCHES,
+          orientation: "portrait",
+          paperWidthInches: SHEET_4X6_SHORT_EDGE_INCHES,
+          paperHeightInches: SHEET_4X6_LONG_EDGE_INCHES,
           margins: { ...DEFAULT_SHEET_MARGINS },
           spacing: { ...DEFAULT_4X6_SHEET_SPACING },
           centerAlignment: true,
-          copies: Math.min(prev.copies, 8),
-          manualRows: 2,
-          manualCols: 4,
+          copies:
+            prev.copies === 56 || prev.copies === 24 || prev.copies === 8 || prev.copies === 6
+              ? 12
+              : Math.min(prev.copies, 12),
+          manualRows: 4,
+          manualCols: 3,
         };
       }
     });
@@ -128,11 +133,34 @@ export const SheetControlsPanel: React.FC<SheetControlsPanelProps> = ({
         heightInches = orientation === "landscape" ? SHEET_4X6_SHORT_EDGE_INCHES : SHEET_4X6_LONG_EDGE_INCHES;
       }
 
+      let manualRows = prev.manualRows;
+      let manualCols = prev.manualCols;
+      let copies = prev.copies;
+
+      if (!isA4) {
+        if (orientation === "landscape") {
+          manualRows = 2;
+          manualCols = 4;
+          if (copies === 12) {
+            copies = 8;
+          }
+        } else {
+          manualRows = 4;
+          manualCols = 3;
+          if (copies === 8) {
+            copies = 12;
+          }
+        }
+      }
+
       return {
         ...prev,
         orientation,
         paperWidthInches: widthInches,
         paperHeightInches: heightInches,
+        manualRows,
+        manualCols,
+        copies,
       };
     });
   };
@@ -182,9 +210,10 @@ export const SheetControlsPanel: React.FC<SheetControlsPanelProps> = ({
   };
 
   const handleManualColsChange = (cols: number) => {
+    const maxAllowed = layout.maxColumns > 0 ? layout.maxColumns : 20;
     onConfigChange((prev) => ({
       ...prev,
-      manualCols: Math.max(1, Math.min(MAX_A4_COLUMNS, cols)),
+      manualCols: Math.max(1, Math.min(maxAllowed, cols)),
     }));
   };
 
@@ -315,7 +344,7 @@ export const SheetControlsPanel: React.FC<SheetControlsPanelProps> = ({
                   {paper.dimensionsMm}
                 </span>
                 <span className="text-[10px] text-surface-400 block line-clamp-1 mt-0.5">
-                  {paper.id === "a4" ? "High capacity (30+ photos)" : "Photo lab standard (8 photos)"}
+                  {paper.id === "a4" ? "High capacity (up to 56 photos)" : "Photo standard (up to 12 photos)"}
                 </span>
               </button>
             ))}
@@ -498,12 +527,14 @@ export const SheetControlsPanel: React.FC<SheetControlsPanelProps> = ({
             <div>
               <label className="text-[11px] font-semibold text-surface-700 flex items-center justify-between mb-1">
                 <span>Columns:</span>
-                <span className="text-[10px] text-surface-400 font-mono">(Max 4)</span>
+                <span className="text-[10px] text-surface-400 font-mono">
+                  (Max {layout.maxColumns > 0 ? layout.maxColumns : 20})
+                </span>
               </label>
               <input
                 type="number"
                 min={1}
-                max={4}
+                max={layout.maxColumns > 0 ? layout.maxColumns : 20}
                 value={config.manualCols}
                 onChange={(e) => handleManualColsChange(parseInt(e.target.value, 10) || 1)}
                 className="w-full px-2.5 py-1 text-xs font-mono rounded-lg border border-surface-300 focus:outline-none focus:ring-1 focus:ring-brand-500"

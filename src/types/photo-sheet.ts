@@ -46,6 +46,7 @@ export interface PhotoSheetConfig {
   margins: SheetMargins;
   spacing: SheetSpacing;
   cutGuides: CutGuidesConfig;
+  maxColumnLimit?: number;
 }
 
 export interface PhotoPlacement {
@@ -112,5 +113,6 @@ export interface SheetExportResult {
   heightPx?: number;
   pageWidthPt?: number;
   pageHeightPt?: number;
+  pageCount?: number;
   sizeBytes: number;
 }

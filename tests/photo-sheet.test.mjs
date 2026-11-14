@@ -220,6 +220,9 @@ describe('PHASE 03D: 4×6 Inch Photo Sheet Generator Test Suite', () => {
     it('places single copy correctly with center alignment', () => {
       const config = {
         ...DEFAULT_PHOTO_SHEET_CONFIG,
+        orientation: 'landscape',
+        paperWidthInches: SHEET_4X6_LONG_EDGE_INCHES,
+        paperHeightInches: SHEET_4X6_SHORT_EDGE_INCHES,
         copies: 1,
         centerAlignment: true,
       };
@@ -240,6 +243,9 @@ describe('PHASE 03D: 4×6 Inch Photo Sheet Generator Test Suite', () => {
     it('arranges exact grid of 2 rows and 3 columns in manual mode', () => {
       const config = {
         ...DEFAULT_PHOTO_SHEET_CONFIG,
+        orientation: 'landscape',
+        paperWidthInches: SHEET_4X6_LONG_EDGE_INCHES,
+        paperHeightInches: SHEET_4X6_SHORT_EDGE_INCHES,
         layoutMode: 'manual',
         manualCols: 3,
         manualRows: 2,

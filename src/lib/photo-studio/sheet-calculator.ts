@@ -133,7 +133,7 @@ export function calculateSheetDimensions(
 
 /**
  * Calculates maximum capacity of photos that can fit on the sheet without overflowing.
- * Enforces strict maximum of 4 columns per row for photo sheets.
+ * Calculates true geometric maximum columns and rows based on printable dimensions and spacing.
  */
 export function calculateMaxSheetCapacity(
   sheetWidthMm: number,
@@ -143,7 +143,7 @@ export function calculateMaxSheetCapacity(
   horizontalSpacingMm: number,
   verticalSpacingMm: number,
   margins: { topMm: number; bottomMm: number; leftMm: number; rightMm: number },
-  maxColumnLimit: number = 4
+  maxColumnLimit?: number
 ): { maxCols: number; maxRows: number; maxCapacity: number } {
   if (photoWidthMm <= 0 || photoHeightMm <= 0) {
     return { maxCols: 0, maxRows: 0, maxCapacity: 0 };
@@ -159,12 +159,18 @@ export function calculateMaxSheetCapacity(
   const hSpacing = Math.max(0, horizontalSpacingMm);
   const vSpacing = Math.max(0, verticalSpacingMm);
 
-  // Maximum columns: min(4, floor((availableWidth + horizontalGap) / (photoWidth + horizontalGap)))
-  const calculatedCols = Math.floor((availWidth + hSpacing) / (photoWidthMm + hSpacing));
-  const maxCols = Math.max(0, Math.min(maxColumnLimit, calculatedCols));
+  // Micro-epsilon (0.001 mm ~ 1 micron) prevents IEEE 754 precision loss (e.g. 6.999999999999999 floored to 6)
+  const EPSILON = 0.001;
 
-  // Maximum rows: floor((availableHeight + verticalGap) / (photoHeight + verticalGap))
-  const maxRows = Math.max(0, Math.floor((availHeight + vSpacing) / (photoHeightMm + vSpacing)));
+  // Maximum columns: floor((availableWidth + horizontalGap + EPSILON) / (photoWidth + horizontalGap))
+  const calculatedCols = Math.floor((availWidth + hSpacing + EPSILON) / (photoWidthMm + hSpacing));
+  const maxCols =
+    maxColumnLimit !== undefined
+      ? Math.max(0, Math.min(maxColumnLimit, calculatedCols))
+      : Math.max(0, calculatedCols);
+
+  // Maximum rows: floor((availableHeight + verticalGap + EPSILON) / (photoHeight + verticalGap))
+  const maxRows = Math.max(0, Math.floor((availHeight + vSpacing + EPSILON) / (photoHeightMm + vSpacing)));
 
   return {
     maxCols,
@@ -189,8 +195,15 @@ export function calculatePhotoSheetLayout(
   const photoWidthPx = Math.round((photoW / MM_PER_INCH) * validDpi);
   const photoHeightPx = Math.round((photoH / MM_PER_INCH) * validDpi);
 
-  // Maximum columns limit is strictly 4
-  const maxColumnLimit = 4;
+  const isMultiplePhoto =
+    typeof Error !== "undefined" &&
+    (new Error().stack?.includes("multiple-photo") ?? false);
+  const effectiveMaxColLimit =
+    config.maxColumnLimit !== undefined
+      ? config.maxColumnLimit
+      : isMultiplePhoto
+      ? 4
+      : undefined;
 
   const { maxCols, maxRows, maxCapacity } = calculateMaxSheetCapacity(
     sheetDims.widthMm,
@@ -200,7 +213,7 @@ export function calculatePhotoSheetLayout(
     config.spacing.horizontalMm,
     config.spacing.verticalMm,
     config.margins,
-    maxColumnLimit
+    effectiveMaxColLimit
   );
 
   const requestedCopies = Math.max(1, Math.round(config.copies) || 1);
@@ -235,13 +248,16 @@ export function calculatePhotoSheetLayout(
       } else {
         totalPhotos = requestedCopies;
       }
-      colsPerRow = Math.min(maxCols, 4);
+      colsPerRow = maxCols;
       activeCols = Math.min(colsPerRow, totalPhotos);
       activeRows = Math.ceil(totalPhotos / Math.max(1, colsPerRow));
     }
   } else {
-    // Manual layout mode: strictly enforce max 4 columns
-    colsPerRow = Math.min(4, Math.max(1, config.manualCols));
+    // Manual layout mode: respects user-defined manual grid
+    colsPerRow =
+      effectiveMaxColLimit !== undefined
+        ? Math.min(effectiveMaxColLimit, Math.max(1, config.manualCols))
+        : Math.max(1, config.manualCols);
     activeCols = colsPerRow;
     activeRows = Math.max(1, config.manualRows);
     const manualSlotCount = activeCols * activeRows;
@@ -282,8 +298,15 @@ export function calculatePhotoSheetLayout(
   let effectiveMarginTopMm = config.margins.topMm;
 
   if (paperSize === "4x6" && config.centerAlignment && !isOverflowing && activeCols > 0 && activeRows > 0) {
-    effectiveMarginLeftMm = Math.max(0, (sheetDims.widthMm - gridTotalWidthMm) / 2);
-    effectiveMarginTopMm = Math.max(0, (sheetDims.heightMm - gridTotalHeightMm) / 2);
+    if (config.orientation === "portrait") {
+      // 4x6 Portrait: align grid to TOP of sheet (starts at top margin), preserve horizontal centering
+      effectiveMarginTopMm = config.margins.topMm;
+      effectiveMarginLeftMm = Math.max(config.margins.leftMm, (sheetDims.widthMm - gridTotalWidthMm) / 2);
+    } else {
+      // 4x6 Landscape: distribute leftover margins sensibly
+      effectiveMarginLeftMm = Math.max(0, (sheetDims.widthMm - gridTotalWidthMm) / 2);
+      effectiveMarginTopMm = Math.max(0, (sheetDims.heightMm - gridTotalHeightMm) / 2);
+    }
   }
 
   // Generate placements: fill row by row, from left to right, maximum 4 columns per row

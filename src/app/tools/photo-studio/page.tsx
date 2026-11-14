@@ -15,7 +15,12 @@ import { PhotoSheetWorkspace } from "@/components/photo-studio/sheet/PhotoSheetW
 import { ValidatedImageFile } from "@/types/image-engine";
 import type { PhotoPreset, CustomDimensionsInput, CropMode } from "@/types/crop-preset";
 import type { CropCoordinates } from "@/types/crop";
-import { DEFAULT_PRESET } from "@/constants/crop-presets";
+import type { SheetPaperSize } from "@/types/photo-sheet";
+import {
+  DEFAULT_PRESET,
+  DEFAULT_A4_PRESET,
+  DEFAULT_4X6_PRESET,
+} from "@/constants/crop-presets";
 import { DEFAULT_BACKGROUND_COLOR } from "@/constants/background-options";
 import {
   initDefaultCrop,
@@ -107,11 +112,81 @@ export default function PhotoStudioPage() {
       const tabParam = params.get("tab");
       if (tabParam === "sheet" || tabParam === "a4" || tabParam === "sheet_a4") {
         setActiveTab("sheet_a4");
+        if (selectedPreset.id === "compact-1.1x1.35") {
+          setSelectedPreset(DEFAULT_A4_PRESET);
+          setCustomDimensions({
+            width: DEFAULT_A4_PRESET.width,
+            height: DEFAULT_A4_PRESET.height,
+            unit: DEFAULT_A4_PRESET.unit,
+          });
+        }
       } else if (tabParam === "4x6" || tabParam === "sheet_4x6") {
         setActiveTab("sheet_4x6");
+        if (selectedPreset.id === "a4-compact-27x32") {
+          setSelectedPreset(DEFAULT_4X6_PRESET);
+          setCustomDimensions({
+            width: DEFAULT_4X6_PRESET.width,
+            height: DEFAULT_4X6_PRESET.height,
+            unit: DEFAULT_4X6_PRESET.unit,
+          });
+        }
       }
     }
-  }, []);
+  }, [selectedPreset.id]);
+
+  // Tab & Paper size synchronization preserving custom preferences but toggling paper defaults
+  const handleTabChange = useCallback(
+    (targetTab: "crop" | "sheet_a4" | "sheet_4x6") => {
+      setActiveTab(targetTab);
+      if (targetTab === "sheet_a4") {
+        if (selectedPreset.id === "compact-1.1x1.35") {
+          setSelectedPreset(DEFAULT_A4_PRESET);
+          setCustomDimensions({
+            width: DEFAULT_A4_PRESET.width,
+            height: DEFAULT_A4_PRESET.height,
+            unit: DEFAULT_A4_PRESET.unit,
+          });
+        }
+      } else if (targetTab === "sheet_4x6") {
+        if (selectedPreset.id === "a4-compact-27x32") {
+          setSelectedPreset(DEFAULT_4X6_PRESET);
+          setCustomDimensions({
+            width: DEFAULT_4X6_PRESET.width,
+            height: DEFAULT_4X6_PRESET.height,
+            unit: DEFAULT_4X6_PRESET.unit,
+          });
+        }
+      }
+    },
+    [selectedPreset.id]
+  );
+
+  const handlePaperSizeChange = useCallback(
+    (paperSize: SheetPaperSize) => {
+      const nextTab = paperSize === "4x6" ? "sheet_4x6" : "sheet_a4";
+      setActiveTab(nextTab);
+      if (paperSize === "4x6") {
+        if (selectedPreset.id === "a4-compact-27x32") {
+          setSelectedPreset(DEFAULT_4X6_PRESET);
+          setCustomDimensions({
+            width: DEFAULT_4X6_PRESET.width,
+            height: DEFAULT_4X6_PRESET.height,
+            unit: DEFAULT_4X6_PRESET.unit,
+          });
+        }
+      } else {
+        if (selectedPreset.id === "compact-1.1x1.35") {
+          setSelectedPreset(DEFAULT_A4_PRESET);
+          setCustomDimensions({
+            width: DEFAULT_A4_PRESET.width,
+            height: DEFAULT_A4_PRESET.height,
+            unit: DEFAULT_A4_PRESET.unit,
+          });
+        }
+      }
+    },
+    [selectedPreset.id]
+  );
 
   // Cached HTMLImageElement for canvas rendering in crop editor and preview
   const [imageElement, setImageElement] = useState<HTMLImageElement | null>(null);
@@ -521,7 +596,7 @@ export default function PhotoStudioPage() {
         <div className="flex flex-wrap items-center gap-2 p-1.5 bg-surface-100 rounded-2xl border border-surface-200 max-w-2xl">
           <button
             type="button"
-            onClick={() => setActiveTab("crop")}
+            onClick={() => handleTabChange("crop")}
             className={cn(
               "flex-1 min-w-[130px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all",
               activeTab === "crop"
@@ -535,7 +610,7 @@ export default function PhotoStudioPage() {
 
           <button
             type="button"
-            onClick={() => setActiveTab("sheet_a4")}
+            onClick={() => handleTabChange("sheet_a4")}
             className={cn(
               "flex-1 min-w-[130px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all",
               activeTab === "sheet_a4"
@@ -552,7 +627,7 @@ export default function PhotoStudioPage() {
 
           <button
             type="button"
-            onClick={() => setActiveTab("sheet_4x6")}
+            onClick={() => handleTabChange("sheet_4x6")}
             className={cn(
               "flex-1 min-w-[130px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all",
               activeTab === "sheet_4x6"
@@ -634,9 +709,7 @@ export default function PhotoStudioPage() {
             initialPaperSize={activeTab === "sheet_4x6" ? "4x6" : "a4"}
             initialDpi={dpi}
             onNavigateToCrop={() => setActiveTab("crop")}
-            onPaperSizeChange={(paperSize) =>
-              setActiveTab(paperSize === "4x6" ? "sheet_4x6" : "sheet_a4")
-            }
+            onPaperSizeChange={handlePaperSizeChange}
             onDpiChange={setDpi}
           />
         ) : (

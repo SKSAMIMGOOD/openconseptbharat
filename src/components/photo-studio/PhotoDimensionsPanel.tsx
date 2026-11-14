@@ -77,7 +77,15 @@ export const PhotoDimensionsPanel: React.FC<PhotoDimensionsPanelProps> = ({
 
   // Active form state
   const effectiveDefaultDpi = currentDpi || userPreferences.defaultDpi || DEFAULT_DPI;
-  const [selectedPresetId, setSelectedPresetId] = useState<string>(currentPresetId || "passport_standard");
+  const initialPresetId =
+    currentPresetId === "a4-compact-27x32" || currentPresetId === "a4_compact_default"
+      ? "a4_compact_default"
+      : currentPresetId === "compact-1.1x1.35" || currentPresetId === "compact_default"
+      ? "compact_default"
+      : currentPresetId === "passport-35-45" || currentPresetId === "passport_standard"
+      ? "passport_standard"
+      : currentPresetId || "a4_compact_default";
+  const [selectedPresetId, setSelectedPresetId] = useState<string>(initialPresetId);
   const [widthMm, setWidthMm] = useState<number>(currentWidthMm || DEFAULT_PHOTO_WIDTH_MM);
   const [heightMm, setHeightMm] = useState<number>(currentHeightMm || DEFAULT_PHOTO_HEIGHT_MM);
   const [dpi, setDpi] = useState<number>(effectiveDefaultDpi);
@@ -122,7 +130,13 @@ export const PhotoDimensionsPanel: React.FC<PhotoDimensionsPanelProps> = ({
 
   React.useEffect(() => {
     if (currentPresetId && currentPresetId !== selectedPresetId) {
-      const match = PHOTO_DIMENSION_PRESETS.find((p) => p.id === currentPresetId);
+      const match = PHOTO_DIMENSION_PRESETS.find(
+        (p) =>
+          p.id === currentPresetId ||
+          ((currentPresetId === "a4-compact-27x32" || currentPresetId === "a4_compact_default") && p.id === "a4_compact_default") ||
+          ((currentPresetId === "compact-1.1x1.35" || currentPresetId === "compact_default") && p.id === "compact_default") ||
+          ((currentPresetId === "passport-35-45" || currentPresetId === "passport_standard") && p.id === "passport_standard")
+      );
       setSelectedPresetId(match ? match.id : "custom");
     }
   }, [currentPresetId, selectedPresetId]);
@@ -243,6 +257,9 @@ export const PhotoDimensionsPanel: React.FC<PhotoDimensionsPanelProps> = ({
 
   // Aspect Ratio Toggle Handler
   const toggleAspectLock = useCallback(() => {
+    if (selectedPresetId === "a4_compact_default" || selectedPresetId === "compact_default") {
+      setSelectedPresetId("custom");
+    }
     setIsAspectLocked((prev) => {
       const next = !prev;
       if (next && widthMm > 0 && heightMm > 0) {
@@ -250,7 +267,7 @@ export const PhotoDimensionsPanel: React.FC<PhotoDimensionsPanelProps> = ({
       }
       return next;
     });
-  }, [widthMm, heightMm]);
+  }, [selectedPresetId, widthMm, heightMm]);
 
   // Sync with uploaded image's intrinsic aspect ratio
   const handleSyncImageRatio = useCallback(() => {
@@ -266,9 +283,9 @@ export const PhotoDimensionsPanel: React.FC<PhotoDimensionsPanelProps> = ({
     setHeightInputStr(String(newHeight));
   }, [imageFile, widthMm]);
 
-  // Reset to default 35 × 45 mm at 300 DPI
+  // Reset to default 27 mm × 32 mm (26.94 × 32.33 mm) at 300 DPI
   const handleResetDefaults = useCallback(() => {
-    handlePresetChange("passport_standard");
+    handlePresetChange("a4_compact_default");
   }, [handlePresetChange]);
 
   return (
@@ -298,7 +315,7 @@ export const PhotoDimensionsPanel: React.FC<PhotoDimensionsPanelProps> = ({
           type="button"
           onClick={handleResetDefaults}
           className="text-surface-400 hover:text-surface-700 p-1.5 rounded-lg hover:bg-surface-100 transition-colors"
-          title="Reset to 35 × 45 mm at 300 DPI"
+          title="Reset to 27 mm × 32 mm (26.94 × 32.33 mm) at 300 DPI"
           aria-label="Reset dimensions"
         >
           <RotateCcw className="w-3.5 h-3.5" />

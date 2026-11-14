@@ -103,17 +103,19 @@ describe('PHASE 03G: Custom Photo Dimensions Test Suite', () => {
       assert.equal(sheet4x6Default.maxCapacity, 6);
       assert.equal(sheet4x6Default.totalPhotos, 6);
 
-      // A4 Portrait sheet (4 cols × 6 rows = 24 photos)
+      // A4 Portrait sheet: 5 cols × 6 rows = 30 photos with 6mm margins & 1.5mm spacing
       const sheetA4 = calculatePhotoSheetLayout(
         {
           ...DEFAULT_A4_SHEET_CONFIG,
           paperSize: 'a4',
           orientation: 'portrait',
+          margins: { topMm: 6, bottomMm: 6, leftMm: 6, rightMm: 6, uniform: true },
+          spacing: { horizontalMm: 1.5, verticalMm: 1.5, uniform: true },
           copies: 24,
         },
         { widthMm: 35, heightMm: 45 }
       );
-      assert.equal(sheetA4.maxCapacity, 24);
+      assert.equal(sheetA4.maxCapacity, 30);
       assert.equal(sheetA4.totalPhotos, 24);
       assert.equal(sheetA4.isOverflowing, false);
     });
