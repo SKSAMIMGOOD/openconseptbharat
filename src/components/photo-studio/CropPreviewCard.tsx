@@ -94,11 +94,12 @@ export const CropPreviewCard: React.FC<CropPreviewCardProps> = ({
   const qualityAssessment =
     originalDimensions && targetCalculation.isValid
       ? assessResolutionQuality(
-          crop.width,
-          crop.height,
+          originalDimensions.width,
+          originalDimensions.height,
           targetWidthMm,
           targetHeightMm,
-          dpi
+          dpi,
+          { width: crop.width, height: crop.height }
         )
       : null;
 

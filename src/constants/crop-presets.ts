@@ -46,6 +46,19 @@ export const INITIAL_PHOTO_PRESETS: readonly PhotoPreset[] = [
     countryOrStandard: "4×6 Photo Sheet Standard (1.1 × 1.35 in)",
   },
   {
+    id: "compact-4x6-landscape",
+    name: "24.55 mm × 30.14 mm",
+    width: 24.5533333333333,
+    height: 30.1413333333333,
+    unit: "mm",
+    aspectRatio: 290 / 356, // ~0.8146 (290:356 @ 300 DPI)
+    description:
+      "4×6 landscape compact photo proportion: 24.55 mm × 30.14 mm (290 × 356 px at 300 DPI) with locked 290:356 aspect ratio. High-density layout fitting exactly 15 photos (5 cols × 3 rows) on 4×6 landscape.",
+    category: "standard",
+    isOfficial: false,
+    countryOrStandard: "4×6 Landscape Photo Sheet Standard (24.55 × 30.14 mm)",
+  },
+  {
     id: "passport-35-45",
     name: "Passport-style photo (35 × 45 mm)",
     width: 35,
@@ -170,6 +183,7 @@ export const ALL_PHOTO_PRESETS: readonly PhotoPreset[] = [
  */
 export const DEFAULT_A4_PRESET: PhotoPreset = INITIAL_PHOTO_PRESETS[0];
 export const DEFAULT_4X6_PRESET: PhotoPreset = INITIAL_PHOTO_PRESETS[1];
+export const DEFAULT_4X6_LANDSCAPE_PRESET: PhotoPreset = INITIAL_PHOTO_PRESETS[2];
 export const DEFAULT_PRESET: PhotoPreset = INITIAL_PHOTO_PRESETS[0];
 
 /**

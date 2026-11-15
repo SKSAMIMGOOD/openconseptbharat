@@ -164,6 +164,15 @@ export const DEFAULT_SHEET_MARGINS = {
   uniform: true,
 };
 
+/** Default margins in millimeters for 4x6 landscape (exact from competitor Excel: 5 cols × 3 rows = 15 photos) */
+export const DEFAULT_4X6_LANDSCAPE_SHEET_MARGINS = {
+  topMm: 3.13266666666667, // 3.13 mm (37 px @ 300 DPI)
+  bottomMm: 3.302, // 3.30 mm (39 px @ 300 DPI)
+  leftMm: 9.99066666666667, // 9.99 mm (118 px @ 300 DPI)
+  rightMm: 10.0753333333333, // 10.08 mm (119 px @ 300 DPI)
+  uniform: false,
+};
+
 /** Default margins in millimeters for A4 (27 × 32 mm high-density 56-photo default layout) */
 export const DEFAULT_A4_SHEET_MARGINS = {
   topMm: 3.1,
@@ -190,6 +199,13 @@ export const DEFAULT_4X6_SHEET_SPACING = {
   uniform: false,
 };
 
+/** Default spacing between photos in millimeters for 4x6 landscape paper (28 px @ 300 DPI = 2.37 mm) */
+export const DEFAULT_4X6_LANDSCAPE_SHEET_SPACING = {
+  horizontalMm: 2.37066666666667,
+  verticalMm: 2.37066666666667,
+  uniform: true,
+};
+
 /** Default spacing between photos in millimeters */
 export const DEFAULT_SHEET_SPACING = {
   horizontalMm: 1.5,
@@ -211,6 +227,23 @@ export const DEFAULT_PHOTO_SHEET_CONFIG: PhotoSheetConfig = {
   centerAlignment: true,
   margins: { ...DEFAULT_SHEET_MARGINS }, // 3 mm uniform
   spacing: { ...DEFAULT_4X6_SHEET_SPACING }, // 2.7 mm horiz, 2.8 mm vert
+  cutGuides: { ...DEFAULT_CUT_GUIDES },
+};
+
+/** Default 4x6 Landscape Photo Sheet Configuration (Competitor compact: 5 cols × 3 rows = 15 photos) */
+export const DEFAULT_4X6_LANDSCAPE_SHEET_CONFIG: PhotoSheetConfig = {
+  paperSize: "4x6",
+  orientation: "landscape",
+  paperWidthInches: SHEET_4X6_LONG_EDGE_INCHES, // 6.0 in
+  paperHeightInches: SHEET_4X6_SHORT_EDGE_INCHES, // 4.0 in
+  dpi: DEFAULT_SHEET_DPI, // 300 DPI
+  layoutMode: "auto",
+  manualRows: 3,
+  manualCols: 5,
+  copies: 15,
+  centerAlignment: false,
+  margins: { ...DEFAULT_4X6_LANDSCAPE_SHEET_MARGINS },
+  spacing: { ...DEFAULT_4X6_LANDSCAPE_SHEET_SPACING },
   cutGuides: { ...DEFAULT_CUT_GUIDES },
 };
 

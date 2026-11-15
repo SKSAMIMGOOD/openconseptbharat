@@ -298,28 +298,47 @@ export function assessResolutionQuality(
   sourceHeightPx: number,
   targetWidthMm: number,
   targetHeightMm: number,
-  targetDpi: number
+  targetDpi: number,
+  cropRegion?: { width: number; height: number } | null
 ): ResolutionQualityAssessment {
   const requiredWidthPx = mmToPixels(targetWidthMm, targetDpi);
   const requiredHeightPx = mmToPixels(targetHeightMm, targetDpi);
 
+  // If a crop region is specified, the effective optical resolution and scaling
+  // into the final physical composition are determined by the active crop area.
+  const activeW = cropRegion && cropRegion.width > 0 ? cropRegion.width : sourceWidthPx;
+  const activeH = cropRegion && cropRegion.height > 0 ? cropRegion.height : sourceHeightPx;
+
   const effectiveDpi = calculateEffectiveDpi(
-    sourceWidthPx,
-    sourceHeightPx,
+    activeW,
+    activeH,
     targetWidthMm,
     targetHeightMm
   );
 
-  const scaleW = requiredWidthPx / Math.max(1, sourceWidthPx);
-  const scaleH = requiredHeightPx / Math.max(1, sourceHeightPx);
+  const scaleW = requiredWidthPx / Math.max(1, activeW);
+  const scaleH = requiredHeightPx / Math.max(1, activeH);
   const scaleFactor = Math.max(scaleW, scaleH);
 
-  // Aspect ratio analysis
+  // Aspect ratio analysis:
+  // A. Original source image aspect ratio
   const sourceAspectRatio = sourceWidthPx / Math.max(1, sourceHeightPx);
+  // C. Final exported photo aspect ratio
   const targetAspectRatio = targetWidthMm / Math.max(0.01, targetHeightMm);
+  // B. Selected crop-region aspect ratio (if active)
+  const cropAspectRatio =
+    cropRegion && cropRegion.width > 0 && cropRegion.height > 0
+      ? cropRegion.width / cropRegion.height
+      : undefined;
+
+  // The scaling behavior of the actual final composition determines whether facial features distort.
+  // When a crop region is active, that crop slice is what scales to the final output.
+  // Otherwise, the full source image scales directly.
+  const compositionRatio = cropAspectRatio !== undefined ? cropAspectRatio : sourceAspectRatio;
+
   const aspectRatioDeviationPercent = Number(
     (
-      (Math.abs(sourceAspectRatio - targetAspectRatio) / targetAspectRatio) *
+      (Math.abs(compositionRatio - targetAspectRatio) / targetAspectRatio) *
       100
     ).toFixed(1)
   );
@@ -330,20 +349,26 @@ export function assessResolutionQuality(
   let description: string;
   let badgeVariant: "emerald" | "amber" | "rose";
 
-  if (sourceWidthPx >= requiredWidthPx && sourceHeightPx >= requiredHeightPx) {
+  if (activeW >= requiredWidthPx && activeH >= requiredHeightPx) {
     tier = "sufficient";
     title = "Sufficient Resolution";
-    description = `The uploaded image (${sourceWidthPx} × ${sourceHeightPx} px) exceeds the required ${requiredWidthPx} × ${requiredHeightPx} px. Effective print density is ${effectiveDpi.effectiveDpi} DPI, guaranteeing sharp, professional optical output without digital interpolation.`;
+    description = cropRegion
+      ? `The cropped photo area (${activeW} × ${activeH} px) exceeds the required ${requiredWidthPx} × ${requiredHeightPx} px. Effective print density is ${effectiveDpi.effectiveDpi} DPI, guaranteeing sharp, professional optical output without digital interpolation.`
+      : `The uploaded image (${sourceWidthPx} × ${sourceHeightPx} px) exceeds the required ${requiredWidthPx} × ${requiredHeightPx} px. Effective print density is ${effectiveDpi.effectiveDpi} DPI, guaranteeing sharp, professional optical output without digital interpolation.`;
     badgeVariant = "emerald";
   } else if (scaleFactor <= 1.5) {
     tier = "upscaling_required";
     title = "Upscaling Required";
-    description = `The uploaded image is slightly below requested print dimensions (${requiredWidthPx} × ${requiredHeightPx} px at ${targetDpi} DPI). Software interpolation will be required (${Math.round(scaleFactor * 100)}% scale). Moderate detail loss may be visible upon close inspection.`;
+    description = cropRegion
+      ? `The cropped photo area (${activeW} × ${activeH} px) is slightly below requested print dimensions (${requiredWidthPx} × ${requiredHeightPx} px at ${targetDpi} DPI). Software interpolation will be required (${Math.round(scaleFactor * 100)}% scale). Moderate detail loss may be visible upon close inspection.`
+      : `The uploaded image is slightly below requested print dimensions (${requiredWidthPx} × ${requiredHeightPx} px at ${targetDpi} DPI). Software interpolation will be required (${Math.round(scaleFactor * 100)}% scale). Moderate detail loss may be visible upon close inspection.`;
     badgeVariant = "amber";
   } else {
     tier = "significant_upscaling";
     title = "Significant Upscaling Required";
-    description = `Required output dimensions (${requiredWidthPx} × ${requiredHeightPx} px) are substantially larger than the source photo (${sourceWidthPx} × ${sourceHeightPx} px; ${Math.round(scaleFactor * 100)}% scale factor). The printed photo will likely suffer from noticeable softness, pixelation, or blurriness.`;
+    description = cropRegion
+      ? `Required output dimensions (${requiredWidthPx} × ${requiredHeightPx} px) are substantially larger than the cropped photo area (${activeW} × ${activeH} px; ${Math.round(scaleFactor * 100)}% scale factor). The printed photo will likely suffer from noticeable softness, pixelation, or blurriness.`
+      : `Required output dimensions (${requiredWidthPx} × ${requiredHeightPx} px) are substantially larger than the source photo (${sourceWidthPx} × ${sourceHeightPx} px; ${Math.round(scaleFactor * 100)}% scale factor). The printed photo will likely suffer from noticeable softness, pixelation, or blurriness.`;
     badgeVariant = "rose";
   }
 
@@ -366,6 +391,8 @@ export function assessResolutionQuality(
     aspectRatioDeviationPercent,
     sourceAspectRatio,
     targetAspectRatio,
+    cropAspectRatio,
+    cropRegion: cropRegion ? { width: cropRegion.width, height: cropRegion.height } : undefined,
     disclaimer,
   };
 }

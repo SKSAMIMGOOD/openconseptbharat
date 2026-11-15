@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { ValidatedImageFile } from "@/types/image-engine";
+import type { CropCoordinates } from "@/types/crop";
+import type { CropMode } from "@/types/crop-preset";
 import {
   StandardDpiPreset,
   DpiSelection,
@@ -46,6 +48,8 @@ import { usePreferences } from "@/hooks/usePreferences";
 
 export interface PhotoDimensionsPanelProps {
   imageFile?: ValidatedImageFile | null;
+  crop?: CropCoordinates | null;
+  cropMode?: CropMode;
   className?: string;
   currentWidthMm?: number;
   currentHeightMm?: number;
@@ -62,6 +66,8 @@ export interface PhotoDimensionsPanelProps {
 
 export const PhotoDimensionsPanel: React.FC<PhotoDimensionsPanelProps> = ({
   imageFile,
+  crop,
+  cropMode,
   className,
   currentWidthMm,
   currentHeightMm,
@@ -80,6 +86,8 @@ export const PhotoDimensionsPanel: React.FC<PhotoDimensionsPanelProps> = ({
   const initialPresetId =
     currentPresetId === "a4-compact-27x32" || currentPresetId === "a4_compact_default"
       ? "a4_compact_default"
+      : currentPresetId === "compact-4x6-landscape" || currentPresetId === "compact_4x6_landscape"
+      ? "compact_4x6_landscape"
       : currentPresetId === "compact-1.1x1.35" || currentPresetId === "compact_default"
       ? "compact_default"
       : currentPresetId === "passport-35-45" || currentPresetId === "passport_standard"
@@ -134,8 +142,12 @@ export const PhotoDimensionsPanel: React.FC<PhotoDimensionsPanelProps> = ({
         (p) =>
           p.id === currentPresetId ||
           ((currentPresetId === "a4-compact-27x32" || currentPresetId === "a4_compact_default") && p.id === "a4_compact_default") ||
+          ((currentPresetId === "compact-4x6-landscape" || currentPresetId === "compact_4x6_landscape") && p.id === "compact_4x6_landscape") ||
           ((currentPresetId === "compact-1.1x1.35" || currentPresetId === "compact_default") && p.id === "compact_default") ||
-          ((currentPresetId === "passport-35-45" || currentPresetId === "passport_standard") && p.id === "passport_standard")
+          ((currentPresetId === "passport-35-45" || currentPresetId === "passport_standard") && p.id === "passport_standard") ||
+          ((currentPresetId === "square-2x2-inch" || currentPresetId === "us_visa") && p.id === "us_visa") ||
+          ((currentPresetId === "india-pan-25-35" || currentPresetId === "pan_card_photo") && p.id === "pan_card_photo") ||
+          ((currentPresetId === "stamp-size-20-25" || currentPresetId === "stamp_size") && p.id === "stamp_size")
       );
       setSelectedPresetId(match ? match.id : "custom");
     }
@@ -159,9 +171,10 @@ export const PhotoDimensionsPanel: React.FC<PhotoDimensionsPanelProps> = ({
       imageFile.dimensions.height,
       widthMm,
       heightMm,
-      dpi
+      dpi,
+      crop ? { width: crop.width, height: crop.height } : null
     );
-  }, [imageFile, calculationResult.isValid, widthMm, heightMm, dpi]);
+  }, [imageFile, calculationResult.isValid, widthMm, heightMm, dpi, crop]);
 
   // Notify parent of dimension updates
   React.useEffect(() => {
@@ -666,17 +679,20 @@ export const PhotoDimensionsPanel: React.FC<PhotoDimensionsPanelProps> = ({
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="p-3 rounded-xl bg-surface-50 border border-surface-200/80">
               <span className="text-[10px] text-surface-400 block font-mono">
-                Original Image Pixels
+                {crop ? "Active Crop Region" : "Original Image Pixels"}
               </span>
               <span className="font-mono font-bold text-surface-800 text-sm">
-                {imageFile.dimensions.width} × {imageFile.dimensions.height} px
+                {crop
+                  ? `${crop.width} × ${crop.height} px`
+                  : `${imageFile.dimensions.width} × ${imageFile.dimensions.height} px`}
               </span>
               <span className="text-[10px] text-surface-500 block font-mono mt-0.5">
-                {(
-                  (imageFile.dimensions.width * imageFile.dimensions.height) /
-                  1_000_000
-                ).toFixed(1)}{" "}
-                Megapixels
+                {crop
+                  ? `Source: ${imageFile.dimensions.width} × ${imageFile.dimensions.height} px`
+                  : `${(
+                      (imageFile.dimensions.width * imageFile.dimensions.height) /
+                      1_000_000
+                    ).toFixed(1)} Megapixels`}
               </span>
             </div>
 
@@ -739,20 +755,41 @@ export const PhotoDimensionsPanel: React.FC<PhotoDimensionsPanelProps> = ({
                   Aspect Ratio Mismatch Detected
                 </h5>
                 <p className="text-[11px] text-amber-800 leading-relaxed">
-                  Source photo ratio is{" "}
-                  <strong>
-                    {getFriendlyAspectRatioName(
-                      qualityAssessment.sourceAspectRatio
-                    )}
-                  </strong>
-                  , while the requested physical print ratio is{" "}
-                  <strong>
-                    {getFriendlyAspectRatioName(
-                      qualityAssessment.targetAspectRatio
-                    )}
-                  </strong>{" "}
-                  ({qualityAssessment.aspectRatioDeviationPercent}% difference).
-                  Direct non-uniform scaling will distort facial features; cropping or framing will be required.
+                  {qualityAssessment.cropAspectRatio ? (
+                    <>
+                      Selected crop ratio is{" "}
+                      <strong>
+                        {getFriendlyAspectRatioName(
+                          qualityAssessment.cropAspectRatio
+                        )}
+                      </strong>
+                      , while the requested physical print ratio is{" "}
+                      <strong>
+                        {getFriendlyAspectRatioName(
+                          qualityAssessment.targetAspectRatio
+                        )}
+                      </strong>{" "}
+                      ({qualityAssessment.aspectRatioDeviationPercent}% difference).
+                      Direct non-uniform scaling will distort facial features; adjust the crop framing or lock aspect ratio.
+                    </>
+                  ) : (
+                    <>
+                      Source photo ratio is{" "}
+                      <strong>
+                        {getFriendlyAspectRatioName(
+                          qualityAssessment.sourceAspectRatio
+                        )}
+                      </strong>
+                      , while the requested physical print ratio is{" "}
+                      <strong>
+                        {getFriendlyAspectRatioName(
+                          qualityAssessment.targetAspectRatio
+                        )}
+                      </strong>{" "}
+                      ({qualityAssessment.aspectRatioDeviationPercent}% difference).
+                      Direct non-uniform scaling will distort facial features; cropping or framing will be required.
+                    </>
+                  )}
                 </p>
               </div>
             </div>

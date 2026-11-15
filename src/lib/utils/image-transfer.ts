@@ -12,13 +12,23 @@
  * - Clears memory immediately once consumed or overwritten
  */
 
+import type { CropCoordinates } from "@/types/crop";
+
 let stagedImage: File | null = null;
 let stagedSourceTool: string | null = null;
+let stagedMetadata: StagedImageMetadata | null = null;
+
+export interface StagedImageMetadata {
+  crop?: CropCoordinates;
+  dimensions?: { width: number; height: number; aspectRatio?: number };
+  [key: string]: any;
+}
 
 export interface StagedImageInfo {
   file: File;
   sourceTool: string;
   timestamp: number;
+  metadata?: StagedImageMetadata;
 }
 
 let stagedTimestamp: number = 0;
@@ -26,9 +36,14 @@ let stagedTimestamp: number = 0;
 /**
  * Stages a processed image in ephemeral RAM for handoff to another tool.
  */
-export function stageImageForTransfer(file: File, sourceTool: string = "background-remover"): void {
+export function stageImageForTransfer(
+  file: File,
+  sourceTool: string = "background-remover",
+  metadata?: StagedImageMetadata
+): void {
   stagedImage = file;
   stagedSourceTool = sourceTool;
+  stagedMetadata = metadata || null;
   stagedTimestamp = Date.now();
 }
 
@@ -41,6 +56,7 @@ export function peekStagedImage(): StagedImageInfo | null {
     file: stagedImage,
     sourceTool: stagedSourceTool || "unknown",
     timestamp: stagedTimestamp,
+    metadata: stagedMetadata || undefined,
   };
 }
 
@@ -51,6 +67,7 @@ export function consumeTransferredImage(): File | null {
   const file = stagedImage;
   stagedImage = null;
   stagedSourceTool = null;
+  stagedMetadata = null;
   stagedTimestamp = 0;
   return file;
 }
@@ -61,5 +78,6 @@ export function consumeTransferredImage(): File | null {
 export function clearStagedImage(): void {
   stagedImage = null;
   stagedSourceTool = null;
+  stagedMetadata = null;
   stagedTimestamp = 0;
 }

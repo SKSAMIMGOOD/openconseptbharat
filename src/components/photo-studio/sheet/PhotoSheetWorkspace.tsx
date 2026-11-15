@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import {
   PhotoSheetConfig,
   SheetPaperSize,
+  SheetOrientation,
   SheetExportFormat,
   SheetExportResult,
   SheetCalculationResult,
@@ -11,7 +12,12 @@ import {
 import {
   DEFAULT_A4_SHEET_CONFIG,
   DEFAULT_PHOTO_SHEET_CONFIG,
+  DEFAULT_4X6_LANDSCAPE_SHEET_CONFIG,
 } from "@/constants/photo-sheet";
+import {
+  DEFAULT_4X6_LANDSCAPE_PHOTO_WIDTH_MM,
+  DEFAULT_4X6_LANDSCAPE_PHOTO_HEIGHT_MM,
+} from "@/constants/photo-dimensions";
 import { calculatePhotoSheetLayout } from "@/lib/photo-studio/sheet-calculator";
 import {
   renderScaledSheetPreview,
@@ -61,6 +67,7 @@ export interface PhotoSheetWorkspaceProps {
   initialDpi?: number;
   onNavigateToCrop: () => void;
   onPaperSizeChange?: (paperSize: SheetPaperSize) => void;
+  onOrientationChange?: (orientation: SheetOrientation) => void;
   onDpiChange?: (dpi: number) => void;
   className?: string;
 }
@@ -73,6 +80,7 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
   initialDpi,
   onNavigateToCrop,
   onPaperSizeChange,
+  onOrientationChange,
   onDpiChange,
   className,
 }) => {
@@ -148,7 +156,7 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
     }
   }, [initialPaperSize]);
 
-  // Wrapper for config changes that keeps paperSize & DPI synced with parent
+  // Wrapper for config changes that keeps paperSize, orientation & DPI synced with parent
   const handleConfigChange = useCallback(
     (updater: (prev: PhotoSheetConfig) => PhotoSheetConfig) => {
       setSheetConfig((prev) => {
@@ -158,13 +166,16 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
           prevInitialPaperSizeRef.current = nextPaperSize;
           onPaperSizeChange?.(nextPaperSize);
         }
+        if (next.orientation !== prev.orientation) {
+          onOrientationChange?.(next.orientation);
+        }
         if (next.dpi !== prev.dpi) {
           onDpiChange?.(next.dpi);
         }
         return next;
       });
     },
-    [onPaperSizeChange, onDpiChange]
+    [onPaperSizeChange, onOrientationChange, onDpiChange]
   );
 
   // Clean up print image URLs, afterprint listener, and scoped @page style on unmount
@@ -187,34 +198,63 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
   const effectivePhotoDimensions = useMemo(() => {
     if (
       sheetConfig.paperSize === "a4" &&
-      (presetName === "27 mm × 32 mm" || presetName === "Default Compact (1.1 × 1.35 in)")
+      (presetName === "27 mm × 32 mm" ||
+        presetName === "Default Compact (1.1 × 1.35 in)" ||
+        presetName === "24.55 mm × 30.14 mm")
     ) {
       return { width: 26.94, height: 32.33 };
     }
-    if (
-      sheetConfig.paperSize === "4x6" &&
-      (presetName === "27 mm × 32 mm" || presetName === "Default Compact (1.1 × 1.35 in)")
-    ) {
-      return { width: 27.94, height: 34.29 };
+    if (sheetConfig.paperSize === "4x6") {
+      if (
+        sheetConfig.orientation === "landscape" &&
+        (presetName === "24.55 mm × 30.14 mm" ||
+          presetName === "Default Compact (1.1 × 1.35 in)" ||
+          presetName === "27 mm × 32 mm")
+      ) {
+        return {
+          width: DEFAULT_4X6_LANDSCAPE_PHOTO_WIDTH_MM,
+          height: DEFAULT_4X6_LANDSCAPE_PHOTO_HEIGHT_MM,
+        };
+      }
+      if (
+        presetName === "27 mm × 32 mm" ||
+        presetName === "Default Compact (1.1 × 1.35 in)" ||
+        presetName === "24.55 mm × 30.14 mm"
+      ) {
+        return { width: 27.94, height: 34.29 };
+      }
     }
     return photoDimensionsMm;
-  }, [sheetConfig.paperSize, presetName, photoDimensionsMm]);
+  }, [sheetConfig.paperSize, sheetConfig.orientation, presetName, photoDimensionsMm]);
 
   const effectivePresetName = useMemo(() => {
     if (
       sheetConfig.paperSize === "a4" &&
-      (presetName === "Default Compact (1.1 × 1.35 in)" || presetName === "27 mm × 32 mm")
+      (presetName === "Default Compact (1.1 × 1.35 in)" ||
+        presetName === "27 mm × 32 mm" ||
+        presetName === "24.55 mm × 30.14 mm")
     ) {
       return "27 mm × 32 mm";
     }
-    if (
-      sheetConfig.paperSize === "4x6" &&
-      (presetName === "27 mm × 32 mm" || presetName === "Default Compact (1.1 × 1.35 in)")
-    ) {
-      return "Default Compact (1.1 × 1.35 in)";
+    if (sheetConfig.paperSize === "4x6") {
+      if (
+        sheetConfig.orientation === "landscape" &&
+        (presetName === "24.55 mm × 30.14 mm" ||
+          presetName === "Default Compact (1.1 × 1.35 in)" ||
+          presetName === "27 mm × 32 mm")
+      ) {
+        return "24.55 mm × 30.14 mm";
+      }
+      if (
+        presetName === "27 mm × 32 mm" ||
+        presetName === "Default Compact (1.1 × 1.35 in)" ||
+        presetName === "24.55 mm × 30.14 mm"
+      ) {
+        return "Default Compact (1.1 × 1.35 in)";
+      }
     }
     return presetName;
-  }, [sheetConfig.paperSize, presetName]);
+  }, [sheetConfig.paperSize, sheetConfig.orientation, presetName]);
 
   // Calculate layout whenever config or photo dimensions change
   const layout: SheetCalculationResult = useMemo(() => {

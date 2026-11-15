@@ -15,11 +15,12 @@ import { PhotoSheetWorkspace } from "@/components/photo-studio/sheet/PhotoSheetW
 import { ValidatedImageFile } from "@/types/image-engine";
 import type { PhotoPreset, CustomDimensionsInput, CropMode } from "@/types/crop-preset";
 import type { CropCoordinates } from "@/types/crop";
-import type { SheetPaperSize } from "@/types/photo-sheet";
+import type { SheetPaperSize, SheetOrientation } from "@/types/photo-sheet";
 import {
   DEFAULT_PRESET,
   DEFAULT_A4_PRESET,
   DEFAULT_4X6_PRESET,
+  DEFAULT_4X6_LANDSCAPE_PRESET,
 } from "@/constants/crop-presets";
 import { DEFAULT_BACKGROUND_COLOR } from "@/constants/background-options";
 import {
@@ -112,7 +113,7 @@ export default function PhotoStudioPage() {
       const tabParam = params.get("tab");
       if (tabParam === "sheet" || tabParam === "a4" || tabParam === "sheet_a4") {
         setActiveTab("sheet_a4");
-        if (selectedPreset.id === "compact-1.1x1.35") {
+        if (selectedPreset.id === "compact-1.1x1.35" || selectedPreset.id === "compact-4x6-landscape") {
           setSelectedPreset(DEFAULT_A4_PRESET);
           setCustomDimensions({
             width: DEFAULT_A4_PRESET.width,
@@ -139,7 +140,7 @@ export default function PhotoStudioPage() {
     (targetTab: "crop" | "sheet_a4" | "sheet_4x6") => {
       setActiveTab(targetTab);
       if (targetTab === "sheet_a4") {
-        if (selectedPreset.id === "compact-1.1x1.35") {
+        if (selectedPreset.id === "compact-1.1x1.35" || selectedPreset.id === "compact-4x6-landscape") {
           setSelectedPreset(DEFAULT_A4_PRESET);
           setCustomDimensions({
             width: DEFAULT_A4_PRESET.width,
@@ -175,7 +176,7 @@ export default function PhotoStudioPage() {
           });
         }
       } else {
-        if (selectedPreset.id === "compact-1.1x1.35") {
+        if (selectedPreset.id === "compact-1.1x1.35" || selectedPreset.id === "compact-4x6-landscape") {
           setSelectedPreset(DEFAULT_A4_PRESET);
           setCustomDimensions({
             width: DEFAULT_A4_PRESET.width,
@@ -186,6 +187,30 @@ export default function PhotoStudioPage() {
       }
     },
     [selectedPreset.id]
+  );
+
+  // Orientation synchronization for 4×6 landscape 15-photo vs portrait 12-photo profiles
+  const handleOrientationChange = useCallback(
+    (orientation: SheetOrientation) => {
+      if (activeTab === "sheet_4x6") {
+        if (orientation === "landscape") {
+          setSelectedPreset(DEFAULT_4X6_LANDSCAPE_PRESET);
+          setCustomDimensions({
+            width: DEFAULT_4X6_LANDSCAPE_PRESET.width,
+            height: DEFAULT_4X6_LANDSCAPE_PRESET.height,
+            unit: DEFAULT_4X6_LANDSCAPE_PRESET.unit,
+          });
+        } else {
+          setSelectedPreset(DEFAULT_4X6_PRESET);
+          setCustomDimensions({
+            width: DEFAULT_4X6_PRESET.width,
+            height: DEFAULT_4X6_PRESET.height,
+            unit: DEFAULT_4X6_PRESET.unit,
+          });
+        }
+      }
+    },
+    [activeTab]
   );
 
   // Cached HTMLImageElement for canvas rendering in crop editor and preview
@@ -253,32 +278,71 @@ export default function PhotoStudioPage() {
 
   const { dimensions: engineDimensions, updateCrop: engineUpdateCrop } = engine;
 
-  // Initialize crop frame whenever a new photo is decoded
+  // Active target crop aspect ratio based on preset and cropMode
+  const activeTargetRatio = useMemo(() => {
+    if (cropMode !== "fixed") return null;
+    if (selectedPreset.id === "custom") {
+      return photoDimensionsMm.height > 0
+        ? photoDimensionsMm.width / photoDimensionsMm.height
+        : 1;
+    }
+    return selectedPreset.aspectRatio;
+  }, [cropMode, selectedPreset, photoDimensionsMm]);
+
+  // Keep crop frame synchronized when image dimensions or preset ratio change
   useEffect(() => {
     if (engineDimensions) {
-      const initial = initDefaultCrop(
-        engineDimensions.width,
-        engineDimensions.height,
-        cropMode === "fixed" ? selectedPreset.aspectRatio : null
-      );
-      setCrop(initial);
-      engineUpdateCrop({
-        x: initial.x,
-        y: initial.y,
-        width: initial.width,
-        height: initial.height,
+      const targetRatio = activeTargetRatio;
+      setCrop((prevCrop) => {
+        if (targetRatio && prevCrop.width > 0 && prevCrop.height > 0) {
+          const currentRatio = prevCrop.width / prevCrop.height;
+          const ratioDiff = Math.abs(currentRatio - targetRatio) / targetRatio;
+          if (
+            ratioDiff < 0.015 &&
+            prevCrop.x + prevCrop.width <= engineDimensions.width &&
+            prevCrop.y + prevCrop.height <= engineDimensions.height
+          ) {
+            return prevCrop;
+          }
+        }
+        const initial = initDefaultCrop(
+          engineDimensions.width,
+          engineDimensions.height,
+          targetRatio
+        );
+        engineUpdateCrop(initial);
+        return initial;
       });
     }
-  }, [engineDimensions, cropMode, selectedPreset.aspectRatio, engineUpdateCrop]);
+  }, [engineDimensions, activeTargetRatio, engineUpdateCrop]);
 
   // Handle successful image ingestion and decoding
   const handleImageLoaded = useCallback(
-    async (validated: ValidatedImageFile) => {
+    async (validated: ValidatedImageFile, stagedCrop?: CropCoordinates) => {
       setWorkspaceState("decoding");
       setErrorMessage(null);
 
       try {
+        const targetRatio =
+          cropMode === "fixed"
+            ? selectedPreset.id === "custom"
+              ? photoDimensionsMm.height > 0
+                ? photoDimensionsMm.width / photoDimensionsMm.height
+                : 1
+              : selectedPreset.aspectRatio
+            : null;
+
+        const initial =
+          stagedCrop ||
+          initDefaultCrop(
+            validated.dimensions.width,
+            validated.dimensions.height,
+            targetRatio
+          );
+
+        setCrop(initial);
         await engine.loadImage(validated);
+        engine.updateCrop(initial);
         setWorkspaceState("ready");
       } catch (err) {
         const msg =
@@ -289,7 +353,7 @@ export default function PhotoStudioPage() {
         setWorkspaceState("processing_error");
       }
     },
-    [engine]
+    [engine, cropMode, selectedPreset, photoDimensionsMm]
   );
 
   // Check for ephemeral image handed off from AI Background Remover in RAM
@@ -320,9 +384,10 @@ export default function PhotoStudioPage() {
             previewUrl: createTrackedObjectURL(staged.file),
             createdAt: Date.now(),
           };
+          const stagedMetadataCrop = staged.metadata?.crop;
           decoded.close();
           consumeTransferredImage();
-          await handleImageLoaded(validated);
+          await handleImageLoaded(validated, stagedMetadataCrop);
         } catch (err) {
           console.error("Failed to ingest transferred photo:", err);
         }
@@ -383,8 +448,24 @@ export default function PhotoStudioPage() {
           createdAt: Date.now(),
         };
 
+        const targetRatio =
+          cropMode === "fixed"
+            ? selectedPreset.id === "custom"
+              ? photoDimensionsMm.height > 0
+                ? photoDimensionsMm.width / photoDimensionsMm.height
+                : 1
+              : selectedPreset.aspectRatio
+            : null;
+
+        const initial = initDefaultCrop(
+          decoded.width,
+          decoded.height,
+          targetRatio
+        );
+        setCrop(initial);
         decoded.close();
         await engine.loadImage(validatedImage);
+        engine.updateCrop(initial);
         setWorkspaceState("ready");
       } catch (decErr) {
         setErrorMessage(
@@ -395,7 +476,7 @@ export default function PhotoStudioPage() {
         setWorkspaceState("processing_error");
       }
     },
-    [engine, tool.maxFileSizeMB]
+    [engine, tool.maxFileSizeMB, cropMode, selectedPreset, photoDimensionsMm]
   );
 
   // Handle removing the photo
@@ -710,6 +791,7 @@ export default function PhotoStudioPage() {
             initialDpi={dpi}
             onNavigateToCrop={() => setActiveTab("crop")}
             onPaperSizeChange={handlePaperSizeChange}
+            onOrientationChange={handleOrientationChange}
             onDpiChange={setDpi}
           />
         ) : (
@@ -734,7 +816,7 @@ export default function PhotoStudioPage() {
                   naturalWidth={engine.dimensions?.width ?? 800}
                   naturalHeight={engine.dimensions?.height ?? 600}
                   crop={crop}
-                  aspectRatio={cropMode === "fixed" ? selectedPreset.aspectRatio : null}
+                  aspectRatio={activeTargetRatio}
                   cropMode={cropMode}
                   backgroundColor={backgroundColor}
                   presetName={selectedPreset.name}
@@ -777,6 +859,8 @@ export default function PhotoStudioPage() {
                 {/* 2. Dedicated DPI & Physical Resolution Assessment Panel */}
                 <PhotoDimensionsPanel
                   imageFile={engine.currentFile}
+                  crop={crop}
+                  cropMode={cropMode}
                   currentWidthMm={photoDimensionsMm.width}
                   currentHeightMm={photoDimensionsMm.height}
                   currentDpi={dpi}

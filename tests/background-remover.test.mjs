@@ -304,6 +304,32 @@ describe("PHASE 05: AI Background Remover Test Suite", () => {
       assert.strictEqual(consumeTransferredImage(), null);
       assert.strictEqual(peekStagedImage(), null);
     });
+
+    test("preserves metadata including dimensions, crop framing, and transparency across handoff", () => {
+      clearStagedImage();
+
+      const fakeFile = new File([new Uint8Array([1, 2, 3])], "bg-removed-portrait.png", {
+        type: "image/png",
+      });
+
+      const metadata = {
+        dimensions: { width: 1280, height: 1280, aspectRatio: 1.0 },
+        crop: { x: 187, y: 96, width: 907, height: 1088 },
+      };
+
+      stageImageForTransfer(fakeFile, "background-remover", metadata);
+
+      const peeked = peekStagedImage();
+      assert.ok(peeked);
+      assert.strictEqual(peeked.file.type, "image/png");
+      assert.deepStrictEqual(peeked.metadata?.dimensions, { width: 1280, height: 1280, aspectRatio: 1.0 });
+      assert.deepStrictEqual(peeked.metadata?.crop, { x: 187, y: 96, width: 907, height: 1088 });
+
+      const consumed = consumeTransferredImage();
+      assert.ok(consumed);
+      assert.strictEqual(consumed.name, "bg-removed-portrait.png");
+      assert.strictEqual(peekStagedImage(), null);
+    });
   });
 
   // 8. Image Upload Validation & Magic Bytes

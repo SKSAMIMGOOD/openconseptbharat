@@ -287,6 +287,103 @@ describe('PHASE 03B: DPI & Physical Photo Size Calculator Test Suite', () => {
       assert.equal(assessment.aspectRatioMismatch, false);
       assert.ok(assessment.aspectRatioDeviationPercent <= 1.5);
     });
+
+    it('Case 1: Square 1280 × 1280 image cropped to 27 × 32 mm preset crops normally without false warning', () => {
+      // Original square source: 1280 × 1280 px (1:1)
+      // Selected preset: 27 × 32 mm (exact print 26.94 × 32.33 mm, ratio ~0.8333)
+      // Crop region initialized with target aspect ratio: 907 × 1088 px
+      const assessment = assessResolutionQuality(1280, 1280, 26.94, 32.33, 300, {
+        width: 907,
+        height: 1088,
+      });
+
+      assert.equal(assessment.aspectRatioMismatch, false);
+      assert.ok(assessment.aspectRatioDeviationPercent <= 1.5);
+      assert.equal(assessment.sourceAspectRatio, 1.0);
+      assert.ok(Math.abs(assessment.cropAspectRatio - 907 / 1088) < 0.001);
+      assert.ok(Math.abs(assessment.targetAspectRatio - 26.94 / 32.33) < 0.001);
+      assert.equal(assessment.tier, 'sufficient');
+      assert.equal(assessment.badgeVariant, 'emerald');
+    });
+
+    it('Case 2: Square image cropped to 35 × 45 mm passport crops normally without warning', () => {
+      // Original square source: 1280 × 1280 px
+      // Target: 35 × 45 mm passport (ratio ~0.7778)
+      // Crop region: 846 × 1088 px
+      const assessment = assessResolutionQuality(1280, 1280, 35, 45, 300, {
+        width: 846,
+        height: 1088,
+      });
+
+      assert.equal(assessment.aspectRatioMismatch, false);
+      assert.ok(assessment.aspectRatioDeviationPercent <= 1.5);
+      assert.equal(assessment.tier, 'sufficient');
+    });
+
+    it('Case 3: Portrait source image cropped to 27 × 32 mm preset has correct crop ratio', () => {
+      // Portrait source: 1200 × 1600 px (3:4 ratio = 0.75)
+      // Target: 27 × 32 mm (ratio 0.8333)
+      // Crop region: 1020 × 1224 px
+      const assessment = assessResolutionQuality(1200, 1600, 26.94, 32.33, 300, {
+        width: 1020,
+        height: 1224,
+      });
+
+      assert.equal(assessment.aspectRatioMismatch, false);
+      assert.ok(assessment.aspectRatioDeviationPercent <= 1.5);
+    });
+
+    it('Case 4: Landscape source image cropped to 27 × 32 mm preset has correct crop ratio', () => {
+      // Landscape source: 1920 × 1080 px (16:9 ratio = 1.7778)
+      // Target: 27 × 32 mm (ratio 0.8333)
+      // Crop region: 765 × 918 px
+      const assessment = assessResolutionQuality(1920, 1080, 26.94, 32.33, 300, {
+        width: 765,
+        height: 918,
+      });
+
+      assert.equal(assessment.aspectRatioMismatch, false);
+      assert.ok(assessment.aspectRatioDeviationPercent <= 1.5);
+    });
+
+    it('Case 5: User reframing/moving crop preserves locked ratio without triggering mismatch', () => {
+      // Reframed smaller crop box: 500 × 600 px (ratio ~0.8333)
+      const assessment = assessResolutionQuality(1280, 1280, 26.94, 32.33, 300, {
+        width: 500,
+        height: 600,
+      });
+
+      assert.equal(assessment.aspectRatioMismatch, false);
+      assert.ok(assessment.aspectRatioDeviationPercent <= 1.5);
+    });
+
+    it('Case 6: Legitimate warning still appears when actual output requires non-uniform scaling', () => {
+      // User creates a 2:1 wide banner crop (800 × 400 px) in Freeform mode for 27 × 32 mm photo
+      const assessment = assessResolutionQuality(1280, 1280, 26.94, 32.33, 300, {
+        width: 800,
+        height: 400,
+      });
+
+      assert.equal(assessment.aspectRatioMismatch, true);
+      assert.ok(assessment.aspectRatioDeviationPercent > 50);
+      assert.equal(assessment.cropAspectRatio, 2.0);
+    });
+
+    it('Case 7: Clearly distinguishes between source ratio (A), crop ratio (B), and target ratio (C)', () => {
+      const assessment = assessResolutionQuality(1280, 1280, 26.94, 32.33, 300, {
+        width: 907,
+        height: 1088,
+      });
+
+      // A: Source ratio = 1.0 (square)
+      assert.equal(assessment.sourceAspectRatio, 1.0);
+      // B: Crop ratio = 907 / 1088 ≈ 0.8336
+      assert.ok(Math.abs(assessment.cropAspectRatio - 907 / 1088) < 0.001);
+      // C: Target ratio = 26.94 / 32.33 ≈ 0.8333
+      assert.ok(Math.abs(assessment.targetAspectRatio - 26.94 / 32.33) < 0.001);
+      // Crop matches target, so no mismatch
+      assert.equal(assessment.aspectRatioMismatch, false);
+    });
   });
 
   // 12. Effective DPI Calculation

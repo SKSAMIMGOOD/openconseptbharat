@@ -20,8 +20,10 @@ import {
   SHEET_4X6_LONG_EDGE_INCHES,
   DEFAULT_A4_SHEET_MARGINS,
   DEFAULT_SHEET_MARGINS,
+  DEFAULT_4X6_LANDSCAPE_SHEET_MARGINS,
   DEFAULT_A4_SHEET_SPACING,
   DEFAULT_4X6_SHEET_SPACING,
+  DEFAULT_4X6_LANDSCAPE_SHEET_SPACING,
   MIN_SHEET_DPI,
   MAX_SHEET_DPI,
 } from "@/constants/photo-sheet";
@@ -91,29 +93,48 @@ export const SheetControlsPanel: React.FC<SheetControlsPanelProps> = ({
           spacing: { ...DEFAULT_A4_SHEET_SPACING },
           centerAlignment: false,
           copies:
-            prev.copies === 12 || prev.copies === 8 || prev.copies === 6 || prev.copies === 24
+            prev.copies === 12 || prev.copies === 15 || prev.copies === 8 || prev.copies === 6 || prev.copies === 24
               ? 56
               : prev.copies,
           manualRows: 8,
           manualCols: 7,
         };
       } else {
-        return {
-          ...prev,
-          paperSize: "4x6",
-          orientation: "portrait",
-          paperWidthInches: SHEET_4X6_SHORT_EDGE_INCHES,
-          paperHeightInches: SHEET_4X6_LONG_EDGE_INCHES,
-          margins: { ...DEFAULT_SHEET_MARGINS },
-          spacing: { ...DEFAULT_4X6_SHEET_SPACING },
-          centerAlignment: true,
-          copies:
-            prev.copies === 56 || prev.copies === 24 || prev.copies === 8 || prev.copies === 6
-              ? 12
-              : Math.min(prev.copies, 12),
-          manualRows: 4,
-          manualCols: 3,
-        };
+        if (prev.orientation === "landscape") {
+          return {
+            ...prev,
+            paperSize: "4x6",
+            orientation: "landscape",
+            paperWidthInches: SHEET_4X6_LONG_EDGE_INCHES,
+            paperHeightInches: SHEET_4X6_SHORT_EDGE_INCHES,
+            margins: { ...DEFAULT_4X6_LANDSCAPE_SHEET_MARGINS },
+            spacing: { ...DEFAULT_4X6_LANDSCAPE_SHEET_SPACING },
+            centerAlignment: false,
+            copies:
+              prev.copies === 56 || prev.copies === 24 || prev.copies === 12 || prev.copies === 8 || prev.copies === 6
+                ? 15
+                : Math.min(prev.copies, 15),
+            manualRows: 3,
+            manualCols: 5,
+          };
+        } else {
+          return {
+            ...prev,
+            paperSize: "4x6",
+            orientation: "portrait",
+            paperWidthInches: SHEET_4X6_SHORT_EDGE_INCHES,
+            paperHeightInches: SHEET_4X6_LONG_EDGE_INCHES,
+            margins: { ...DEFAULT_SHEET_MARGINS },
+            spacing: { ...DEFAULT_4X6_SHEET_SPACING },
+            centerAlignment: true,
+            copies:
+              prev.copies === 56 || prev.copies === 24 || prev.copies === 15 || prev.copies === 8 || prev.copies === 6
+                ? 12
+                : Math.min(prev.copies, 12),
+            manualRows: 4,
+            manualCols: 3,
+          };
+        }
       }
     });
   };
@@ -136,20 +157,25 @@ export const SheetControlsPanel: React.FC<SheetControlsPanelProps> = ({
       let manualRows = prev.manualRows;
       let manualCols = prev.manualCols;
       let copies = prev.copies;
+      let margins = prev.margins;
+      let spacing = prev.spacing;
+      let centerAlignment = prev.centerAlignment;
 
       if (!isA4) {
         if (orientation === "landscape") {
-          manualRows = 2;
-          manualCols = 4;
-          if (copies === 12) {
-            copies = 8;
-          }
+          manualRows = 3;
+          manualCols = 5;
+          copies = 15;
+          margins = { ...DEFAULT_4X6_LANDSCAPE_SHEET_MARGINS };
+          spacing = { ...DEFAULT_4X6_LANDSCAPE_SHEET_SPACING };
+          centerAlignment = false;
         } else {
           manualRows = 4;
           manualCols = 3;
-          if (copies === 8) {
-            copies = 12;
-          }
+          copies = 12;
+          margins = { ...DEFAULT_SHEET_MARGINS };
+          spacing = { ...DEFAULT_4X6_SHEET_SPACING };
+          centerAlignment = true;
         }
       }
 
@@ -161,6 +187,9 @@ export const SheetControlsPanel: React.FC<SheetControlsPanelProps> = ({
         manualRows,
         manualCols,
         copies,
+        margins,
+        spacing,
+        centerAlignment,
       };
     });
   };
@@ -456,7 +485,7 @@ export const SheetControlsPanel: React.FC<SheetControlsPanelProps> = ({
             <div className="text-right font-mono shrink-0">
               <span className="text-[11px] text-surface-500 block">Print Size:</span>
               <span className="font-bold text-brand-700 text-xs">
-                {photoDimensionsMm.width} × {photoDimensionsMm.height} mm
+                {Number(photoDimensionsMm.width.toFixed(2))} × {Number(photoDimensionsMm.height.toFixed(2))} mm
               </span>
             </div>
           </div>

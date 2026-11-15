@@ -21,6 +21,7 @@ import {
   DEFAULT_PRESET,
   DEFAULT_A4_PRESET,
   DEFAULT_4X6_PRESET,
+  DEFAULT_4X6_LANDSCAPE_PRESET,
 } from '../src/constants/crop-presets.ts';
 
 import {
@@ -43,12 +44,13 @@ describe('PHASE 03C: Passport Photo Presets & Interactive Crop Editor Test Suite
 
   // 1. Predefined Presets
   describe('1. Predefined Photo Presets Specification', () => {
-    it('contains all 6 required initial presets with strictly typed properties', () => {
-      assert.equal(INITIAL_PHOTO_PRESETS.length, 6);
+    it('contains all 7 required initial presets with strictly typed properties', () => {
+      assert.equal(INITIAL_PHOTO_PRESETS.length, 7);
 
       const ids = INITIAL_PHOTO_PRESETS.map((p) => p.id);
       assert.ok(ids.includes('a4-compact-27x32'));
       assert.ok(ids.includes('compact-1.1x1.35'));
+      assert.ok(ids.includes('compact-4x6-landscape'));
       assert.ok(ids.includes('passport-35-45'));
       assert.ok(ids.includes('portrait-40-50'));
       assert.ok(ids.includes('square-2x2-inch'));
@@ -65,6 +67,17 @@ describe('PHASE 03C: Passport Photo Presets & Interactive Crop Editor Test Suite
       assert.equal(compact.isOfficial, false);
       assert.equal(DEFAULT_4X6_PRESET.id, 'compact-1.1x1.35');
       assert.equal(DEFAULT_A4_PRESET.id, 'a4-compact-27x32');
+    });
+
+    it('verifies 4×6 landscape compact (24.55 × 30.14 mm) preset geometry', () => {
+      const compactLandscape = INITIAL_PHOTO_PRESETS.find((p) => p.id === 'compact-4x6-landscape');
+      assert.ok(compactLandscape);
+      assert.ok(Math.abs(compactLandscape.width - 24.5533) < 0.01);
+      assert.ok(Math.abs(compactLandscape.height - 30.1413) < 0.01);
+      assert.equal(compactLandscape.unit, 'mm');
+      assert.ok(Math.abs(compactLandscape.aspectRatio - 290 / 356) < 0.0001);
+      assert.equal(compactLandscape.isOfficial, false);
+      assert.equal(DEFAULT_4X6_LANDSCAPE_PRESET.id, 'compact-4x6-landscape');
     });
 
     it('verifies 35 × 45 mm passport-style preset geometry', () => {

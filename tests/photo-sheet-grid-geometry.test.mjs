@@ -21,12 +21,19 @@ import {
   MM_PER_INCH,
   DEFAULT_A4_SHEET_CONFIG,
   DEFAULT_PHOTO_SHEET_CONFIG,
+  DEFAULT_4X6_LANDSCAPE_SHEET_CONFIG,
   DEFAULT_A4_SHEET_MARGINS,
   DEFAULT_SHEET_MARGINS,
+  DEFAULT_4X6_LANDSCAPE_SHEET_MARGINS,
   DEFAULT_A4_SHEET_SPACING,
   DEFAULT_4X6_SHEET_SPACING,
+  DEFAULT_4X6_LANDSCAPE_SHEET_SPACING,
   DEFAULT_SHEET_SPACING,
 } from '../src/constants/photo-sheet.ts';
+import {
+  DEFAULT_4X6_LANDSCAPE_PHOTO_WIDTH_MM,
+  DEFAULT_4X6_LANDSCAPE_PHOTO_HEIGHT_MM,
+} from '../src/constants/photo-dimensions.ts';
 
 import { exportMultiSheetAsPdf } from '../src/lib/photo-studio/sheet-exporter.ts';
 import { renderMasterSheetCanvas } from '../src/lib/photo-studio/sheet-renderer.ts';
@@ -654,6 +661,74 @@ describe('PHOTO STUDIO: Physical Grid Layout & Geometry Test Suite (Phase 06)', 
       assert.equal(layout4x6.maxRows, 4);
       assert.equal(layout4x6.totalPhotos, 12);
       assert.equal(layout4x6.placements[0].yMm, 3.0);
+    });
+
+    it('4×6 landscape: applies 24.55 mm × 30.14 mm with 2.37 mm gaps and exact margins to fit exactly 15 photos (5 cols × 3 rows)', () => {
+      const landscapeDims = {
+        widthMm: DEFAULT_4X6_LANDSCAPE_PHOTO_WIDTH_MM,
+        heightMm: DEFAULT_4X6_LANDSCAPE_PHOTO_HEIGHT_MM,
+      };
+
+      const layout = calculatePhotoSheetLayout(
+        DEFAULT_4X6_LANDSCAPE_SHEET_CONFIG,
+        landscapeDims
+      );
+
+      // Verify grid arrangement
+      assert.equal(layout.sheetWidthMm, 152.4);
+      assert.equal(layout.sheetHeightMm, 101.6);
+      assert.equal(layout.maxColumns, 5);
+      assert.equal(layout.maxRows, 3);
+      assert.equal(layout.maxCapacity, 15);
+      assert.equal(layout.totalPhotos, 15);
+      assert.equal(layout.activeColumns, 5);
+      assert.equal(layout.activeRows, 3);
+      assert.equal(layout.isOverflowing, false);
+
+      // Target pixel dimensions at 300 DPI
+      assert.equal(layout.photoWidthPx, 290);
+      assert.equal(layout.photoHeightPx, 356);
+
+      // Verify outer margins from Excel calculation
+      assert.equal(Number(layout.placements[0].xMm.toFixed(2)), 9.99);
+      assert.equal(Number(layout.placements[0].yMm.toFixed(2)), 3.13);
+
+      // Verify right and bottom margins
+      const lastPlacement = layout.placements[14];
+      const rightMarginMm = 152.4 - (lastPlacement.xMm + landscapeDims.widthMm);
+      const bottomMarginMm = 101.6 - (lastPlacement.yMm + landscapeDims.heightMm);
+      assert.ok(Math.abs(rightMarginMm - 10.08) < 0.1, `Right margin expected ~10.08 mm, got ${rightMarginMm}`);
+      assert.ok(Math.abs(bottomMarginMm - 3.30) < 0.01, `Bottom margin expected ~3.30 mm, got ${bottomMarginMm}`);
+
+      // Verify inter-photo gaps (2.37 mm)
+      const gapX = Number((layout.placements[1].xMm - (layout.placements[0].xMm + landscapeDims.widthMm)).toFixed(2));
+      assert.equal(gapX, 2.37);
+
+      const gapY = Number((layout.placements[5].yMm - (layout.placements[0].yMm + landscapeDims.heightMm)).toFixed(2));
+      assert.equal(gapY, 2.37);
+    });
+
+    it('4×6 landscape: exports valid 15-photo PDF with 432 × 288 pt dimensions', async () => {
+      const landscapeDims = {
+        widthMm: DEFAULT_4X6_LANDSCAPE_PHOTO_WIDTH_MM,
+        heightMm: DEFAULT_4X6_LANDSCAPE_PHOTO_HEIGHT_MM,
+      };
+
+      const layout = calculatePhotoSheetLayout(
+        DEFAULT_4X6_LANDSCAPE_SHEET_CONFIG,
+        landscapeDims
+      );
+
+      const pdfResult = await exportMultiSheetAsPdf(
+        [{ imageSource: null, layout, imageBytes: SAMPLE_JPEG_BYTES }],
+        DEFAULT_4X6_LANDSCAPE_SHEET_CONFIG,
+        { format: 'application/pdf', quality: 0.95 }
+      );
+
+      assert.equal(pdfResult.format, 'application/pdf');
+      assert.equal(pdfResult.pageCount, 1);
+      assert.equal(pdfResult.pageWidthPt, SHEET_4X6_LONG_EDGE_PT); // 432 pt
+      assert.equal(pdfResult.pageHeightPt, SHEET_4X6_SHORT_EDGE_PT); // 288 pt
     });
   });
 });

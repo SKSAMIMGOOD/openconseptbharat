@@ -14,12 +14,14 @@ export const SUPPORTED_DPI_PRESETS: readonly StandardDpiPreset[] = [
 ] as const;
 
 /**
- * Default calculation parameters (A4 default: 27 mm × 32 mm / exact print 26.94 × 32.33 mm; 4×6 default: 27.94 × 34.29 mm).
+ * Default calculation parameters (A4 default: 27 mm × 32 mm / exact print 26.94 × 32.33 mm; 4×6 portrait default: 27.94 × 34.29 mm; 4×6 landscape default: 24.55 × 30.14 mm).
  */
 export const DEFAULT_A4_PHOTO_WIDTH_MM = 26.94;
 export const DEFAULT_A4_PHOTO_HEIGHT_MM = 32.33;
 export const DEFAULT_4X6_PHOTO_WIDTH_MM = 27.94;
 export const DEFAULT_4X6_PHOTO_HEIGHT_MM = 34.29;
+export const DEFAULT_4X6_LANDSCAPE_PHOTO_WIDTH_MM = 24.5533333333333; // 24.55 mm (290 px @ 300 DPI)
+export const DEFAULT_4X6_LANDSCAPE_PHOTO_HEIGHT_MM = 30.1413333333333; // 30.14 mm (356 px @ 300 DPI)
 export const DEFAULT_PHOTO_WIDTH_MM = 26.94;
 export const DEFAULT_PHOTO_HEIGHT_MM = 32.33;
 export const DEFAULT_DPI = 300;
@@ -55,6 +57,16 @@ export const PHOTO_DIMENSION_PRESETS: PhotoDimensionPreset[] = [
     category: "standard",
     widthMm: 27.94,
     heightMm: 34.29,
+    defaultDpi: 300,
+  },
+  {
+    id: "compact_4x6_landscape",
+    name: "24.55 mm × 30.14 mm",
+    countryOrStandard: "4×6 Landscape Photo Sheet Standard (24.55 × 30.14 mm)",
+    description: "4×6 landscape compact photo dimension: 24.55 mm × 30.14 mm (target resolution 290 × 356 px at 300 DPI, exact 15-photo layout)",
+    category: "standard",
+    widthMm: 24.5533333333333,
+    heightMm: 30.1413333333333,
     defaultDpi: 300,
   },
   {

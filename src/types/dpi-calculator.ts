@@ -74,6 +74,8 @@ export interface ResolutionQualityAssessment {
   aspectRatioDeviationPercent: number;
   sourceAspectRatio: number;
   targetAspectRatio: number;
+  cropAspectRatio?: number;
+  cropRegion?: { width: number; height: number };
   disclaimer: string;
 }
 

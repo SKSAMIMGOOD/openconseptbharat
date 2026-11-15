@@ -15,6 +15,11 @@ import {
   releaseCanvasBuffer,
 } from '../src/lib/utils/memory.ts';
 
+import { initDefaultCrop, recalculateCropForAspectRatio } from '../src/lib/crop/crop-geometry.ts';
+import { assessResolutionQuality } from '../src/lib/photo-studio/dpi-calculator.ts';
+import { DEFAULT_PRESET, INITIAL_PHOTO_PRESETS } from '../src/constants/crop-presets.ts';
+import { stageImageForTransfer, peekStagedImage, consumeTransferredImage, clearStagedImage } from '../src/lib/utils/image-transfer.ts';
+
 // Synthetic Mock File Factory for Node.js test environment
 function createMockFile(name, type, byteData, sizeOverride) {
   const buffer = byteData instanceof Uint8Array ? byteData : new Uint8Array(byteData);
@@ -239,6 +244,219 @@ describe('PHASE 03A: Professional Photo Studio Test Suite', () => {
       assert.equal(allowed.includes('image/png'), true);
       assert.equal(allowed.includes('image/webp'), true);
       assert.equal(allowed.includes('application/octet-stream'), false);
+    });
+  });
+
+  describe('8. Photo Studio Crop Initialization & Aspect Ratio Validation Suite', () => {
+    // Preset: 27 × 32 mm (exact: 26.94 × 32.33 mm, ratio ~0.8333)
+    const preset27x32 = DEFAULT_PRESET; // a4-compact-27x32
+    // Preset: 35 × 45 mm (ratio ~0.7778)
+    const preset35x45 = INITIAL_PHOTO_PRESETS.find((p) => p.id === 'passport-35-45');
+
+    it('1. Square 1280 × 1280 image -> 27 × 32 mm photo: crops normally without false warning', () => {
+      const sourceW = 1280;
+      const sourceH = 1280;
+      // Crop initialization using preset's target aspect ratio
+      const crop = initDefaultCrop(sourceW, sourceH, preset27x32.aspectRatio);
+      assert.ok(crop.width > 0 && crop.height > 0);
+      assert.ok(crop.x >= 0 && crop.y >= 0);
+      assert.ok(crop.x + crop.width <= sourceW);
+      assert.ok(crop.y + crop.height <= sourceH);
+
+      // Verify crop aspect ratio matches target ratio (~0.8333)
+      const cropRatio = crop.width / crop.height;
+      assert.ok(Math.abs(cropRatio - preset27x32.aspectRatio) < 0.01);
+
+      // Aspect ratio validation must evaluate crop, NOT uncropped source
+      const assessment = assessResolutionQuality(
+        sourceW,
+        sourceH,
+        preset27x32.width,
+        preset27x32.height,
+        300,
+        { width: crop.width, height: crop.height }
+      );
+
+      assert.equal(assessment.aspectRatioMismatch, false);
+      assert.ok(assessment.aspectRatioDeviationPercent <= 1.5);
+      assert.equal(assessment.sourceAspectRatio, 1.0);
+      assert.ok(assessment.cropAspectRatio !== undefined);
+      assert.equal(assessment.tier, 'sufficient');
+      assert.equal(assessment.badgeVariant, 'emerald');
+    });
+
+    it('2. Square image -> 35 × 45 mm photo: crops normally without false warning', () => {
+      const sourceW = 1280;
+      const sourceH = 1280;
+      const crop = initDefaultCrop(sourceW, sourceH, preset35x45.aspectRatio);
+
+      const cropRatio = crop.width / crop.height;
+      assert.ok(Math.abs(cropRatio - preset35x45.aspectRatio) < 0.01);
+
+      const assessment = assessResolutionQuality(
+        sourceW,
+        sourceH,
+        preset35x45.width,
+        preset35x45.height,
+        300,
+        { width: crop.width, height: crop.height }
+      );
+
+      assert.equal(assessment.aspectRatioMismatch, false);
+      assert.ok(assessment.aspectRatioDeviationPercent <= 1.5);
+      assert.equal(assessment.tier, 'sufficient');
+    });
+
+    it('3. Portrait source image -> selected photo preset: correct crop ratio and no false warning', () => {
+      // 3:4 portrait image (1200 × 1600 px)
+      const sourceW = 1200;
+      const sourceH = 1600;
+      const crop = initDefaultCrop(sourceW, sourceH, preset27x32.aspectRatio);
+
+      const cropRatio = crop.width / crop.height;
+      assert.ok(Math.abs(cropRatio - preset27x32.aspectRatio) < 0.01);
+
+      const assessment = assessResolutionQuality(
+        sourceW,
+        sourceH,
+        preset27x32.width,
+        preset27x32.height,
+        300,
+        { width: crop.width, height: crop.height }
+      );
+
+      assert.equal(assessment.aspectRatioMismatch, false);
+      assert.ok(assessment.aspectRatioDeviationPercent <= 1.5);
+    });
+
+    it('4. Landscape source image -> selected photo preset: correct crop ratio and no false warning', () => {
+      // 16:9 landscape image (1920 × 1080 px)
+      const sourceW = 1920;
+      const sourceH = 1080;
+      const crop = initDefaultCrop(sourceW, sourceH, preset27x32.aspectRatio);
+
+      const cropRatio = crop.width / crop.height;
+      assert.ok(Math.abs(cropRatio - preset27x32.aspectRatio) < 0.01);
+
+      const assessment = assessResolutionQuality(
+        sourceW,
+        sourceH,
+        preset27x32.width,
+        preset27x32.height,
+        300,
+        { width: crop.width, height: crop.height }
+      );
+
+      assert.equal(assessment.aspectRatioMismatch, false);
+      assert.ok(assessment.aspectRatioDeviationPercent <= 1.5);
+    });
+
+    it('5. User manually changes crop framing: final output remains correctly proportioned without warning', () => {
+      const sourceW = 1280;
+      const sourceH = 1280;
+      const initialCrop = initDefaultCrop(sourceW, sourceH, preset27x32.aspectRatio);
+
+      // Reposition crop (move by deltaX: 40, deltaY: 30)
+      const movedCrop = {
+        x: Math.min(sourceW - initialCrop.width, initialCrop.x + 40),
+        y: Math.min(sourceH - initialCrop.height, initialCrop.y + 30),
+        width: initialCrop.width,
+        height: initialCrop.height,
+      };
+
+      const assessmentMoved = assessResolutionQuality(
+        sourceW,
+        sourceH,
+        preset27x32.width,
+        preset27x32.height,
+        300,
+        { width: movedCrop.width, height: movedCrop.height }
+      );
+      assert.equal(assessmentMoved.aspectRatioMismatch, false);
+
+      // Resize crop maintaining locked aspect ratio
+      const resizedCrop = recalculateCropForAspectRatio(
+        initialCrop,
+        sourceW,
+        sourceH,
+        preset27x32.aspectRatio
+      );
+
+      const assessmentResized = assessResolutionQuality(
+        sourceW,
+        sourceH,
+        preset27x32.width,
+        preset27x32.height,
+        300,
+        { width: resizedCrop.width, height: resizedCrop.height }
+      );
+      assert.equal(assessmentResized.aspectRatioMismatch, false);
+    });
+
+    it('6. Actual non-uniform scaling: legitimate warning still appears', () => {
+      const sourceW = 1280;
+      const sourceH = 1280;
+      // In freeform mode, user created an extreme wide crop (800 × 400 px, 2:1 ratio)
+      const freeformCrop = { x: 240, y: 440, width: 800, height: 400 };
+
+      const assessment = assessResolutionQuality(
+        sourceW,
+        sourceH,
+        preset27x32.width,
+        preset27x32.height,
+        300,
+        { width: freeformCrop.width, height: freeformCrop.height }
+      );
+
+      assert.equal(assessment.aspectRatioMismatch, true);
+      assert.ok(assessment.aspectRatioDeviationPercent > 10);
+      assert.equal(assessment.cropAspectRatio, 2.0);
+    });
+
+    it('7. Background Remover -> Photo Studio transfer: no unnecessary warning', () => {
+      clearStagedImage();
+
+      // Simulate Background Remover output of 1280 × 1280 px
+      const stagedFile = createMockFile(
+        'bg-removed-user-photo.png',
+        'image/png',
+        VALID_PNG_HEADER,
+        1024 * 500
+      );
+
+      stageImageForTransfer(stagedFile, 'background-remover');
+
+      const peeked = peekStagedImage();
+      assert.ok(peeked);
+      assert.equal(peeked.sourceTool, 'background-remover');
+
+      const consumed = consumeTransferredImage();
+      assert.ok(consumed);
+
+      // Photo Studio receives 1280 × 1280 px image
+      const decodedWidth = 1280;
+      const decodedHeight = 1280;
+
+      // Crop is initialized using default preset (27 × 32 mm)
+      const initializedCrop = initDefaultCrop(
+        decodedWidth,
+        decodedHeight,
+        preset27x32.aspectRatio
+      );
+
+      // Verify aspect ratio validation on the final composition
+      const assessment = assessResolutionQuality(
+        decodedWidth,
+        decodedHeight,
+        preset27x32.width,
+        preset27x32.height,
+        300,
+        { width: initializedCrop.width, height: initializedCrop.height }
+      );
+
+      assert.equal(assessment.aspectRatioMismatch, false);
+      assert.equal(assessment.tier, 'sufficient');
+      assert.equal(assessment.badgeVariant, 'emerald');
     });
   });
 
