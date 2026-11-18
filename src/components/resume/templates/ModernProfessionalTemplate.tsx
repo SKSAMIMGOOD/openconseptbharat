@@ -2,7 +2,8 @@
 
 import React from "react";
 import { ResumeData } from "@/types/resume";
-import { Mail, Phone, MapPin, Globe, Linkedin, ExternalLink } from "lucide-react";
+import { getPhotoDimensions } from "@/lib/resume/resume-photo";
+import { Mail, Phone, MapPin, Globe, Linkedin, ExternalLink, Github, Twitter, User } from "lucide-react";
 
 export interface TemplateProps {
   data: ResumeData;
@@ -11,65 +12,143 @@ export interface TemplateProps {
 export const ModernProfessionalTemplate: React.FC<TemplateProps> = ({ data }) => {
   const { personalInfo, summary, experiences, education, skills, projects, certifications, languages, awards, achievements } = data;
 
-  const hasContact = personalInfo.email || personalInfo.phone || personalInfo.location || personalInfo.linkedIn || personalInfo.portfolio;
+  const hasContact =
+    personalInfo.email ||
+    personalInfo.phone ||
+    personalInfo.location ||
+    personalInfo.linkedIn ||
+    personalInfo.github ||
+    personalInfo.portfolio ||
+    personalInfo.twitter;
 
   return (
     <div className="w-full bg-white text-surface-900 font-sans p-8 sm:p-12 text-[13px] leading-relaxed select-text">
       {/* Header */}
-      <header className="border-b-2 border-brand-600/80 pb-5 mb-6">
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-surface-900 tracking-tight">
-          {personalInfo.fullName || "Your Full Name"}
-        </h1>
-        {personalInfo.jobTitle && (
-          <p className="text-sm sm:text-base font-semibold text-brand-700 mt-1">
-            {personalInfo.jobTitle}
-          </p>
-        )}
+      <header className="border-b-2 border-brand-600/80 pb-5 mb-6 flex items-start justify-between gap-6">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-surface-900 tracking-tight">
+            {personalInfo.fullName || "Your Full Name"}
+          </h1>
+          {personalInfo.jobTitle && (
+            <p className="text-sm sm:text-base font-semibold text-brand-700 mt-1">
+              {personalInfo.jobTitle}
+            </p>
+          )}
 
-        {hasContact && (
-          <div className="flex flex-wrap items-center gap-y-1.5 gap-x-4 mt-3 text-xs text-surface-600">
-            {personalInfo.email && (
-              <span className="inline-flex items-center gap-1">
-                <Mail className="w-3.5 h-3.5 text-brand-600 shrink-0" />
-                <span>{personalInfo.email}</span>
-              </span>
-            )}
-            {personalInfo.phone && (
-              <span className="inline-flex items-center gap-1">
-                <Phone className="w-3.5 h-3.5 text-brand-600 shrink-0" />
-                <span>{personalInfo.phone}</span>
-              </span>
-            )}
-            {personalInfo.location && (
-              <span className="inline-flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5 text-brand-600 shrink-0" />
-                <span>{personalInfo.location}</span>
-              </span>
-            )}
-            {personalInfo.linkedIn && (
-              <a
-                href={personalInfo.linkedIn}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-brand-600 hover:underline"
-              >
-                <Linkedin className="w-3.5 h-3.5 shrink-0" />
-                <span>LinkedIn</span>
-              </a>
-            )}
-            {personalInfo.portfolio && (
-              <a
-                href={personalInfo.portfolio}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-brand-600 hover:underline"
-              >
-                <Globe className="w-3.5 h-3.5 shrink-0" />
-                <span>Portfolio</span>
-              </a>
-            )}
-          </div>
-        )}
+          {hasContact && (
+            <div className="flex flex-wrap items-center gap-y-1.5 gap-x-4 mt-3 text-xs text-surface-600">
+              {personalInfo.email && (
+                <a
+                  href={`mailto:${personalInfo.email}`}
+                  className="inline-flex items-center gap-1 hover:text-brand-600 transition-colors"
+                >
+                  <Mail className="w-3.5 h-3.5 text-brand-600 shrink-0" />
+                  <span>{personalInfo.email}</span>
+                </a>
+              )}
+              {personalInfo.phone && (
+                <a
+                  href={`tel:${personalInfo.phone.replace(/\s+/g, "")}`}
+                  className="inline-flex items-center gap-1 hover:text-brand-600 transition-colors"
+                >
+                  <Phone className="w-3.5 h-3.5 text-brand-600 shrink-0" />
+                  <span>{personalInfo.phone}</span>
+                </a>
+              )}
+              {personalInfo.location && (
+                <span className="inline-flex items-center gap-1">
+                  <MapPin className="w-3.5 h-3.5 text-brand-600 shrink-0" />
+                  <span>{personalInfo.location}</span>
+                </span>
+              )}
+              {personalInfo.linkedIn && (
+                <a
+                  href={personalInfo.linkedIn}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-brand-600 hover:underline"
+                >
+                  <Linkedin className="w-3.5 h-3.5 shrink-0" />
+                  <span>LinkedIn</span>
+                </a>
+              )}
+              {personalInfo.github && (
+                <a
+                  href={personalInfo.github}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-brand-600 hover:underline"
+                >
+                  <Github className="w-3.5 h-3.5 shrink-0" />
+                  <span>GitHub</span>
+                </a>
+              )}
+              {personalInfo.portfolio && (
+                <a
+                  href={personalInfo.portfolio}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-brand-600 hover:underline"
+                >
+                  <Globe className="w-3.5 h-3.5 shrink-0" />
+                  <span>Portfolio</span>
+                </a>
+              )}
+              {personalInfo.twitter && (
+                <a
+                  href={personalInfo.twitter}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-brand-600 hover:underline"
+                >
+                  <Twitter className="w-3.5 h-3.5 shrink-0" />
+                  <span>Twitter</span>
+                </a>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Profile Photo if enabled */}
+        {personalInfo.showPhoto && personalInfo.photoUrl && (() => {
+          const photoDims = getPhotoDimensions(personalInfo.photoSize, personalInfo.photoShape);
+          return (
+            <div
+              className={`shrink-0 overflow-hidden ${
+                photoDims.isCircle ? "rounded-full" : "rounded-none"
+              }`}
+              style={{
+                width: `${photoDims.previewWidthPx}px`,
+                height: `${photoDims.previewHeightPx}px`,
+                minWidth: `${photoDims.previewWidthPx}px`,
+                minHeight: `${photoDims.previewHeightPx}px`,
+                maxWidth: `${photoDims.previewWidthPx}px`,
+                maxHeight: `${photoDims.previewHeightPx}px`,
+                flex: `0 0 ${photoDims.previewWidthPx}px`,
+                borderRadius: photoDims.isCircle ? "50%" : "0",
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={personalInfo.photoUrl}
+                alt={personalInfo.fullName || "Profile"}
+                className={`w-full h-full object-cover block ${
+                  photoDims.isCircle ? "rounded-full" : "rounded-none"
+                }`}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  maxWidth: "100%",
+                  maxHeight: "100%",
+                  objectFit: "cover",
+                  objectPosition: "center",
+                  borderRadius: photoDims.isCircle ? "50%" : "0",
+                  display: "block",
+                }}
+              />
+            </div>
+          );
+        })()}
       </header>
 
       {/* Summary */}
@@ -237,7 +316,16 @@ export const ModernProfessionalTemplate: React.FC<TemplateProps> = ({ data }) =>
             <ul className="space-y-1.5 text-xs">
               {certifications.map((c) => (
                 <li key={c.id}>
-                  <div className="font-semibold text-surface-900">{c.name}</div>
+                  <div className="font-semibold text-surface-900">
+                    {c.url ? (
+                      <a href={c.url} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline inline-flex items-center gap-1">
+                        {c.name}
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    ) : (
+                      c.name
+                    )}
+                  </div>
                   <div className="text-surface-500 text-[11px]">
                     {c.issuer} {c.date && `• ${c.date}`}
                   </div>

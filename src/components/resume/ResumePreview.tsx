@@ -5,17 +5,44 @@ import { ResumeData } from "@/types/resume";
 import { ModernProfessionalTemplate } from "./templates/ModernProfessionalTemplate";
 import { MinimalAtsTemplate } from "./templates/MinimalAtsTemplate";
 import { ClassicCorporateTemplate } from "./templates/ClassicCorporateTemplate";
+import { ModernTwoColumnTemplate } from "./templates/ModernTwoColumnTemplate";
+import { ExecutiveTemplate } from "./templates/ExecutiveTemplate";
+import { CreativeTemplate } from "./templates/CreativeTemplate";
+import { StudentFresherTemplate } from "./templates/StudentFresherTemplate";
+import { ElegantMinimalTemplate } from "./templates/ElegantMinimalTemplate";
 import { generateResumePdf, downloadPdfBuffer } from "@/lib/resume/resume-pdf";
+import { DEFAULT_TYPOGRAPHY, getTemplateDefaultColors } from "@/constants/resume-defaults";
+
+function getFontFamilyCss(fontFamily?: string): string {
+  switch (fontFamily) {
+    case "Roboto":
+      return "'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+    case "Arial":
+      return "Arial, Helvetica, sans-serif";
+    case "Lato":
+      return "'Lato', -apple-system, BlinkMacSystemFont, sans-serif";
+    case "Open Sans":
+      return "'Open Sans', -apple-system, BlinkMacSystemFont, sans-serif";
+    case "Georgia":
+      return "Georgia, 'Times New Roman', serif";
+    case "Merriweather":
+      return "'Merriweather', Georgia, 'Times New Roman', serif";
+    case "Poppins":
+      return "'Poppins', -apple-system, BlinkMacSystemFont, sans-serif";
+    case "Inter":
+    default:
+      return "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  }
+}
 import {
   Download,
-  Printer,
   ZoomIn,
   ZoomOut,
   Maximize2,
   FileText,
-  Sparkles,
   ShieldCheck,
   CheckCircle2,
+  Loader2,
 } from "lucide-react";
 
 export interface ResumePreviewProps {
@@ -41,6 +68,7 @@ export const ResumePreview: React.FC<ResumePreviewProps> = ({ data, onNotify }) 
   };
 
   const handleDownloadPdf = async () => {
+    if (isExporting) return;
     try {
       setIsExporting(true);
       const pdfBytes = await generateResumePdf(data);
@@ -52,23 +80,19 @@ export const ResumePreview: React.FC<ResumePreviewProps> = ({ data, onNotify }) 
 
       onNotify?.({
         type: "success",
-        title: "Vector PDF Generated",
-        message: `High-resolution vector PDF "${fileName}" (${(pdfBytes.length / 1024).toFixed(1)} KB) compiled in browser memory.`,
+        title: "Download Complete",
+        message: "PDF downloaded successfully.",
       });
     } catch (err) {
       console.error("Failed to generate vector resume PDF:", err);
       onNotify?.({
         type: "error",
-        title: "PDF Generation Failed",
-        message: "An error occurred while compiling your resume vector PDF.",
+        title: "Generation Error",
+        message: "Failed to generate PDF.",
       });
     } finally {
       setIsExporting(false);
     }
-  };
-
-  const handleBrowserPrint = () => {
-    window.print();
   };
 
   // Select active template
@@ -78,11 +102,23 @@ export const ResumePreview: React.FC<ResumePreviewProps> = ({ data, onNotify }) 
         return <MinimalAtsTemplate data={data} />;
       case "classic-corporate":
         return <ClassicCorporateTemplate data={data} />;
+      case "modern-two-column":
+        return <ModernTwoColumnTemplate data={data} />;
+      case "executive":
+        return <ExecutiveTemplate data={data} />;
+      case "creative":
+        return <CreativeTemplate data={data} />;
+      case "student-fresher":
+        return <StudentFresherTemplate data={data} />;
+      case "elegant-minimal":
+        return <ElegantMinimalTemplate data={data} />;
       case "modern-professional":
       default:
         return <ModernProfessionalTemplate data={data} />;
     }
   };
+
+  const colors = data.colors || getTemplateDefaultColors(data.templateId);
 
   return (
     <div className="flex flex-col h-full bg-surface-100/70 dark:bg-surface-900/60 rounded-2xl border border-surface-200 dark:border-surface-800 p-4 sm:p-5 overflow-hidden">
@@ -105,7 +141,7 @@ export const ResumePreview: React.FC<ResumePreviewProps> = ({ data, onNotify }) 
           </div>
         </div>
 
-        {/* Action Buttons: Zoom & Export */}
+        {/* Action Buttons: Zoom & Single Primary Download PDF Action */}
         <div className="flex items-center gap-2">
           {/* Zoom Controls */}
           <div className="inline-flex items-center bg-white dark:bg-surface-800 rounded-xl border border-surface-200 dark:border-surface-700 p-0.5 shadow-subtle text-xs">
@@ -141,27 +177,25 @@ export const ResumePreview: React.FC<ResumePreviewProps> = ({ data, onNotify }) 
             </button>
           </div>
 
-          {/* Browser Print Button */}
-          <button
-            type="button"
-            onClick={handleBrowserPrint}
-            className="p-2 rounded-xl bg-white dark:bg-surface-800 text-surface-700 dark:text-surface-300 hover:text-surface-900 hover:bg-surface-50 border border-surface-200 dark:border-surface-700 shadow-subtle text-xs transition-colors"
-            title="Print via browser dialog"
-            aria-label="Browser print"
-          >
-            <Printer className="w-4 h-4" />
-          </button>
-
-          {/* Download Vector PDF Button */}
+          {/* Single Prominent Action: Download PDF */}
           <button
             type="button"
             onClick={handleDownloadPdf}
             disabled={isExporting}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800 transition-all shadow-sm hover:shadow disabled:opacity-60"
-            title="Download true vector PDF"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800 transition-all shadow-sm hover:shadow disabled:opacity-60 disabled:cursor-not-allowed"
+            title="Download vector resume PDF"
           >
-            <Download className="w-3.5 h-3.5" />
-            <span>{isExporting ? "Compiling..." : "Download PDF"}</span>
+            {isExporting ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Generating PDF...</span>
+              </>
+            ) : (
+              <>
+                <Download className="w-3.5 h-3.5" />
+                <span>Download PDF</span>
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -180,7 +214,112 @@ export const ResumePreview: React.FC<ResumePreviewProps> = ({ data, onNotify }) 
           className="w-full max-w-[794px] shrink-0"
         >
           {/* A4 Sheet Frame (Shadow & Pure White Surface) */}
-          <div className="bg-white rounded-md shadow-float border border-surface-300/80 min-h-[1123px] overflow-hidden my-2">
+          <div
+            className="resume-typography-root resume-color-root bg-white rounded-md shadow-float border border-surface-300/80 min-h-[1123px] overflow-hidden my-2 select-text"
+            style={{
+              fontFamily: getFontFamilyCss(data.typography?.fontFamily),
+              lineHeight: data.typography?.lineSpacing || DEFAULT_TYPOGRAPHY.lineSpacing,
+            }}
+          >
+            <style
+              dangerouslySetInnerHTML={{
+                __html: `
+                  .resume-typography-root,
+                  .resume-typography-root * {
+                    font-family: ${getFontFamilyCss(data.typography?.fontFamily)} !important;
+                  }
+                  .resume-typography-root header h1 {
+                    font-size: ${data.typography?.nameSize || DEFAULT_TYPOGRAPHY.nameSize}px !important;
+                    line-height: 1.15 !important;
+                  }
+                  .resume-typography-root header p {
+                    font-size: ${data.typography?.titleSize || DEFAULT_TYPOGRAPHY.titleSize}px !important;
+                  }
+                  .resume-typography-root header a,
+                  .resume-typography-root header span {
+                    font-size: ${data.typography?.contactSize || DEFAULT_TYPOGRAPHY.contactSize}px !important;
+                  }
+                  .resume-typography-root h2 {
+                    font-size: ${data.typography?.headingSize || DEFAULT_TYPOGRAPHY.headingSize}px !important;
+                  }
+                  .resume-typography-root p,
+                  .resume-typography-root li,
+                  .resume-typography-root section span {
+                    font-size: ${data.typography?.bodySize || DEFAULT_TYPOGRAPHY.bodySize}px;
+                    line-height: ${data.typography?.lineSpacing || DEFAULT_TYPOGRAPHY.lineSpacing};
+                  }
+                  .resume-typography-root section {
+                    margin-bottom: ${data.typography?.sectionSpacing || DEFAULT_TYPOGRAPHY.sectionSpacing}px !important;
+                  }
+                  .resume-typography-root p + p,
+                  .resume-typography-root ul {
+                    margin-top: ${data.typography?.paragraphSpacing || DEFAULT_TYPOGRAPHY.paragraphSpacing}px;
+                  }
+
+                  /* ============================================================ */
+                  /* Dynamic Colour & Theme Styling                               */
+                  /* ============================================================ */
+                  .resume-color-root header h1 {
+                    color: ${colors.nameColor} !important;
+                  }
+                  .resume-color-root header p {
+                    color: ${colors.titleColor} !important;
+                  }
+                  .resume-color-root h2,
+                  .resume-color-root h2 span {
+                    color: ${colors.headingColor} !important;
+                  }
+                  .resume-color-root p,
+                  .resume-color-root li {
+                    color: ${colors.bodyColor};
+                  }
+                  .resume-color-root .text-surface-500,
+                  .resume-color-root .text-surface-600,
+                  .resume-color-root .text-slate-500,
+                  .resume-color-root .text-slate-600,
+                  .resume-color-root .text-stone-500,
+                  .resume-color-root .text-stone-600,
+                  .resume-color-root .text-neutral-500,
+                  .resume-color-root .text-neutral-600 {
+                    color: ${colors.secondaryColor};
+                  }
+                  .resume-color-root hr,
+                  .resume-color-root header {
+                    border-color: ${colors.dividerColor} !important;
+                  }
+                  .resume-color-root h2 {
+                    border-color: ${colors.dividerColor} !important;
+                  }
+                  .resume-color-root .border-brand-600,
+                  .resume-color-root .border-brand-500,
+                  .resume-color-root .border-slate-800,
+                  .resume-color-root .border-slate-900,
+                  .resume-color-root .border-violet-500,
+                  .resume-color-root .border-teal-600,
+                  .resume-color-root .border-stone-300,
+                  .resume-color-root .border-neutral-900 {
+                    border-color: ${colors.dividerColor} !important;
+                  }
+                  .resume-color-root svg.lucide {
+                    color: ${colors.primaryAccent} !important;
+                    stroke: ${colors.primaryAccent} !important;
+                  }
+                  .resume-color-root .text-brand-600,
+                  .resume-color-root .text-brand-700,
+                  .resume-color-root .text-violet-600,
+                  .resume-color-root .text-violet-700,
+                  .resume-color-root .text-teal-600,
+                  .resume-color-root .text-teal-700 {
+                    color: ${colors.primaryAccent} !important;
+                  }
+                  .resume-color-root .bg-violet-600,
+                  .resume-color-root .bg-brand-600,
+                  .resume-color-root .bg-teal-600 {
+                    background-color: ${colors.primaryAccent} !important;
+                  }
+                `,
+              }}
+            />
             {renderTemplate()}
           </div>
         </div>

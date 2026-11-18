@@ -2,6 +2,7 @@
 
 import React from "react";
 import { ResumeData } from "@/types/resume";
+import { getPhotoDimensions } from "@/lib/resume/resume-photo";
 
 export interface TemplateProps {
   data: ResumeData;
@@ -10,31 +11,87 @@ export interface TemplateProps {
 export const ClassicCorporateTemplate: React.FC<TemplateProps> = ({ data }) => {
   const { personalInfo, summary, experiences, education, skills, projects, certifications, languages, awards, achievements } = data;
 
-  const contactParts: string[] = [];
-  if (personalInfo.phone) contactParts.push(personalInfo.phone);
-  if (personalInfo.email) contactParts.push(personalInfo.email);
-  if (personalInfo.location) contactParts.push(personalInfo.location);
-  if (personalInfo.linkedIn) contactParts.push(personalInfo.linkedIn.replace(/^https?:\/\/(www\.)?/, ""));
-  if (personalInfo.portfolio) contactParts.push(personalInfo.portfolio.replace(/^https?:\/\/(www\.)?/, ""));
+  const contactParts: { label: string; url?: string }[] = [];
+  if (personalInfo.phone) contactParts.push({ label: personalInfo.phone, url: `tel:${personalInfo.phone.replace(/\s+/g, "")}` });
+  if (personalInfo.email) contactParts.push({ label: personalInfo.email, url: `mailto:${personalInfo.email}` });
+  if (personalInfo.location) contactParts.push({ label: personalInfo.location });
+  if (personalInfo.linkedIn) contactParts.push({ label: `LinkedIn: ${personalInfo.linkedIn.replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//, "")}`, url: personalInfo.linkedIn });
+  if (personalInfo.github) contactParts.push({ label: `GitHub: ${personalInfo.github.replace(/^https?:\/\/(www\.)?github\.com\//, "")}`, url: personalInfo.github });
+  if (personalInfo.portfolio) contactParts.push({ label: personalInfo.portfolio.replace(/^https?:\/\/(www\.)?/, ""), url: personalInfo.portfolio });
+  if (personalInfo.twitter) contactParts.push({ label: `Twitter: ${personalInfo.twitter.replace(/^https?:\/\/(www\.)?(twitter|x)\.com\//, "@")}`, url: personalInfo.twitter });
 
   return (
     <div className="w-full bg-white text-neutral-900 font-serif p-8 sm:p-12 text-[13px] leading-relaxed select-text">
       {/* Header: Centered, Executive Style with Double Border */}
-      <header className="text-center pb-4 mb-5 border-b-2 border-neutral-900">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-normal text-neutral-900">
-          {personalInfo.fullName || "Your Full Name"}
-        </h1>
-        {personalInfo.jobTitle && (
-          <p className="text-sm italic font-medium text-neutral-700 mt-1">
-            {personalInfo.jobTitle}
-          </p>
-        )}
+      <header className="pb-4 mb-5 border-b-2 border-neutral-900 flex items-start justify-between gap-6">
+        <div className={`flex-1 min-w-0 ${personalInfo.showPhoto && personalInfo.photoUrl ? "text-left" : "text-center"}`}>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-normal text-neutral-900">
+            {personalInfo.fullName || "Your Full Name"}
+          </h1>
+          {personalInfo.jobTitle && (
+            <p className="text-sm italic font-medium text-neutral-700 mt-1">
+              {personalInfo.jobTitle}
+            </p>
+          )}
 
-        {contactParts.length > 0 && (
-          <div className="text-xs text-neutral-600 mt-2 font-sans tracking-wide">
-            {contactParts.join("   ♦   ")}
-          </div>
-        )}
+          {contactParts.length > 0 && (
+            <div className={`text-xs text-neutral-600 mt-2 font-sans tracking-wide flex flex-wrap items-center gap-y-1 gap-x-2.5 ${personalInfo.showPhoto && personalInfo.photoUrl ? "justify-start" : "justify-center"}`}>
+              {contactParts.map((item, idx) => (
+                <React.Fragment key={idx}>
+                  {item.url ? (
+                    <a href={item.url} target="_blank" rel="noreferrer" className="hover:underline">
+                      {item.label}
+                    </a>
+                  ) : (
+                    <span>{item.label}</span>
+                  )}
+                  {idx < contactParts.length - 1 && <span className="text-neutral-400">♦</span>}
+                </React.Fragment>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Profile Photo if enabled */}
+        {personalInfo.showPhoto && personalInfo.photoUrl && (() => {
+          const photoDims = getPhotoDimensions(personalInfo.photoSize, personalInfo.photoShape);
+          return (
+            <div
+              className={`shrink-0 overflow-hidden ${
+                photoDims.isCircle ? "rounded-full" : "rounded-none"
+              }`}
+              style={{
+                width: `${photoDims.previewWidthPx}px`,
+                height: `${photoDims.previewHeightPx}px`,
+                minWidth: `${photoDims.previewWidthPx}px`,
+                minHeight: `${photoDims.previewHeightPx}px`,
+                maxWidth: `${photoDims.previewWidthPx}px`,
+                maxHeight: `${photoDims.previewHeightPx}px`,
+                flex: `0 0 ${photoDims.previewWidthPx}px`,
+                borderRadius: photoDims.isCircle ? "50%" : "0",
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={personalInfo.photoUrl}
+                alt={personalInfo.fullName || "Profile"}
+                className={`w-full h-full object-cover block ${
+                  photoDims.isCircle ? "rounded-full" : "rounded-none"
+                }`}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  maxWidth: "100%",
+                  maxHeight: "100%",
+                  objectFit: "cover",
+                  objectPosition: "center",
+                  borderRadius: photoDims.isCircle ? "50%" : "0",
+                  display: "block",
+                }}
+              />
+            </div>
+          );
+        })()}
       </header>
 
       {/* Summary */}
@@ -158,9 +215,14 @@ export const ClassicCorporateTemplate: React.FC<TemplateProps> = ({ data }) => {
                 <div className="flex items-baseline justify-between font-bold text-neutral-900">
                   <span>{proj.title}</span>
                   {proj.projectUrl && (
-                    <span className="font-sans font-normal text-[11px] text-neutral-600">
+                    <a
+                      href={proj.projectUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-sans font-normal text-[11px] text-neutral-600 hover:underline"
+                    >
                       {proj.projectUrl.replace(/^https?:\/\/(www\.)?/, "")}
-                    </span>
+                    </a>
                   )}
                 </div>
                 {proj.technologies && (
@@ -186,7 +248,14 @@ export const ClassicCorporateTemplate: React.FC<TemplateProps> = ({ data }) => {
           <ul className="text-xs text-neutral-800 space-y-1 list-disc list-outside ml-4">
             {certifications.map((c) => (
               <li key={c.id}>
-                <span className="font-bold">{c.name}</span> – {c.issuer} {c.date && `(${c.date})`}
+                {c.url ? (
+                  <a href={c.url} target="_blank" rel="noreferrer" className="hover:underline">
+                    <span className="font-bold">{c.name}</span>
+                  </a>
+                ) : (
+                  <span className="font-bold">{c.name}</span>
+                )}
+                {c.issuer && ` – ${c.issuer}`} {c.date && `(${c.date})`}
               </li>
             ))}
           </ul>

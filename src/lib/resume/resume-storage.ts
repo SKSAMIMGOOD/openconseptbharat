@@ -1,5 +1,5 @@
-import type { ResumeData } from "../../types/resume.ts";
-import { EMPTY_RESUME_DATA } from "../../constants/resume-defaults.ts";
+import type { ResumeData, PhotoCropShape, PhotoSizePreset, ResumeFontFamily, ResumeTypography, ResumeThemeColors } from "../../types/resume.ts";
+import { EMPTY_RESUME_DATA, getTemplateDefaultColors, isValidHexColor } from "../../constants/resume-defaults.ts";
 
 export const RESUME_STORAGE_KEY = "browser_utility_studio_resume_data";
 
@@ -21,7 +21,21 @@ export function sanitizeResumeData(input: unknown): ResumeData {
     phone: typeof raw.personalInfo?.phone === "string" ? raw.personalInfo.phone : "",
     location: typeof raw.personalInfo?.location === "string" ? raw.personalInfo.location : "",
     linkedIn: typeof raw.personalInfo?.linkedIn === "string" ? raw.personalInfo.linkedIn : "",
+    github: typeof raw.personalInfo?.github === "string" ? raw.personalInfo.github : "",
     portfolio: typeof raw.personalInfo?.portfolio === "string" ? raw.personalInfo.portfolio : "",
+    twitter: typeof raw.personalInfo?.twitter === "string" ? raw.personalInfo.twitter : "",
+    photoUrl: typeof raw.personalInfo?.photoUrl === "string" ? raw.personalInfo.photoUrl : "",
+    rawPhotoUrl: typeof raw.personalInfo?.rawPhotoUrl === "string" ? raw.personalInfo.rawPhotoUrl : "",
+    showPhoto: Boolean(raw.personalInfo?.showPhoto),
+    photoShape: (raw.personalInfo?.photoShape === "rectangle"
+      ? "rectangle"
+      : raw.personalInfo?.photoShape === "square"
+      ? "square"
+      : "circle") as PhotoCropShape,
+    photoSize: (raw.personalInfo?.photoSize === "small" ||
+    raw.personalInfo?.photoSize === "large"
+      ? raw.personalInfo.photoSize
+      : "standard") as PhotoSizePreset,
   };
 
   const summary = typeof raw.summary === "string" ? raw.summary : "";
@@ -106,11 +120,91 @@ export function sanitizeResumeData(input: unknown): ResumeData {
       }))
     : [];
 
-  const validTemplates = ["modern-professional", "minimal-ats", "classic-corporate"];
+  const validTemplates = [
+    "modern-professional",
+    "minimal-ats",
+    "classic-corporate",
+    "modern-two-column",
+    "executive",
+    "creative",
+    "student-fresher",
+    "elegant-minimal",
+  ];
   const templateId =
     raw.templateId && validTemplates.includes(raw.templateId)
       ? raw.templateId
       : "modern-professional";
+
+  const validFonts: ResumeFontFamily[] = [
+    "Inter",
+    "Roboto",
+    "Arial",
+    "Lato",
+    "Open Sans",
+    "Georgia",
+    "Merriweather",
+    "Poppins",
+  ];
+
+  const rawTypo = (raw.typography && typeof raw.typography === "object") ? (raw.typography as unknown as Record<string, unknown>) : {};
+  const typography: ResumeTypography = {
+    fontFamily: (typeof rawTypo.fontFamily === "string" && validFonts.includes(rawTypo.fontFamily as any))
+      ? (rawTypo.fontFamily as ResumeFontFamily)
+      : "Inter",
+    nameSize: typeof rawTypo.nameSize === "number" && !isNaN(rawTypo.nameSize)
+      ? Math.max(18, Math.min(32, rawTypo.nameSize))
+      : 24,
+    titleSize: typeof rawTypo.titleSize === "number" && !isNaN(rawTypo.titleSize)
+      ? Math.max(11, Math.min(20, rawTypo.titleSize))
+      : 14,
+    headingSize: typeof rawTypo.headingSize === "number" && !isNaN(rawTypo.headingSize)
+      ? Math.max(11, Math.min(18, rawTypo.headingSize))
+      : 13,
+    bodySize: typeof rawTypo.bodySize === "number" && !isNaN(rawTypo.bodySize)
+      ? Math.max(10, Math.min(15, rawTypo.bodySize))
+      : 12,
+    contactSize: typeof rawTypo.contactSize === "number" && !isNaN(rawTypo.contactSize)
+      ? Math.max(9, Math.min(14, rawTypo.contactSize))
+      : 11,
+    lineSpacing: typeof rawTypo.lineSpacing === "number" && !isNaN(rawTypo.lineSpacing)
+      ? Math.max(1.15, Math.min(1.6, rawTypo.lineSpacing))
+      : 1.3,
+    sectionSpacing: typeof rawTypo.sectionSpacing === "number" && !isNaN(rawTypo.sectionSpacing)
+      ? Math.max(10, Math.min(26, rawTypo.sectionSpacing))
+      : 16,
+    paragraphSpacing: typeof rawTypo.paragraphSpacing === "number" && !isNaN(rawTypo.paragraphSpacing)
+      ? Math.max(3, Math.min(12, rawTypo.paragraphSpacing))
+      : 6,
+  };
+
+  const defaultThemeColors = getTemplateDefaultColors(templateId);
+  let colors: ResumeThemeColors = { ...defaultThemeColors };
+  if (raw.colors && typeof raw.colors === "object") {
+    const rawCol = raw.colors as unknown as Record<string, unknown>;
+    colors = {
+      primaryAccent: typeof rawCol.primaryAccent === "string" && isValidHexColor(rawCol.primaryAccent)
+        ? rawCol.primaryAccent.trim()
+        : defaultThemeColors.primaryAccent,
+      nameColor: typeof rawCol.nameColor === "string" && isValidHexColor(rawCol.nameColor)
+        ? rawCol.nameColor.trim()
+        : defaultThemeColors.nameColor,
+      titleColor: typeof rawCol.titleColor === "string" && isValidHexColor(rawCol.titleColor)
+        ? rawCol.titleColor.trim()
+        : defaultThemeColors.titleColor,
+      headingColor: typeof rawCol.headingColor === "string" && isValidHexColor(rawCol.headingColor)
+        ? rawCol.headingColor.trim()
+        : defaultThemeColors.headingColor,
+      bodyColor: typeof rawCol.bodyColor === "string" && isValidHexColor(rawCol.bodyColor)
+        ? rawCol.bodyColor.trim()
+        : defaultThemeColors.bodyColor,
+      secondaryColor: typeof rawCol.secondaryColor === "string" && isValidHexColor(rawCol.secondaryColor)
+        ? rawCol.secondaryColor.trim()
+        : defaultThemeColors.secondaryColor,
+      dividerColor: typeof rawCol.dividerColor === "string" && isValidHexColor(rawCol.dividerColor)
+        ? rawCol.dividerColor.trim()
+        : defaultThemeColors.dividerColor,
+    };
+  }
 
   return {
     personalInfo,
@@ -124,6 +218,8 @@ export function sanitizeResumeData(input: unknown): ResumeData {
     awards,
     achievements,
     templateId,
+    typography,
+    colors,
   };
 }
 

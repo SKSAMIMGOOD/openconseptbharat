@@ -2,6 +2,7 @@
 
 import React from "react";
 import { ResumeData } from "@/types/resume";
+import { getPhotoDimensions } from "@/lib/resume/resume-photo";
 
 export interface TemplateProps {
   data: ResumeData;
@@ -10,31 +11,87 @@ export interface TemplateProps {
 export const MinimalAtsTemplate: React.FC<TemplateProps> = ({ data }) => {
   const { personalInfo, summary, experiences, education, skills, projects, certifications, languages, awards, achievements } = data;
 
-  const contactParts: string[] = [];
-  if (personalInfo.phone) contactParts.push(personalInfo.phone);
-  if (personalInfo.email) contactParts.push(personalInfo.email);
-  if (personalInfo.location) contactParts.push(personalInfo.location);
-  if (personalInfo.linkedIn) contactParts.push(personalInfo.linkedIn.replace(/^https?:\/\/(www\.)?/, ""));
-  if (personalInfo.portfolio) contactParts.push(personalInfo.portfolio.replace(/^https?:\/\/(www\.)?/, ""));
+  const contactParts: { label: string; url?: string }[] = [];
+  if (personalInfo.phone) contactParts.push({ label: personalInfo.phone, url: `tel:${personalInfo.phone.replace(/\s+/g, "")}` });
+  if (personalInfo.email) contactParts.push({ label: personalInfo.email, url: `mailto:${personalInfo.email}` });
+  if (personalInfo.location) contactParts.push({ label: personalInfo.location });
+  if (personalInfo.linkedIn) contactParts.push({ label: `LinkedIn: ${personalInfo.linkedIn.replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//, "")}`, url: personalInfo.linkedIn });
+  if (personalInfo.github) contactParts.push({ label: `GitHub: ${personalInfo.github.replace(/^https?:\/\/(www\.)?github\.com\//, "")}`, url: personalInfo.github });
+  if (personalInfo.portfolio) contactParts.push({ label: personalInfo.portfolio.replace(/^https?:\/\/(www\.)?/, ""), url: personalInfo.portfolio });
+  if (personalInfo.twitter) contactParts.push({ label: `Twitter: ${personalInfo.twitter.replace(/^https?:\/\/(www\.)?(twitter|x)\.com\//, "@")}`, url: personalInfo.twitter });
 
   return (
     <div className="w-full bg-white text-black font-sans p-8 sm:p-12 text-[12.5px] leading-relaxed select-text">
       {/* Header (Single Column, High Contrast) */}
-      <header className="border-b border-black pb-3 mb-5">
-        <h1 className="text-2xl sm:text-3xl font-bold uppercase tracking-wide text-black">
-          {personalInfo.fullName || "Your Full Name"}
-        </h1>
-        {personalInfo.jobTitle && (
-          <p className="text-sm font-semibold text-neutral-800 mt-0.5 uppercase tracking-wider">
-            {personalInfo.jobTitle}
-          </p>
-        )}
+      <header className="border-b border-black pb-3 mb-5 flex items-start justify-between gap-6">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold uppercase tracking-wide text-black">
+            {personalInfo.fullName || "Your Full Name"}
+          </h1>
+          {personalInfo.jobTitle && (
+            <p className="text-sm font-semibold text-neutral-800 mt-0.5 uppercase tracking-wider">
+              {personalInfo.jobTitle}
+            </p>
+          )}
 
-        {contactParts.length > 0 && (
-          <p className="text-xs text-neutral-700 mt-2 font-normal">
-            {contactParts.join("   |   ")}
-          </p>
-        )}
+          {contactParts.length > 0 && (
+            <div className="flex flex-wrap items-center gap-y-1 gap-x-3 text-xs text-neutral-700 mt-2 font-normal">
+              {contactParts.map((item, idx) => (
+                <React.Fragment key={idx}>
+                  {item.url ? (
+                    <a href={item.url} target="_blank" rel="noreferrer" className="hover:underline">
+                      {item.label}
+                    </a>
+                  ) : (
+                    <span>{item.label}</span>
+                  )}
+                  {idx < contactParts.length - 1 && <span className="text-neutral-400">|</span>}
+                </React.Fragment>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Profile Photo if enabled */}
+        {personalInfo.showPhoto && personalInfo.photoUrl && (() => {
+          const photoDims = getPhotoDimensions(personalInfo.photoSize, personalInfo.photoShape);
+          return (
+            <div
+              className={`shrink-0 overflow-hidden ${
+                photoDims.isCircle ? "rounded-full" : "rounded-none"
+              }`}
+              style={{
+                width: `${photoDims.previewWidthPx}px`,
+                height: `${photoDims.previewHeightPx}px`,
+                minWidth: `${photoDims.previewWidthPx}px`,
+                minHeight: `${photoDims.previewHeightPx}px`,
+                maxWidth: `${photoDims.previewWidthPx}px`,
+                maxHeight: `${photoDims.previewHeightPx}px`,
+                flex: `0 0 ${photoDims.previewWidthPx}px`,
+                borderRadius: photoDims.isCircle ? "50%" : "0",
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={personalInfo.photoUrl}
+                alt={personalInfo.fullName || "Profile"}
+                className={`w-full h-full object-cover block ${
+                  photoDims.isCircle ? "rounded-full" : "rounded-none"
+                }`}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  maxWidth: "100%",
+                  maxHeight: "100%",
+                  objectFit: "cover",
+                  objectPosition: "center",
+                  borderRadius: photoDims.isCircle ? "50%" : "0",
+                  display: "block",
+                }}
+              />
+            </div>
+          );
+        })()}
       </header>
 
       {/* Summary */}
@@ -157,9 +214,14 @@ export const MinimalAtsTemplate: React.FC<TemplateProps> = ({ data }) => {
                     )}
                   </span>
                   {proj.projectUrl && (
-                    <span className="font-normal text-neutral-600 text-[11px] truncate max-w-[200px]">
+                    <a
+                      href={proj.projectUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-normal text-neutral-600 text-[11px] hover:underline truncate max-w-[200px]"
+                    >
                       {proj.projectUrl}
-                    </span>
+                    </a>
                   )}
                 </div>
                 {proj.description && (
@@ -182,7 +244,14 @@ export const MinimalAtsTemplate: React.FC<TemplateProps> = ({ data }) => {
           <ul className="text-xs text-neutral-800 space-y-1 list-disc list-outside ml-4">
             {certifications.map((c) => (
               <li key={c.id}>
-                <strong>{c.name}</strong> – {c.issuer} {c.date && `(${c.date})`}
+                {c.url ? (
+                  <a href={c.url} target="_blank" rel="noreferrer" className="hover:underline">
+                    <strong>{c.name}</strong>
+                  </a>
+                ) : (
+                  <strong>{c.name}</strong>
+                )}
+                {c.issuer && ` – ${c.issuer}`} {c.date && `(${c.date})`}
               </li>
             ))}
           </ul>

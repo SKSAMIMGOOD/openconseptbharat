@@ -19,6 +19,7 @@ import {
   Info,
   Layers,
   X,
+  MessageSquare,
 } from "lucide-react";
 import { TOOLS, TOOL_CATEGORIES } from "@/constants/tools";
 import { ToolCategory } from "@/types/tools";
@@ -152,6 +153,16 @@ export default function HomePage() {
               </Link>
 
               <SupportButton size="lg" className="w-full sm:w-auto" />
+
+              <a
+                href="mailto:socialmediasamim@gmail.com"
+                className="w-full sm:w-auto inline-flex items-center justify-center px-5 py-3 rounded-xl text-sm font-semibold bg-surface-100 text-surface-800 hover:bg-surface-200 hover:text-surface-900 transition-colors border border-surface-200/80 gap-2"
+                title="Send Feedback to socialmediasamim@gmail.com"
+                aria-label="Send Feedback via Email"
+              >
+                <MessageSquare className="w-4 h-4 text-brand-600" />
+                <span>Feedback</span>
+              </a>
             </div>
 
             {/* Architectural Trust Points */}
@@ -390,6 +401,15 @@ export default function HomePage() {
 
             <div className="flex flex-wrap items-center gap-3 shrink-0">
               <SupportButton size="sm" />
+              <a
+                href="mailto:socialmediasamim@gmail.com"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-surface-100 text-surface-700 hover:bg-surface-200 hover:text-surface-900 transition-colors border border-surface-200/80"
+                title="Send Feedback to socialmediasamim@gmail.com"
+                aria-label="Send Feedback via Email"
+              >
+                <MessageSquare className="w-3.5 h-3.5 text-brand-600" />
+                <span>Feedback</span>
+              </a>
               <Link
                 href="/tools"
                 className="inline-flex items-center text-xs font-semibold text-brand-600 hover:text-brand-800 transition-colors gap-1.5 shrink-0"

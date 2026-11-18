@@ -167,9 +167,9 @@ export default function ResumeMakerPage() {
 
       {/* Main Responsive Grid Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left Panel: Resume Editor Form (Desktop: 6 cols, Mobile: controlled by mobileTab) */}
+        {/* Left Panel: Resume Editor Form (Desktop: 6 cols, sticky & scrollable) */}
         <div
-          className={`lg:col-span-6 space-y-6 ${
+          className={`lg:col-span-6 space-y-6 lg:sticky lg:top-20 ${
             mobileTab === "edit" ? "block" : "hidden lg:block"
           }`}
         >
@@ -185,9 +185,9 @@ export default function ResumeMakerPage() {
           )}
         </div>
 
-        {/* Right Panel: Live Resume Preview (Desktop: 6 cols, Mobile: controlled by mobileTab) */}
+        {/* Right Panel: Live Resume Preview (Desktop: 6 cols, sticky & viewport-constrained) */}
         <div
-          className={`lg:col-span-6 sticky top-20 ${
+          className={`lg:col-span-6 lg:sticky lg:top-20 lg:h-[calc(100vh-6.5rem)] ${
             mobileTab === "preview" ? "block" : "hidden lg:block"
           }`}
         >

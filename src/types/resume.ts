@@ -1,4 +1,15 @@
-export type ResumeTemplateId = "modern-professional" | "minimal-ats" | "classic-corporate";
+export type ResumeTemplateId =
+  | "modern-professional"
+  | "minimal-ats"
+  | "classic-corporate"
+  | "modern-two-column"
+  | "executive"
+  | "creative"
+  | "student-fresher"
+  | "elegant-minimal";
+
+export type PhotoCropShape = "circle" | "rectangle" | "square";
+export type PhotoSizePreset = "small" | "standard" | "large";
 
 export interface PersonalInfo {
   fullName: string;
@@ -7,7 +18,14 @@ export interface PersonalInfo {
   phone: string;
   location: string;
   linkedIn?: string;
+  github?: string;
   portfolio?: string;
+  twitter?: string;
+  photoUrl?: string;
+  rawPhotoUrl?: string;
+  showPhoto?: boolean;
+  photoShape?: PhotoCropShape;
+  photoSize?: PhotoSizePreset;
 }
 
 export interface WorkExperience {
@@ -72,6 +90,45 @@ export interface Achievement {
   description: string;
 }
 
+export type ResumeFontFamily =
+  | "Inter"
+  | "Roboto"
+  | "Arial"
+  | "Lato"
+  | "Open Sans"
+  | "Georgia"
+  | "Merriweather"
+  | "Poppins";
+
+export interface ResumeTypography {
+  fontFamily: ResumeFontFamily;
+  nameSize: number;
+  titleSize: number;
+  headingSize: number;
+  bodySize: number;
+  contactSize: number;
+  lineSpacing: number;
+  sectionSpacing: number;
+  paragraphSpacing: number;
+}
+
+export interface ResumeThemeColors {
+  primaryAccent: string;   // Primary accent colour
+  nameColor: string;       // Candidate name colour
+  titleColor: string;      // Professional title colour
+  headingColor: string;    // Section heading colour
+  bodyColor: string;       // Body text colour
+  secondaryColor: string;  // Secondary text colour
+  dividerColor: string;    // Divider and decorative line colour
+}
+
+export interface ResumeColorPreset {
+  id: string;
+  name: string;
+  primary: string;
+  colors: ResumeThemeColors;
+}
+
 export interface ResumeData {
   personalInfo: PersonalInfo;
   summary: string;
@@ -84,6 +141,8 @@ export interface ResumeData {
   awards: Award[];
   achievements: Achievement[];
   templateId: ResumeTemplateId;
+  typography?: ResumeTypography;
+  colors?: ResumeThemeColors;
 }
 
 export interface ResumeTemplateMeta {
