@@ -714,6 +714,7 @@ export const DocumentStudioWorkspace: React.FC<DocumentStudioWorkspaceProps> = (
             isSingleSided={isSingleSided}
             isFrontActive={isFrontActive}
             isBackActive={isBackActive}
+            source={state.source}
             onModeChange={setPrintStudioMode}
             onArrangementChange={setPrintStudioArrangement}
             onLayoutChange={setPrintLayoutSettings}

@@ -277,6 +277,9 @@ export const DocumentCropEditor: React.FC<DocumentCropEditorProps> = ({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+
     ctx.clearRect(0, 0, rotatedSize.width, rotatedSize.height);
 
     const drawImageOnCanvas = (img: HTMLImageElement) => {

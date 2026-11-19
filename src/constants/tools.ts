@@ -42,7 +42,7 @@ export const TOOL_CATEGORIES: CategoryMetadata[] = [
 export const TOOLS: ToolMetadata[] = [
   {
     id: "photo-studio",
-    name: "Professional Photo Studio",
+    name: "Free Passport Photo Studio",
     category: "photo-studio",
     categories: ["photo-studio", "photo-printing", "photo"],
     shortDescription:
@@ -64,7 +64,7 @@ export const TOOLS: ToolMetadata[] = [
   },
   {
     id: "background-remover",
-    name: "Background Remover",
+    name: "Free Background Remover",
     category: "image-tools",
     categories: ["image-tools", "photo-studio", "photo"],
     shortDescription:
@@ -86,7 +86,7 @@ export const TOOLS: ToolMetadata[] = [
   },
   {
     id: "photo-editor",
-    name: "Advanced Photo Editor",
+    name: "Free Advanced Photo Editor",
     category: "image-tools",
     categories: ["image-tools", "photo"],
     shortDescription:
@@ -108,7 +108,7 @@ export const TOOLS: ToolMetadata[] = [
   },
   {
     id: "multiple-photo-maker",
-    name: "Multiple Photo Maker",
+    name: "Free Multiple Photo Maker",
     category: "photo-printing",
     categories: ["photo-printing", "photo-studio", "photo", "pdf"],
     shortDescription:
@@ -130,7 +130,7 @@ export const TOOLS: ToolMetadata[] = [
   },
   {
     id: "pan-card-crop",
-    name: "PAN Card Crop",
+    name: "Free PAN Card Crop Tool",
     category: "utilities",
     categories: ["utilities", "document", "pdf"],
     shortDescription:
@@ -152,7 +152,7 @@ export const TOOLS: ToolMetadata[] = [
   },
   {
     id: "aadhaar-card-crop",
-    name: "Aadhaar Card Crop",
+    name: "Free Aadhaar Card Crop Tool",
     category: "utilities",
     categories: ["utilities", "document", "pdf"],
     shortDescription:
@@ -174,7 +174,7 @@ export const TOOLS: ToolMetadata[] = [
   },
   {
     id: "ration-card-crop",
-    name: "Ration Card Crop",
+    name: "Free Ration Card Crop Tool",
     category: "utilities",
     categories: ["utilities", "document", "pdf"],
     shortDescription:
@@ -196,7 +196,7 @@ export const TOOLS: ToolMetadata[] = [
   },
   {
     id: "resume-maker",
-    name: "Resume / CV Maker",
+    name: "Free Resume / CV Maker",
     category: "utilities",
     categories: ["utilities", "resume", "pdf"],
     shortDescription:
@@ -218,7 +218,7 @@ export const TOOLS: ToolMetadata[] = [
   },
   {
     id: "document-studio",
-    name: "Document Studio",
+    name: "Free Document Studio",
     category: "utilities",
     categories: ["utilities", "document", "pdf"],
     shortDescription:

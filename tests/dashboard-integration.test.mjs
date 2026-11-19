@@ -83,12 +83,12 @@ describe("PHASE 06 — Tool Registry & Configuration", () => {
   test("lookup by ID returns the correct tool", () => {
     const photoStudio = getToolById("photo-studio");
     assert.ok(photoStudio);
-    assert.equal(photoStudio.name, "Professional Photo Studio");
+    assert.equal(photoStudio.name, "Free Passport Photo Studio");
     assert.equal(photoStudio.route, "/tools/photo-studio");
 
     const bgRemover = getToolById("background-remover");
     assert.ok(bgRemover);
-    assert.equal(bgRemover.name, "Background Remover");
+    assert.equal(bgRemover.name, "Free Background Remover");
     assert.equal(bgRemover.route, "/tools/background-remover");
 
     const nonExistent = getToolById("non-existent-tool");

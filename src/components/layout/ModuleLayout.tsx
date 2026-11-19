@@ -7,6 +7,7 @@ import { Badge } from "@/components/common/Badge";
 import { Breadcrumb } from "@/components/common/Breadcrumb";
 import { ToolMetadata } from "@/types/tools";
 import { recordToolUsage } from "@/lib/utils/recent-tools";
+import { getToolSoftwareApplicationData } from "@/lib/seo/structured-data";
 
 export interface ModuleLayoutProps {
   tool: ToolMetadata;
@@ -23,6 +24,13 @@ export const ModuleLayout: React.FC<ModuleLayoutProps> = ({ tool, children }) =>
 
   return (
     <div className="min-h-[calc(100vh-4rem)] flex flex-col bg-surface-50">
+      {/* Tool SoftwareApplication Structured Data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(getToolSoftwareApplicationData(tool)),
+        }}
+      />
       {/* Module Sub-Header & Breadcrumb Bar */}
       <div className="bg-white border-b border-surface-200/90 py-5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

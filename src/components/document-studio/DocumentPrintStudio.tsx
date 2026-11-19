@@ -16,6 +16,7 @@ import type {
   PrintScaleMode,
   DocumentPrintLayoutSettings,
   DocumentBorderSettings,
+  DocumentSourceFile,
 } from "@/types/document-studio";
 import {
   DEFAULT_PRINT_LAYOUT_SETTINGS,
@@ -78,6 +79,7 @@ export interface DocumentPrintStudioProps {
   isSingleSided: boolean;
   isFrontActive: boolean;
   isBackActive: boolean;
+  source?: DocumentSourceFile | null;
   onModeChange: (mode: PrintStudioMode) => void;
   onArrangementChange: (arrangement: PrintStudioArrangement) => void;
   onLayoutChange?: (layout: Partial<DocumentPrintLayoutSettings>) => void;
@@ -94,6 +96,7 @@ export const DocumentPrintStudio: React.FC<DocumentPrintStudioProps> = ({
   isSingleSided,
   isFrontActive,
   isBackActive,
+  source,
   onModeChange,
   onArrangementChange,
   onLayoutChange,
@@ -115,6 +118,9 @@ export const DocumentPrintStudio: React.FC<DocumentPrintStudioProps> = ({
   const [printImageUrls, setPrintImageUrls] = useState<string[]>([]);
   const [errorNotice, setErrorNotice] = useState<string | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
+  const [pipelineMode, setPipelineMode] = useState<
+    "standard" | "experimental-png-300" | "experimental-png-600"
+  >("standard");
 
   // Local layout fallback ensuring immediate reactivity even without external state updater
   const [localLayout, setLocalLayout] = useState<DocumentPrintLayoutSettings>(
@@ -292,7 +298,9 @@ export const DocumentPrintStudio: React.FC<DocumentPrintStudioProps> = ({
         back,
         isSingleSided,
         docDef,
-        dpi: front.printSettings?.dpi || 300,
+        dpi: pipelineMode === "experimental-png-600" ? 600 : front.printSettings?.dpi || 300,
+        source,
+        pipelineMode,
       });
 
       downloadPdfBlob(result.blob, result.fileName);
@@ -421,6 +429,69 @@ export const DocumentPrintStudio: React.FC<DocumentPrintStudioProps> = ({
               >
                 <Printer className="w-4 h-4" />
                 <span>{isPrinting ? "Preparing Print..." : "Print Document"}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* PDF Export Quality Engine (Standard vs Experimental High-Res Lossless PNG Intermediate) */}
+          <div
+            data-testid="pdf-export-pipeline-selector"
+            className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-surface-50/80 dark:bg-surface-800/60 border border-surface-200/90 dark:border-surface-700/80 text-xs shadow-2xs"
+          >
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-brand-600 dark:text-brand-400 shrink-0" />
+              <div>
+                <span className="font-bold text-surface-900 dark:text-surface-100 block">
+                  PDF Export Quality Engine
+                </span>
+                <span className="text-[11px] text-surface-500 dark:text-surface-400">
+                  Select export pipeline: preserve original text thickness and eliminate thinning
+                </span>
+              </div>
+            </div>
+
+            <div className="inline-flex items-center gap-1 p-1 bg-surface-200/70 dark:bg-surface-700/70 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setPipelineMode("standard")}
+                data-testid="pipeline-mode-standard"
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all",
+                  pipelineMode === "standard"
+                    ? "bg-white dark:bg-surface-800 text-brand-700 dark:text-brand-300 shadow-2xs font-bold"
+                    : "text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-100"
+                )}
+                title="Standard export: Vector PDF for PDF uploads, direct card image for raster"
+              >
+                Standard (Auto)
+              </button>
+              <button
+                type="button"
+                onClick={() => setPipelineMode("experimental-png-300")}
+                data-testid="pipeline-mode-png-300"
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all",
+                  pipelineMode === "experimental-png-300"
+                    ? "bg-white dark:bg-surface-800 text-brand-700 dark:text-brand-300 shadow-2xs font-bold"
+                    : "text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-100"
+                )}
+                title="Experimental 300 DPI: In-memory lossless PNG embedding without artificial sharpening"
+              >
+                300 DPI PNG
+              </button>
+              <button
+                type="button"
+                onClick={() => setPipelineMode("experimental-png-600")}
+                data-testid="pipeline-mode-png-600"
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all",
+                  pipelineMode === "experimental-png-600"
+                    ? "bg-white dark:bg-surface-800 text-brand-700 dark:text-brand-300 shadow-2xs font-bold ring-1 ring-brand-500/20"
+                    : "text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-100"
+                )}
+                title="Experimental 600 DPI: High-density lossless PNG embedding (preserves natural text stroke thickness, crisp Hindi characters, and QR codes)"
+              >
+                600 DPI PNG (Ultra-Sharp)
               </button>
             </div>
           </div>

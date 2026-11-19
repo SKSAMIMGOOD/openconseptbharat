@@ -20,12 +20,21 @@ import type {
   PrintPaperSize,
   PrintOrientation,
   DocumentPrintLayoutSettings,
+  DocumentSourceFile,
 } from "../../types/document-studio.ts";
+import { isEnhancementActive } from "../../types/document-studio.ts";
 import type {
   PrintPaperLayoutResult,
   PrintPlacedItem,
 } from "./document-print-studio.ts";
 import { resolveActiveSideImage } from "./document-print-studio.ts";
+import {
+  mapCanvasCropToPdfBoundingBox,
+  getRotatedPlacement,
+  calculateProportionalCardFit,
+  type ProportionalFitResult,
+} from "./pdf-coordinate-converter.ts";
+import { generateExperimentalPngIntermediatePdf } from "./experimental-png-pipeline.ts";
 import {
   createTrackedObjectURL,
   revokeObjectUrlSafely,
@@ -326,6 +335,9 @@ export async function renderMasterDocumentCanvas(options: {
     throw new Error("Could not acquire 2D canvas context for master print rendering.");
   }
 
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+
   // 1. Fill solid white background (no transparency on physical print sheet)
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, sheetWidthPx, sheetHeightPx);
@@ -382,6 +394,281 @@ export async function renderMasterDocumentCanvas(options: {
 }
 
 /**
+ * Non-destructive vector PDF embedding:
+ * Preserves the original uploaded PDF as the source of truth, embedding page content
+ * directly into the target PDF as Form XObjects clipped to the crop bounding box.
+ * Preserves original text operators, embedded fonts, vector graphics, and image objects with zero rasterization.
+ */
+async function tryGenerateVectorPdf(options: {
+  paperLayout: PrintPaperLayoutResult;
+  front: DocumentSideResult;
+  back: DocumentSideResult;
+  source: DocumentSourceFile;
+  pageWidthPt: number;
+  pageHeightPt: number;
+  docName: string;
+}): Promise<Uint8Array | null> {
+  if (options.source.fileType !== "pdf" || !options.source.file) {
+    return null;
+  }
+
+  try {
+    const fileBytes = new Uint8Array(await options.source.file.arrayBuffer());
+    const srcDoc = await PDFDocument.load(fileBytes, { ignoreEncryption: true });
+    const pageIndex = Math.max(0, (options.source.currentPage || 1) - 1);
+    if (pageIndex >= srcDoc.getPageCount()) {
+      return null;
+    }
+    const srcPage = srcDoc.getPage(pageIndex);
+    const canvasDims = options.source.dimensions || { width: 4961, height: 7016 };
+
+    const pdfDoc = await PDFDocument.create();
+    pdfDoc.setTitle(`${options.docName} — Vector Print Studio (Browser Utility Studio)`);
+    pdfDoc.setAuthor("Browser Utility Studio (Privacy-First Client Engine)");
+    pdfDoc.setCreator("Browser Utility Studio Document Studio");
+    pdfDoc.setProducer("pdf-lib Non-Destructive Vector Embedding Engine");
+
+    const copies = Math.max(1, Math.min(20, options.paperLayout.copies || 1));
+
+    // Cache embedded pages so we don't re-embed for each copy
+    const embeddedPagesMap = new Map<
+      string,
+      { embeddedPage: any; fit: ProportionalFitResult; totalClockwise: number }
+    >();
+
+    for (const item of options.paperLayout.items) {
+      if (!item.isAvailable) continue;
+      const sideResult = item.side === "front" ? options.front : options.back;
+      if (!sideResult.crop) continue;
+
+      const cacheKey = `${item.side}-${sideResult.rotation}-${item.rotation || 0}-${item.xMm}-${item.yMm}-${item.widthMm}-${item.heightMm}`;
+      if (!embeddedPagesMap.has(cacheKey)) {
+        const boundingBox = mapCanvasCropToPdfBoundingBox(
+          sideResult.crop,
+          canvasDims,
+          srcPage
+        );
+
+        const embeddedPage = await pdfDoc.embedPage(srcPage, boundingBox);
+
+        const targetW = (item.widthMm / 25.4) * 72;
+        const targetH = (item.heightMm / 25.4) * 72;
+        const targetX = (item.xMm / 25.4) * 72;
+        const targetY =
+          ((options.paperLayout.paperHeightMm - item.yMm - item.heightMm) / 25.4) * 72;
+
+        const fit = calculateProportionalCardFit(
+          embeddedPage.width,
+          embeddedPage.height,
+          targetW,
+          targetH,
+          targetX,
+          targetY
+        );
+
+        const totalClockwise =
+          ((sideResult.rotation || 0) + (item.rotation || 0)) % 360;
+
+        embeddedPagesMap.set(cacheKey, { embeddedPage, fit, totalClockwise });
+      }
+    }
+
+    if (embeddedPagesMap.size === 0) {
+      return null;
+    }
+
+    for (let c = 0; c < copies; c++) {
+      const page = pdfDoc.addPage([options.pageWidthPt, options.pageHeightPt]);
+
+      for (const item of options.paperLayout.items) {
+        if (!item.isAvailable) continue;
+        const sideResult = item.side === "front" ? options.front : options.back;
+        if (!sideResult.crop) continue;
+
+        const cacheKey = `${item.side}-${sideResult.rotation}-${item.rotation || 0}-${item.xMm}-${item.yMm}-${item.widthMm}-${item.heightMm}`;
+        const entry = embeddedPagesMap.get(cacheKey);
+        if (!entry) continue;
+
+        const placement = getRotatedPlacement(
+          entry.fit.x,
+          entry.fit.y,
+          entry.fit.width,
+          entry.fit.height,
+          entry.totalClockwise
+        );
+
+        page.drawPage(entry.embeddedPage, placement);
+
+        // Render vector border overlay directly into PDF page
+        if (options.paperLayout.border?.enabled) {
+          const bwPt = (options.paperLayout.border.thicknessMm / 25.4) * 72;
+          const { r, g, b } = hexToRgb01(options.paperLayout.border.color);
+          let borderDashArray: number[] | undefined = undefined;
+          if (options.paperLayout.border.style === "dashed") {
+            borderDashArray = [(2.5 / 25.4) * 72, (1.5 / 25.4) * 72];
+          } else if (options.paperLayout.border.style === "dotted") {
+            borderDashArray = [(0.6 / 25.4) * 72, (1.2 / 25.4) * 72];
+          }
+
+          const xPt = (item.xMm / 25.4) * 72;
+          const yPt =
+            ((options.paperLayout.paperHeightMm - item.yMm - item.heightMm) / 25.4) * 72;
+          const wPt = (item.widthMm / 25.4) * 72;
+          const hPt = (item.heightMm / 25.4) * 72;
+
+          page.drawRectangle({
+            x: xPt + bwPt / 2,
+            y: yPt + bwPt / 2,
+            width: Math.max(0, wPt - bwPt),
+            height: Math.max(0, hPt - bwPt),
+            borderWidth: bwPt,
+            borderColor: rgb(r, g, b),
+            color: undefined,
+            borderDashArray,
+          });
+        }
+      }
+    }
+
+    return await pdfDoc.save();
+  } catch (err) {
+    console.warn("Vector PDF embedding notice, falling back to direct image embedding:", err);
+    return null;
+  }
+}
+
+/**
+ * Direct High-Resolution Card Embedding:
+ * Embeds cropped document card images directly into the PDF at exact physical dimensions
+ * with native vector white background and vector borders, avoiding unnecessary full-sheet canvas rasterization.
+ */
+async function tryGenerateDirectImagePdf(options: {
+  paperLayout: PrintPaperLayoutResult;
+  front: DocumentSideResult;
+  back: DocumentSideResult;
+  pageWidthPt: number;
+  pageHeightPt: number;
+  docName: string;
+}): Promise<Uint8Array | null> {
+  try {
+    const sideBlobs = new Map<"front" | "back", Uint8Array>();
+
+    for (const item of options.paperLayout.items) {
+      if (!item.isAvailable) continue;
+      const side = item.side;
+      if (sideBlobs.has(side)) continue;
+
+      const sideResult = side === "front" ? options.front : options.back;
+      const blob = sideResult.enhancedBlob || sideResult.croppedBlob;
+      if (!blob) {
+        return null;
+      }
+      const buffer = await blob.arrayBuffer();
+      sideBlobs.set(side, new Uint8Array(buffer));
+    }
+
+    if (sideBlobs.size === 0) {
+      return null;
+    }
+
+    const pdfDoc = await PDFDocument.create();
+    pdfDoc.setTitle(`${options.docName} — Print Studio (Browser Utility Studio)`);
+    pdfDoc.setAuthor("Browser Utility Studio (Privacy-First Client Engine)");
+    pdfDoc.setCreator("Browser Utility Studio Document Studio");
+    pdfDoc.setProducer("pdf-lib High-Resolution Direct Card Embedding Engine");
+
+    const embeddedImages = new Map<"front" | "back", any>();
+    for (const [side, bytes] of Array.from(sideBlobs.entries())) {
+      const isPng =
+        bytes.length >= 8 &&
+        bytes[0] === 0x89 &&
+        bytes[1] === 0x50 &&
+        bytes[2] === 0x4e &&
+        bytes[3] === 0x47;
+      const embedded = isPng
+        ? await pdfDoc.embedPng(bytes)
+        : await pdfDoc.embedJpg(bytes);
+      embeddedImages.set(side, embedded);
+    }
+
+    const copies = Math.max(1, Math.min(20, options.paperLayout.copies || 1));
+
+    for (let c = 0; c < copies; c++) {
+      const page = pdfDoc.addPage([options.pageWidthPt, options.pageHeightPt]);
+
+      for (const item of options.paperLayout.items) {
+        if (!item.isAvailable) continue;
+        const embedded = embeddedImages.get(item.side);
+        if (!embedded) continue;
+
+        const targetW = (item.widthMm / 25.4) * 72;
+        const targetH = (item.heightMm / 25.4) * 72;
+        const targetX = (item.xMm / 25.4) * 72;
+        const targetY =
+          ((options.paperLayout.paperHeightMm - item.yMm - item.heightMm) / 25.4) * 72;
+
+        const fit = calculateProportionalCardFit(
+          embedded.width,
+          embedded.height,
+          targetW,
+          targetH,
+          targetX,
+          targetY
+        );
+
+        const sideResult = item.side === "front" ? options.front : options.back;
+        const totalClockwise =
+          ((sideResult.rotation || 0) + (item.rotation || 0)) % 360;
+
+        const placement = getRotatedPlacement(
+          fit.x,
+          fit.y,
+          fit.width,
+          fit.height,
+          totalClockwise
+        );
+
+        page.drawImage(embedded, placement);
+
+        // Vector border overlay
+        if (options.paperLayout.border?.enabled) {
+          const bwPt = (options.paperLayout.border.thicknessMm / 25.4) * 72;
+          const { r, g, b } = hexToRgb01(options.paperLayout.border.color);
+          let borderDashArray: number[] | undefined = undefined;
+          if (options.paperLayout.border.style === "dashed") {
+            borderDashArray = [(2.5 / 25.4) * 72, (1.5 / 25.4) * 72];
+          } else if (options.paperLayout.border.style === "dotted") {
+            borderDashArray = [(0.6 / 25.4) * 72, (1.2 / 25.4) * 72];
+          }
+
+          const xPt = (item.xMm / 25.4) * 72;
+          const yPt =
+            ((options.paperLayout.paperHeightMm - item.yMm - item.heightMm) / 25.4) * 72;
+          const wPt = (item.widthMm / 25.4) * 72;
+          const hPt = (item.heightMm / 25.4) * 72;
+
+          page.drawRectangle({
+            x: xPt + bwPt / 2,
+            y: yPt + bwPt / 2,
+            width: Math.max(0, wPt - bwPt),
+            height: Math.max(0, hPt - bwPt),
+            borderWidth: bwPt,
+            borderColor: rgb(r, g, b),
+            color: undefined,
+            borderDashArray,
+          });
+        }
+      }
+    }
+
+    return await pdfDoc.save();
+  } catch (err) {
+    console.warn("Direct image embedding notice, falling back to master canvas:", err);
+    return null;
+  }
+}
+
+/**
  * Generates a print-ready vector-calibrated PDF document using pdf-lib.
  * Embeds high-resolution raster image and sets exact physical page dimensions.
  */
@@ -395,6 +682,8 @@ export async function generatePrintReadyPdf(options: {
   imageBytes?: Uint8Array;
   masterCanvas?: HTMLCanvasElement | OffscreenCanvas;
   fileName?: string;
+  source?: DocumentSourceFile | null;
+  pipelineMode?: "standard" | "experimental-png-300" | "experimental-png-600";
 }): Promise<PrintPdfExportResult> {
   const {
     paperLayout,
@@ -404,7 +693,25 @@ export async function generatePrintReadyPdf(options: {
     docDef,
     dpi = front.printSettings?.dpi || 300,
     fileName: customFileName,
+    source,
+    pipelineMode = "standard",
   } = options;
+
+  // 0. Experimental Lossless PNG Intermediate Pipeline:
+  // Original PDF/Image -> High-Res Rendering -> Existing Crop Coordinates -> Lossless In-Memory PNG -> Direct PDF Embed
+  if (pipelineMode === "experimental-png-300" || pipelineMode === "experimental-png-600") {
+    const targetDpi = pipelineMode === "experimental-png-600" ? 600 : 300;
+    return await generateExperimentalPngIntermediatePdf({
+      paperLayout,
+      front,
+      back,
+      source,
+      targetDpi,
+      docDef,
+      isSingleSided,
+      fileName: customFileName,
+    });
+  }
 
   // 1. Validate readiness
   const validation = validatePrintReadiness({
@@ -426,31 +733,105 @@ export async function generatePrintReadyPdf(options: {
     paperLayout.paperHeightMm
   );
 
+  const docName = docDef?.name || "Document";
+
+  // 3. High-fidelity non-destructive export pipeline:
+  // If neither explicit imageBytes nor masterCanvas was provided, attempt vector or direct embedding first.
+  if (!options.imageBytes && !options.masterCanvas) {
+    // 3A. Non-destructive Vector PDF Embedding (for PDF uploads without destructive raster filters)
+    if (source && source.fileType === "pdf" && source.file) {
+      const vectorPdfBytes = await tryGenerateVectorPdf({
+        paperLayout,
+        front,
+        back,
+        source,
+        pageWidthPt,
+        pageHeightPt,
+        docName,
+      });
+
+      if (vectorPdfBytes) {
+        const fileName =
+          customFileName ||
+          generatePrintFileName(
+            docDef?.id || "document",
+            paperLayout.paperSize,
+            paperLayout.orientation,
+            dpi,
+            "pdf"
+          );
+
+        return {
+          blob: new Blob([vectorPdfBytes as any], { type: "application/pdf" }),
+          fileName,
+          sizeBytes: vectorPdfBytes.length,
+          pageWidthPt,
+          pageHeightPt,
+          pageCount: Math.max(1, Math.min(20, paperLayout.copies || 1)),
+          format: "application/pdf",
+        };
+      }
+    }
+
+    // 3B. Direct High-Resolution Card Embedding (for image uploads or raster fallback)
+    const directImagePdfBytes = await tryGenerateDirectImagePdf({
+      paperLayout,
+      front,
+      back,
+      pageWidthPt,
+      pageHeightPt,
+      docName,
+    });
+
+    if (directImagePdfBytes) {
+      const fileName =
+        customFileName ||
+        generatePrintFileName(
+          docDef?.id || "document",
+          paperLayout.paperSize,
+          paperLayout.orientation,
+          dpi,
+          "pdf"
+        );
+
+      return {
+        blob: new Blob([directImagePdfBytes as any], { type: "application/pdf" }),
+        fileName,
+        sizeBytes: directImagePdfBytes.length,
+        pageWidthPt,
+        pageHeightPt,
+        pageCount: Math.max(1, Math.min(20, paperLayout.copies || 1)),
+        format: "application/pdf",
+      };
+    }
+  }
+
+  // 3C. Fallback: Full-sheet master canvas rasterization (for backward compatibility and test harnesses)
   let imageBytes = options.imageBytes;
   let createdCanvas: HTMLCanvasElement | null = null;
 
   try {
-    // 3. Acquire image bytes (from passed buffer, passed canvas, or render fresh canvas)
+    // Acquire image bytes (from passed buffer, passed canvas, or render fresh canvas)
     if (!imageBytes) {
       const canvas = options.masterCanvas || (await renderMasterDocumentCanvas({ paperLayout, dpi }));
       if (!options.masterCanvas && canvas instanceof HTMLCanvasElement) {
         createdCanvas = canvas;
       }
 
-      // Convert canvas to JPEG blob
-      const jpegBlob: Blob = await new Promise((resolve, reject) => {
+      // Convert canvas to lossless PNG blob to preserve crisp text, numbers, and QR codes
+      const pngBlob: Blob = await new Promise((resolve, reject) => {
         if ("toBlob" in canvas && typeof (canvas as HTMLCanvasElement).toBlob === "function") {
           (canvas as HTMLCanvasElement).toBlob(
             (b) => {
               if (b) resolve(b);
-              else reject(new Error("Failed to encode master canvas to JPEG blob."));
+              else reject(new Error("Failed to encode master canvas to PNG blob."));
             },
-            "image/jpeg",
-            0.96
+            "image/png",
+            1.0
           );
         } else if ("convertToBlob" in canvas && typeof (canvas as OffscreenCanvas).convertToBlob === "function") {
           (canvas as OffscreenCanvas)
-            .convertToBlob({ type: "image/jpeg", quality: 0.96 })
+            .convertToBlob({ type: "image/png" })
             .then(resolve)
             .catch(reject);
         } else {
@@ -458,19 +839,27 @@ export async function generatePrintReadyPdf(options: {
         }
       });
 
-      imageBytes = new Uint8Array(await jpegBlob.arrayBuffer());
+      imageBytes = new Uint8Array(await pngBlob.arrayBuffer());
     }
 
     // 4. Create calibrated PDF Document
     const pdfDoc = await PDFDocument.create();
-    const docName = docDef?.name || "Document";
     pdfDoc.setTitle(`${docName} — Print Studio (Browser Utility Studio)`);
     pdfDoc.setAuthor("Browser Utility Studio (Privacy-First Client Engine)");
     pdfDoc.setCreator("Browser Utility Studio Document Studio");
     pdfDoc.setProducer("pdf-lib (In-Browser Execution)");
+    pdfDoc.setProducer("pdf-lib (In-Browser Execution)");
 
-    // 5. Embed JPEG image
-    const embeddedImage = await pdfDoc.embedJpg(imageBytes);
+    // 5. Embed image preserving format (PNG for lossless raster, JPG fallback)
+    const isPng =
+      imageBytes.length >= 8 &&
+      imageBytes[0] === 0x89 &&
+      imageBytes[1] === 0x50 &&
+      imageBytes[2] === 0x4e &&
+      imageBytes[3] === 0x47;
+    const embeddedImage = isPng
+      ? await pdfDoc.embedPng(imageBytes)
+      : await pdfDoc.embedJpg(imageBytes);
 
     // 6. Add pages for copies (respects copies setting in PDF output)
     const copies = Math.max(1, Math.min(20, paperLayout.copies || 1));
@@ -591,9 +980,9 @@ export async function executeBrowserPrint(options: {
   let masterCanvas: HTMLCanvasElement | null = null;
 
   try {
-    // 2. Render master canvas
+    // 2. Render master canvas with lossless PNG data URL
     masterCanvas = await renderMasterDocumentCanvas({ paperLayout, dpi });
-    const dataUrl = masterCanvas.toDataURL("image/jpeg", 0.98);
+    const dataUrl = masterCanvas.toDataURL("image/png");
 
     // 3. Inject calibrated @page CSS
     const pageSizeCss = getPageSizeCss(

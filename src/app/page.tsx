@@ -123,7 +123,7 @@ export default function HomePage() {
 
             {/* Headline */}
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-surface-900 tracking-tight leading-[1.15]">
-              Everything You Need to{" "}
+              Free Online Tools to{" "}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 via-indigo-600 to-teal-600">
                 Edit, Crop & Print.
               </span>
@@ -131,7 +131,7 @@ export default function HomePage() {
 
             {/* Subtitle */}
             <p className="mt-5 text-base sm:text-lg text-surface-600 leading-relaxed max-w-2xl mx-auto">
-              Professional browser-native tools for photo editing, passport photos, government ID card crops, and photo printing. Zero server uploads, zero data tracking.
+              Explore our 100% free online tools for photo editing, passport photo creation, background remover, government ID card cropping, and resume maker. Fast, browser-based processing with an uncompromising zero-upload privacy guarantee.
             </p>
 
             {/* Actions: Primary Explore Tools & Secondary Privacy Information */}
@@ -392,7 +392,7 @@ export default function HomePage() {
                 Central Tool Registry
               </span>
               <h2 className="text-2xl sm:text-3xl font-extrabold text-surface-900 tracking-tight">
-                All Browser Utilities
+                All Free Online Utilities
               </h2>
               <p className="text-xs sm:text-sm text-surface-600 mt-1 max-w-2xl">
                 Explore our full suite of privacy-first photo, document, and printing workflows. Every tool runs 100% in your browser.

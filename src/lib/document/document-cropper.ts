@@ -54,8 +54,9 @@ export interface DocumentCropRenderOptions {
   mimeType?: "image/png" | "image/jpeg";
   quality?: number; // 0.0 - 1.0
   backgroundColor?: string;
-  normalizeCR80?: boolean; // When true, standardizes output to ISO CR80 (1011 x 638 px)
+  normalizeCR80?: boolean; // When true, standardizes output to ISO CR80 (1011 x 638 px at 300 DPI, 2022 x 1276 px at 600 DPI)
   applyCornerRadius?: boolean;
+  targetDpi?: number;
 }
 
 export interface DocumentCropRenderResult {
@@ -192,48 +193,59 @@ export async function renderDocumentCrop(
   const cropW = Math.max(1, Math.min(Math.round(crop.width), rotatedSize.width - cropX));
   const cropH = Math.max(1, Math.min(Math.round(crop.height), rotatedSize.height - cropY));
 
-  // 1. Render rotated full-resolution buffer
-  let rotatedCanvas: HTMLCanvasElement | OffscreenCanvas;
-  if (typeof OffscreenCanvas !== "undefined") {
-    rotatedCanvas = new OffscreenCanvas(rotatedSize.width, rotatedSize.height);
-  } else {
-    rotatedCanvas = document.createElement("canvas");
-    rotatedCanvas.width = rotatedSize.width;
-    rotatedCanvas.height = rotatedSize.height;
+  // 1. Prepare source buffer for cropping:
+  // When unrotated (rotation === 0), crop directly from native source buffer without allocating
+  // a redundant full-resolution intermediate canvas copy. This preserves native pixel resolution,
+  // avoids intermediate canvas conversions, and prevents repeated resizing.
+  let cropSource: CanvasImageSource = source;
+  let rotatedCanvas: HTMLCanvasElement | OffscreenCanvas | null = null;
+
+  if (rotation !== 0) {
+    if (typeof OffscreenCanvas !== "undefined") {
+      rotatedCanvas = new OffscreenCanvas(rotatedSize.width, rotatedSize.height);
+    } else {
+      rotatedCanvas = document.createElement("canvas");
+      rotatedCanvas.width = rotatedSize.width;
+      rotatedCanvas.height = rotatedSize.height;
+    }
+
+    const rotCtx = rotatedCanvas.getContext("2d") as
+      | CanvasRenderingContext2D
+      | OffscreenCanvasRenderingContext2D;
+
+    if (!rotCtx) {
+      throw new Error("Failed to initialize rotated canvas context.");
+    }
+
+    rotCtx.imageSmoothingEnabled = true;
+    rotCtx.imageSmoothingQuality = "high";
+
+    // Position origin and apply 90° step rotation
+    rotCtx.save();
+    if (rotation === 90) {
+      rotCtx.translate(rotatedSize.width, 0);
+      rotCtx.rotate((90 * Math.PI) / 180);
+    } else if (rotation === 180) {
+      rotCtx.translate(rotatedSize.width, rotatedSize.height);
+      rotCtx.rotate((180 * Math.PI) / 180);
+    } else if (rotation === 270) {
+      rotCtx.translate(0, rotatedSize.height);
+      rotCtx.rotate((270 * Math.PI) / 180);
+    }
+
+    rotCtx.drawImage(source, 0, 0, nativeWidth, nativeHeight);
+    rotCtx.restore();
+    cropSource = rotatedCanvas;
   }
-
-  const rotCtx = rotatedCanvas.getContext("2d") as
-    | CanvasRenderingContext2D
-    | OffscreenCanvasRenderingContext2D;
-
-  if (!rotCtx) {
-    throw new Error("Failed to initialize rotated canvas context.");
-  }
-
-  rotCtx.imageSmoothingEnabled = true;
-  rotCtx.imageSmoothingQuality = "high";
-
-  // Position origin and apply 90° step rotation
-  rotCtx.save();
-  if (rotation === 90) {
-    rotCtx.translate(rotatedSize.width, 0);
-    rotCtx.rotate((90 * Math.PI) / 180);
-  } else if (rotation === 180) {
-    rotCtx.translate(rotatedSize.width, rotatedSize.height);
-    rotCtx.rotate((180 * Math.PI) / 180);
-  } else if (rotation === 270) {
-    rotCtx.translate(0, rotatedSize.height);
-    rotCtx.rotate((270 * Math.PI) / 180);
-  }
-
-  rotCtx.drawImage(source, 0, 0, nativeWidth, nativeHeight);
-  rotCtx.restore();
 
   // 2. Render final cropped canvas buffer (with optional ISO CR80 normalization)
   const isCR80 = options.normalizeCR80 ?? false;
-  const outW = isCR80 ? CR80_TARGET_WIDTH_PX : cropW;
-  const outH = isCR80 ? CR80_TARGET_HEIGHT_PX : cropH;
-  const cr80Scaling = isCR80 ? calculateCR80Scaling(cropW, cropH) : null;
+  const effectiveCropDpi = Math.max((cropW / 85.60) * 25.4, (cropH / 53.98) * 25.4);
+  const targetDpi = options.targetDpi ?? (effectiveCropDpi >= 450 ? 600 : 300);
+  const cr80Scaling = isCR80 ? calculateCR80Scaling(cropW, cropH, targetDpi) : null;
+  const outW = isCR80 ? cr80Scaling!.targetWidth : cropW;
+  const outH = isCR80 ? cr80Scaling!.targetHeight : cropH;
+  const cornerRadiusPx = Math.round((3.18 / 25.4) * targetDpi);
 
   let outputCanvas: HTMLCanvasElement | OffscreenCanvas;
   if (typeof OffscreenCanvas !== "undefined") {
@@ -272,9 +284,9 @@ export async function renderDocumentCrop(
     outCtx.save();
     outCtx.beginPath();
     if (typeof outCtx.roundRect === "function") {
-      outCtx.roundRect(0, 0, outW, outH, CR80_CORNER_RADIUS_PX);
+      outCtx.roundRect(0, 0, outW, outH, cornerRadiusPx);
     } else {
-      const r = CR80_CORNER_RADIUS_PX;
+      const r = cornerRadiusPx;
       outCtx.moveTo(r, 0);
       outCtx.lineTo(outW - r, 0);
       outCtx.arcTo(outW, 0, outW, r, r);
@@ -289,10 +301,10 @@ export async function renderDocumentCrop(
     outCtx.clip();
   }
 
-  // Draw slice from rotated canvas onto cropped output canvas
+  // Draw slice from source onto cropped output canvas
   if (cr80Scaling) {
     outCtx.drawImage(
-      rotatedCanvas,
+      cropSource,
       cropX,
       cropY,
       cropW,
@@ -308,7 +320,7 @@ export async function renderDocumentCrop(
     // without cropping sides or stretching interior card content.
     if (cr80Scaling.padVertical > 0) {
       outCtx.drawImage(
-        rotatedCanvas,
+        cropSource,
         cropX,
         cropY,
         cropW,
@@ -319,10 +331,10 @@ export async function renderDocumentCrop(
         cr80Scaling.drawY
       );
       const bottomCardY = cr80Scaling.drawY + cr80Scaling.drawHeight;
-      const bottomRemaining = CR80_TARGET_HEIGHT_PX - bottomCardY;
+      const bottomRemaining = outH - bottomCardY;
       if (bottomRemaining > 0) {
         outCtx.drawImage(
-          rotatedCanvas,
+          cropSource,
           cropX,
           cropY + cropH - 1,
           cropW,
@@ -336,7 +348,7 @@ export async function renderDocumentCrop(
     }
   } else {
     outCtx.drawImage(
-      rotatedCanvas,
+      cropSource,
       cropX,
       cropY,
       cropW,

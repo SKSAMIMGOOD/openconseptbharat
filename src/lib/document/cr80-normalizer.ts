@@ -43,6 +43,7 @@ export interface CR80NormalizationOptions {
   backgroundColor?: string; // Default: "#ffffff"
   mimeType?: "image/png" | "image/jpeg";
   quality?: number;
+  targetDpi?: number;
 }
 
 export interface CR80RenderResult {
@@ -55,20 +56,25 @@ export interface CR80RenderResult {
 /**
  * Calculates proportional placement geometry for scaling a cropped region to CR80 dimensions.
  * Pure mathematical computation — fully compatible with both Node.js and Browser environments.
+ * Supports standard 300 DPI (1011 x 638 px) by default or arbitrary target DPI (e.g. 600 DPI -> 2022 x 1276 px).
  */
 export function calculateCR80Scaling(
   cropWidth: number,
-  cropHeight: number
+  cropHeight: number,
+  targetDpi: number = 300
 ): CR80NormalizationGeometry {
+  const targetWidth = targetDpi === 300 ? CR80_TARGET_WIDTH_PX : Math.round(CR80_TARGET_WIDTH_PX * (targetDpi / 300));
+  const targetHeight = targetDpi === 300 ? CR80_TARGET_HEIGHT_PX : Math.round(CR80_TARGET_HEIGHT_PX * (targetDpi / 300));
+
   if (cropWidth <= 0 || cropHeight <= 0) {
     return {
-      targetWidth: CR80_TARGET_WIDTH_PX,
-      targetHeight: CR80_TARGET_HEIGHT_PX,
+      targetWidth,
+      targetHeight,
       targetAspectRatio: CR80_TARGET_ASPECT_RATIO,
       drawX: 0,
       drawY: 0,
-      drawWidth: CR80_TARGET_WIDTH_PX,
-      drawHeight: CR80_TARGET_HEIGHT_PX,
+      drawWidth: targetWidth,
+      drawHeight: targetHeight,
       scaleFactor: 1,
       padHorizontal: 0,
       padVertical: 0,
@@ -76,24 +82,24 @@ export function calculateCR80Scaling(
     };
   }
 
-  // Calculate proportional scale to fit within 1011 x 638 without clipping
-  const scaleX = CR80_TARGET_WIDTH_PX / cropWidth;
-  const scaleY = CR80_TARGET_HEIGHT_PX / cropHeight;
+  // Calculate proportional scale to fit within target dimensions without clipping
+  const scaleX = targetWidth / cropWidth;
+  const scaleY = targetHeight / cropHeight;
   const uniformScale = Math.min(scaleX, scaleY);
 
-  const drawWidth = Math.min(CR80_TARGET_WIDTH_PX, Math.round(cropWidth * uniformScale));
-  const drawHeight = Math.min(CR80_TARGET_HEIGHT_PX, Math.round(cropHeight * uniformScale));
+  const drawWidth = Math.min(targetWidth, Math.round(cropWidth * uniformScale));
+  const drawHeight = Math.min(targetHeight, Math.round(cropHeight * uniformScale));
 
-  // Center the proportionally scaled card inside the 1011 x 638 frame
-  const padHorizontal = Math.max(0, CR80_TARGET_WIDTH_PX - drawWidth);
-  const padVertical = Math.max(0, CR80_TARGET_HEIGHT_PX - drawHeight);
+  // Center the proportionally scaled card inside the target frame
+  const padHorizontal = Math.max(0, targetWidth - drawWidth);
+  const padVertical = Math.max(0, targetHeight - drawHeight);
 
   const drawX = Math.round(padHorizontal / 2);
   const drawY = Math.round(padVertical / 2);
 
   return {
-    targetWidth: CR80_TARGET_WIDTH_PX,
-    targetHeight: CR80_TARGET_HEIGHT_PX,
+    targetWidth,
+    targetHeight,
     targetAspectRatio: CR80_TARGET_ASPECT_RATIO,
     drawX,
     drawY,
@@ -107,7 +113,8 @@ export function calculateCR80Scaling(
 }
 
 /**
- * Normalizes an image or canvas crop to exact ISO CR80 (1011 x 638 px at 300 DPI)
+ * Normalizes an image or canvas crop to exact ISO CR80 (85.60 x 53.98 mm)
+ * preserving high resolution (600 DPI for high-res sources, 300 DPI standard)
  * in browser / offscreen canvas environments.
  */
 export async function renderCR80NormalizedCrop(
@@ -119,7 +126,12 @@ export async function renderCR80NormalizedCrop(
     throw new Error("Canvas environment required for CR80 normalization.");
   }
 
-  const geometry = calculateCR80Scaling(crop.width, crop.height);
+  const effectiveCropDpi = Math.max((crop.width / 85.60) * 25.4, (crop.height / 53.98) * 25.4);
+  const targetDpi = options.targetDpi ?? (effectiveCropDpi >= 450 ? 600 : 300);
+  const geometry = calculateCR80Scaling(crop.width, crop.height, targetDpi);
+  const targetW = geometry.targetWidth;
+  const targetH = geometry.targetHeight;
+  const cornerRadiusPx = Math.round((3.18 / 25.4) * targetDpi);
   const bgColor = options.backgroundColor ?? "#ffffff";
   const mimeType = options.mimeType ?? "image/png";
   const quality = options.quality ?? 1.0;
@@ -127,11 +139,11 @@ export async function renderCR80NormalizedCrop(
 
   let canvas: HTMLCanvasElement | OffscreenCanvas;
   if (typeof OffscreenCanvas !== "undefined") {
-    canvas = new OffscreenCanvas(CR80_TARGET_WIDTH_PX, CR80_TARGET_HEIGHT_PX);
+    canvas = new OffscreenCanvas(targetW, targetH);
   } else {
     canvas = document.createElement("canvas");
-    canvas.width = CR80_TARGET_WIDTH_PX;
-    canvas.height = CR80_TARGET_HEIGHT_PX;
+    canvas.width = targetW;
+    canvas.height = targetH;
   }
 
   const ctx = canvas.getContext("2d") as
@@ -147,19 +159,19 @@ export async function renderCR80NormalizedCrop(
 
   // 1. Fill background with specified background color
   ctx.fillStyle = bgColor;
-  ctx.fillRect(0, 0, CR80_TARGET_WIDTH_PX, CR80_TARGET_HEIGHT_PX);
+  ctx.fillRect(0, 0, targetW, targetH);
 
   // 2. If rounded corners requested, apply path clipping
   if (applyCorners) {
     ctx.save();
     ctx.beginPath();
     if (typeof ctx.roundRect === "function") {
-      ctx.roundRect(0, 0, CR80_TARGET_WIDTH_PX, CR80_TARGET_HEIGHT_PX, CR80_CORNER_RADIUS_PX);
+      ctx.roundRect(0, 0, targetW, targetH, cornerRadiusPx);
     } else {
       // Manual rounded rect fallback
-      const r = CR80_CORNER_RADIUS_PX;
-      const w = CR80_TARGET_WIDTH_PX;
-      const h = CR80_TARGET_HEIGHT_PX;
+      const r = cornerRadiusPx;
+      const w = targetW;
+      const h = targetH;
       ctx.moveTo(r, 0);
       ctx.lineTo(w - r, 0);
       ctx.arcTo(w, 0, w, r, r);
@@ -188,7 +200,7 @@ export async function renderCR80NormalizedCrop(
   );
 
   // Extend top and bottom edges using the card's edge pixels for cards wider than CR80
-  // (e.g. Ration Card artwork aspect 1.669, 78.1 x 46.8 mm) to seamlessly fill 54 mm (638 px)
+  // (e.g. Ration Card artwork aspect 1.669, 78.1 x 46.8 mm) to seamlessly fill CR80 height
   // without cropping sides or stretching interior card content.
   if (geometry.padVertical > 0) {
     // Extend top edge upward
@@ -205,7 +217,7 @@ export async function renderCR80NormalizedCrop(
     );
     // Extend bottom edge downward
     const bottomCardY = geometry.drawY + geometry.drawHeight;
-    const bottomRemaining = CR80_TARGET_HEIGHT_PX - bottomCardY;
+    const bottomRemaining = targetH - bottomCardY;
     if (bottomRemaining > 0) {
       ctx.drawImage(
         sourceImage,
@@ -248,9 +260,9 @@ export async function renderCR80NormalizedCrop(
     blob,
     previewUrl,
     dimensions: {
-      width: CR80_TARGET_WIDTH_PX,
-      height: CR80_TARGET_HEIGHT_PX,
-      aspectRatio: CR80_TARGET_ASPECT_RATIO,
+      width: targetW,
+      height: targetH,
+      aspectRatio: targetW / targetH,
     },
     geometry,
   };

@@ -265,13 +265,15 @@ export function useDocumentStudio(
       sourceWidth: number,
       sourceHeight: number,
       crop: CropCoordinates,
-      rotation: number
+      rotation: number,
+      targetDpi?: number
     ) => {
       const img = await loadImageElement(sourceUrl);
       return renderDocumentCrop(img, sourceWidth, sourceHeight, {
         crop,
         rotation,
         normalizeCR80: true, // Universal ISO/IEC 7810 ID-1 (CR80) standardization
+        targetDpi,
       });
     },
     []
@@ -321,11 +323,13 @@ export function useDocumentStudio(
         initialFrontCropRef.current = detection.frontCrop;
         initialBackCropRef.current = detection.backCrop;
 
-        // Render Front crop standardized to CR80
+        // Render Front crop standardized to CR80 preserving high DPI
+        const frontDpi = frontRef.current.printSettings?.dpi;
         const frontResult = await renderDocumentCrop(img, sourceWidth, sourceHeight, {
           crop: detection.frontCrop,
           rotation: 0,
           normalizeCR80: true,
+          targetDpi: frontDpi && frontDpi >= 600 ? frontDpi : undefined,
         });
 
         // Re-apply existing front enhancements if active
@@ -389,10 +393,12 @@ export function useDocumentStudio(
 
         // Render Back crop if document is dual-sided
         if (!singleSided && detection.backCrop) {
+          const backDpi = backRef.current.printSettings?.dpi;
           const backResult = await renderDocumentCrop(img, sourceWidth, sourceHeight, {
             crop: detection.backCrop,
             rotation: 0,
             normalizeCR80: true,
+            targetDpi: backDpi && backDpi >= 600 ? backDpi : undefined,
           });
 
           let backEnhancedRes: { previewUrl: string; blob: Blob } | null = null;
@@ -1020,7 +1026,8 @@ export function useDocumentStudio(
           source.dimensions.width,
           source.dimensions.height,
           crop,
-          rotation
+          rotation,
+          currentSide.printSettings?.dpi
         );
 
         if (currentSide.croppedPreviewUrl) {
@@ -1093,7 +1100,8 @@ export function useDocumentStudio(
           source.dimensions.width,
           source.dimensions.height,
           currentSide.crop,
-          newRotation
+          newRotation,
+          currentSide.printSettings?.dpi
         );
 
         if (currentSide.croppedPreviewUrl) {

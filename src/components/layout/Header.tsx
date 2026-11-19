@@ -45,14 +45,14 @@ const PRIMARY_NAV_LINKS: NavLinkItem[] = [
 ];
 
 const FEATURED_DRAWER_TOOLS = [
-  { name: "Document Studio", route: "/tools/document-studio", icon: FileCheck },
-  { name: "Professional Photo Studio", route: "/tools/photo-studio", icon: Camera },
-  { name: "AI Background Remover", route: "/tools/background-remover", icon: Scissors },
-  { name: "Multiple Photo Maker", route: "/tools/multiple-photo-maker", icon: Printer },
-  { name: "Advanced Photo Editor", route: "/tools/photo-editor", icon: SlidersHorizontal },
-  { name: "PAN Card Crop", route: "/tools/pan-card-crop", icon: CreditCard },
-  { name: "Aadhaar Card Crop", route: "/tools/aadhaar-card-crop", icon: CreditCard },
-  { name: "Resume / CV Maker", route: "/tools/resume-maker", icon: FileText },
+  { name: "Free Document Studio", route: "/tools/document-studio", icon: FileCheck },
+  { name: "Free Passport Photo Studio", route: "/tools/photo-studio", icon: Camera },
+  { name: "Free Background Remover", route: "/tools/background-remover", icon: Scissors },
+  { name: "Free Multiple Photo Maker", route: "/tools/multiple-photo-maker", icon: Printer },
+  { name: "Free Advanced Photo Editor", route: "/tools/photo-editor", icon: SlidersHorizontal },
+  { name: "Free PAN Card Crop Tool", route: "/tools/pan-card-crop", icon: CreditCard },
+  { name: "Free Aadhaar Card Crop Tool", route: "/tools/aadhaar-card-crop", icon: CreditCard },
+  { name: "Free Resume / CV Maker", route: "/tools/resume-maker", icon: FileText },
 ];
 
 export const Header: React.FC = () => {

@@ -173,6 +173,7 @@ export interface PdfJsPageProxy {
   render: (params: {
     canvasContext: CanvasRenderingContext2D;
     viewport: { width: number; height: number };
+    intent?: "display" | "print" | string;
   }) => { promise: Promise<void> };
 }
 
@@ -644,13 +645,17 @@ export async function openPdfDocumentSession(
   return initialPromise;
 }
 
+export const DEFAULT_PDF_RENDER_DPI = 600;
+export const DEFAULT_PDF_RENDER_SCALE = DEFAULT_PDF_RENDER_DPI / 72; // ~8.333333 scale for 600 DPI crisp rasterization
+
 /**
  * Renders a specified page from an already-loaded PDF.js document proxy to an image Blob.
+ * Defaults to 600 DPI high-resolution rasterization to preserve fine Hindi & English text, QR codes, and logos.
  */
 export async function renderPdfDocumentPageToBlob(
   pdfDoc: PdfJsDocumentProxy,
   pageNumber: number = 1,
-  scale: number = 2.0 // 2.0 scale provides crisp rendering for cards & high DPI text
+  scale: number = DEFAULT_PDF_RENDER_SCALE
 ): Promise<{ blob: Blob; width: number; height: number; pageNumber: number }> {
   if (typeof document === "undefined") {
     throw new Error("Client browser environment required for PDF rendering.");
@@ -660,7 +665,16 @@ export async function renderPdfDocumentPageToBlob(
   const safePageNum = Math.min(Math.max(1, pageNumber), totalPages);
   const page = await pdfDoc.getPage(safePageNum);
 
-  const viewport = page.getViewport({ scale });
+  // Compute scale, respecting max safe canvas dimension (8192px) to prevent browser OOM on giant sheets
+  const baseViewport = page.getViewport({ scale: 1.0 });
+  const maxDimension = 8192;
+  const requestedScale = scale > 0 ? scale : DEFAULT_PDF_RENDER_SCALE;
+  const maxPageDim = Math.max(baseViewport.width, baseViewport.height);
+  const effectiveScale = maxPageDim * requestedScale > maxDimension
+    ? maxDimension / maxPageDim
+    : requestedScale;
+
+  const viewport = page.getViewport({ scale: effectiveScale });
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(viewport.width);
   canvas.height = Math.round(viewport.height);
@@ -670,6 +684,9 @@ export async function renderPdfDocumentPageToBlob(
     throw new Error("Failed to initialize canvas 2D context for PDF rendering.");
   }
 
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+
   // Fill canvas with white background before rendering
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -677,6 +694,7 @@ export async function renderPdfDocumentPageToBlob(
   await page.render({
     canvasContext: ctx,
     viewport,
+    intent: "print",
   }).promise;
 
   return new Promise((resolve, reject) => {
@@ -705,7 +723,7 @@ export async function renderPdfDocumentPageToBlob(
 export async function renderPdfPageToBlob(
   file: File,
   pageNumber: number = 1,
-  scale: number = 2.0 // 2.0 scale provides crisp rendering for cards & high DPI text
+  scale: number = DEFAULT_PDF_RENDER_SCALE
 ): Promise<{ blob: Blob; width: number; height: number }> {
   if (typeof window === "undefined" || typeof document === "undefined") {
     throw new Error("Client browser environment required for PDF rendering.");

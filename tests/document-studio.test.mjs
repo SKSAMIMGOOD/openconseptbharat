@@ -326,7 +326,7 @@ describe("PHASE 08A — Tool Registry & Navigation Integration", () => {
   test("registers Document Studio in TOOLS registry", () => {
     const docStudio = getToolById("document-studio");
     assert.ok(docStudio, "Document Studio must be registered in TOOLS");
-    assert.equal(docStudio.name, "Document Studio");
+    assert.equal(docStudio.name, "Free Document Studio");
     assert.equal(docStudio.route, "/tools/document-studio");
     assert.equal(docStudio.status, "ready");
     assert.equal(docStudio.category, "utilities");

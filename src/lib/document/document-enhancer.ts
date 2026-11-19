@@ -216,6 +216,9 @@ export async function renderEnhancedCanvas(
     throw new Error("Failed to initialize canvas context for enhancement.");
   }
 
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+
   ctx.drawImage(source, 0, 0, width, height);
 
   if (isEnhancementActive(settings)) {
