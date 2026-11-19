@@ -25,9 +25,12 @@ export default function ContactPage() {
                 For architectural questions, security disclosures, or collaboration inquiries regarding Browser Utility Studio.
               </p>
             </div>
-            <div className="p-3 rounded-xl bg-surface-50 border border-surface-200 text-xs font-mono text-surface-800">
-              support@browserutilitystudio.local
-            </div>
+            <a
+              href="mailto:socialmediasamim@gmail.com"
+              className="p-3 rounded-xl bg-surface-50 hover:bg-surface-100 transition-colors border border-surface-200 text-xs font-mono text-brand-600 font-semibold block text-center"
+            >
+              socialmediasamim@gmail.com
+            </a>
           </div>
 
           <div className="bg-white rounded-2xl border border-surface-200/90 p-6 sm:p-8 shadow-subtle flex flex-col justify-between">

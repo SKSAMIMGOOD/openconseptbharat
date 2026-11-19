@@ -9,6 +9,43 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  async redirects() {
+    return [
+      {
+        source: "/:path*",
+        has: [
+          {
+            type: "host",
+            value: "printreadydesigns.in",
+          },
+        ],
+        destination: "https://www.printreadydesigns.in/:path*",
+        permanent: true,
+      },
+      {
+        source: "/:path*",
+        has: [
+          {
+            type: "host",
+            value: "browserutilitystudio.com",
+          },
+        ],
+        destination: "https://www.printreadydesigns.in/:path*",
+        permanent: true,
+      },
+      {
+        source: "/:path*",
+        has: [
+          {
+            type: "host",
+            value: "www.browserutilitystudio.com",
+          },
+        ],
+        destination: "https://www.printreadydesigns.in/:path*",
+        permanent: true,
+      },
+    ];
+  },
   webpack: (config, { isServer }) => {
     config.resolve.alias = {
       ...config.resolve.alias,

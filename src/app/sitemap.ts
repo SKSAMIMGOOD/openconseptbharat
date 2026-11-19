@@ -1,8 +1,9 @@
 import { MetadataRoute } from "next";
 import { TOOLS } from "@/constants/tools";
+import { SITE_URL } from "@/lib/seo/structured-data";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://browserutilitystudio.com";
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || SITE_URL;
   const lastModified = new Date();
 
   const coreRoutes: MetadataRoute.Sitemap = [

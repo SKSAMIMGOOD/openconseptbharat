@@ -1,6 +1,6 @@
 import { ToolMetadata } from "@/types/tools";
 
-export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://browserutilitystudio.com";
+export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.printreadydesigns.in";
 
 export function getWebsiteStructuredData(baseUrl = SITE_URL) {
   return {
