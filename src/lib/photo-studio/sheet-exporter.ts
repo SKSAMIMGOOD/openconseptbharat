@@ -12,6 +12,7 @@ import {
 } from "./sheet-renderer.ts";
 import { exportCanvasToBlob, downloadImageBlob } from "../image/exporter.ts";
 import { releaseCanvasBuffer } from "../utils/memory.ts";
+import { createZipArchive, type ZipEntry } from "../utils/zip.ts";
 import { generateSheetFileName } from "./sheet-calculator.ts";
 export { generateSheetFileName };
 
@@ -171,6 +172,113 @@ export async function exportMultiSheetAsPdf(
     pageHeightPt: firstLayout.pageHeightPt,
     pageCount: pages.length,
     sizeBytes: pdfBlob.size,
+  };
+}
+
+/**
+ * Exports multiple physical sheets as individual lossless PNG images (or packaged into a ZIP archive).
+ * - Single-page sheet: outputs a single high-quality PNG Blob.
+ * - Multi-page sheet: exports every page as an individual PNG and packages them into one ZIP file.
+ *
+ * Requirements:
+ * - 300 DPI lossless PNG output with embedded pHYs chunk.
+ * - Exact physical page dimensions and layout preservation.
+ * - Meaningful filenames: e.g. photo-sheet-a4-page-1.png, photo-sheet-4x6-page-1.png.
+ * - Deterministic memory cleanup of high-resolution canvas buffers between pages.
+ */
+export async function exportMultiSheetAsPng(
+  pages: MultiSheetPdfPageInput[],
+  config: PhotoSheetConfig,
+  options: Omit<SheetExportOptions, "format"> & { format?: "image/png" } = {}
+): Promise<SheetExportResult> {
+  if (pages.length === 0) {
+    throw new Error("No pages provided for multi-sheet PNG export.");
+  }
+
+  const firstLayout = pages[0].layout;
+  const paperName = firstLayout.paperSize === "a4" ? "a4" : "4x6";
+  const includeGuides = options.includeCutGuides ?? config.cutGuides.includeInExport;
+
+  // Case 1: Single-page sheet -> return single lossless PNG file
+  if (pages.length === 1) {
+    const pageItem = pages[0];
+    const masterCanvas = renderMasterSheetCanvas(
+      pageItem.imageSource,
+      pageItem.layout,
+      config.cutGuides,
+      includeGuides
+    );
+
+    try {
+      const blob = await exportCanvasToBlob(masterCanvas, {
+        format: "image/png",
+        backgroundColor: "#ffffff",
+        dpi: pageItem.layout.dpi,
+      });
+
+      const fileName =
+        options.fileName ||
+        `photo-sheet-${paperName}-page-1.png`;
+
+      return {
+        blob,
+        fileName,
+        format: "image/png",
+        widthPx: pageItem.layout.sheetWidthPx,
+        heightPx: pageItem.layout.sheetHeightPx,
+        pageCount: 1,
+        sizeBytes: blob.size,
+      };
+    } finally {
+      releaseCanvasBuffer(masterCanvas);
+    }
+  }
+
+  // Case 2: Multi-page sheet -> export every page as an individual PNG and package into one ZIP file
+  const zipEntries: ZipEntry[] = [];
+
+  for (let idx = 0; idx < pages.length; idx++) {
+    const pageItem = pages[idx];
+    const masterCanvas = renderMasterSheetCanvas(
+      pageItem.imageSource,
+      pageItem.layout,
+      config.cutGuides,
+      includeGuides
+    );
+
+    try {
+      const pageBlob = await exportCanvasToBlob(masterCanvas, {
+        format: "image/png",
+        backgroundColor: "#ffffff",
+        dpi: pageItem.layout.dpi,
+      });
+
+      const pageBytes = new Uint8Array(await pageBlob.arrayBuffer());
+      const pageFileName = `photo-sheet-${paperName}-page-${idx + 1}.png`;
+
+      zipEntries.push({
+        name: pageFileName,
+        data: pageBytes,
+      });
+    } finally {
+      // Deterministically release each canvas buffer before rendering the next page
+      releaseCanvasBuffer(masterCanvas);
+    }
+  }
+
+  const zipBlob = createZipArchive(zipEntries);
+  const zipFileName =
+    options.fileName ||
+    `photo-sheet-${paperName}-pages.zip`;
+
+  return {
+    blob: zipBlob,
+    fileName: zipFileName,
+    format: "application/zip",
+    widthPx: firstLayout.sheetWidthPx,
+    heightPx: firstLayout.sheetHeightPx,
+    pageCount: pages.length,
+    sizeBytes: zipBlob.size,
   };
 }
 

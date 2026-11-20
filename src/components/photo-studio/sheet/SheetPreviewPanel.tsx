@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   Printer,
   FileCheck,
+  FileText,
   AlertCircle,
   AlertTriangle,
   RefreshCw,
@@ -30,6 +31,8 @@ export interface SheetPreviewPanelProps {
   exportFormat: SheetExportFormat;
   isExporting: boolean;
   onExportClick: () => void;
+  onExportPng?: () => void;
+  onExportPdf?: () => void;
   onPrintClick?: () => void;
   onOpenPrintPreview?: () => void;
   className?: string;
@@ -42,6 +45,8 @@ export const SheetPreviewPanel: React.FC<SheetPreviewPanelProps> = ({
   exportFormat,
   isExporting,
   onExportClick,
+  onExportPng,
+  onExportPdf,
   onPrintClick,
   onOpenPrintPreview,
   className,
@@ -265,43 +270,71 @@ export const SheetPreviewPanel: React.FC<SheetPreviewPanelProps> = ({
           </div>
         </div>
 
-        {/* Primary Action Buttons: Print Sheet & Download Sheet */}
-        <div className="pt-2 space-y-2.5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {onPrintClick && (
-              <button
-                type="button"
-                onClick={onPrintClick}
-                disabled={isExporting || layout.totalPhotos === 0 || layout.isOverflowing}
-                className="w-full py-4 px-4 rounded-2xl bg-surface-900 hover:bg-black text-white font-bold text-sm sm:text-base flex items-center justify-center gap-2 shadow-md transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none"
-              >
-                <Printer className="w-5 h-5 text-brand-400" />
-                <span>Print Sheet</span>
-              </button>
-            )}
-
+        {/* Primary Action Buttons: Print Sheet & Download Options */}
+        <div className="pt-2 space-y-3">
+          {onPrintClick && (
             <button
               type="button"
-              onClick={onExportClick}
+              onClick={onPrintClick}
               disabled={isExporting || layout.totalPhotos === 0 || layout.isOverflowing}
-              className={cn(
-                "w-full py-4 px-4 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg shadow-brand-600/25 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none",
-                !onPrintClick && "sm:col-span-2"
-              )}
+              className="w-full py-3.5 px-4 rounded-2xl bg-surface-900 hover:bg-black text-white font-bold text-sm sm:text-base flex items-center justify-center gap-2 shadow-md transition-all hover:scale-[1.005] active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none"
             >
-              {isExporting ? (
-                <>
-                  <RefreshCw className="w-5 h-5 animate-spin" />
-                  <span>Generating {formatLabel.split(" ")[0]}...</span>
-                </>
-              ) : (
-                <>
-                  <Download className="w-5 h-5" />
-                  <span>
-                    Download {layout.paperSize.toUpperCase()} ({formatLabel.split(" ")[0]})
+              <Printer className="w-5 h-5 text-brand-400" />
+              <span>Print Sheet</span>
+            </button>
+          )}
+
+          {/* Download Options: Download PNG (Recommended) & Download PDF */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* 1. Download PNG (Recommended) */}
+            <button
+              type="button"
+              onClick={onExportPng || onExportClick}
+              disabled={isExporting || layout.totalPhotos === 0 || layout.isOverflowing}
+              className="p-4 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-left shadow-lg shadow-brand-600/25 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none flex flex-col justify-between relative group"
+            >
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <div className="flex items-center gap-2">
+                    {isExporting ? (
+                      <RefreshCw className="w-4 h-4 animate-spin text-brand-200" />
+                    ) : (
+                      <Download className="w-4 h-4 text-brand-200" />
+                    )}
+                    <span className="text-sm font-bold text-white">Download PNG</span>
+                  </div>
+                  <span className="text-[10px] uppercase font-extrabold tracking-wider px-2 py-0.5 rounded-full bg-amber-400 text-amber-950 shadow-xs">
+                    Recommended
                   </span>
-                </>
-              )}
+                </div>
+                <p className="text-[11px] font-normal text-brand-100 leading-snug">
+                  High-quality image format, suitable for sharing, uploading and further image processing.
+                </p>
+              </div>
+            </button>
+
+            {/* 2. Download PDF */}
+            <button
+              type="button"
+              onClick={onExportPdf || onExportClick}
+              disabled={isExporting || layout.totalPhotos === 0 || layout.isOverflowing}
+              className="p-4 rounded-2xl bg-surface-50 hover:bg-surface-100 text-surface-900 border border-surface-300 font-bold text-left transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none flex flex-col justify-between group"
+            >
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <div className="flex items-center gap-2">
+                    {isExporting ? (
+                      <RefreshCw className="w-4 h-4 animate-spin text-surface-600" />
+                    ) : (
+                      <FileText className="w-4 h-4 text-surface-600" />
+                    )}
+                    <span className="text-sm font-bold text-surface-900">Download PDF</span>
+                  </div>
+                </div>
+                <p className="text-[11px] font-normal text-surface-600 leading-snug">
+                  Recommended for accurate physical printing and preserving page dimensions.
+                </p>
+              </div>
             </button>
           </div>
 

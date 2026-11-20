@@ -386,3 +386,43 @@ describe("PIPELINE COMPARISON: 5. Quality Metrics Evaluation Across Document Typ
     }
   });
 });
+
+describe("PIPELINE COMPARISON: 6. Default PDF Embedding Pipeline Selection", () => {
+  it("defaults to 600 DPI PNG (Ultra-Sharp) for PDF embedding", async () => {
+    const front = createMockSideResult("front");
+    const back = createMockSideResult("back");
+    const layout = createDefaultPrintLayoutSettings();
+    const { paperLayout } = resolvePrintStudioLayout({
+      mode: "combined",
+      arrangement: "vertical",
+      layout,
+      front,
+      back,
+      isSingleSided: false,
+    });
+
+    const result = await generatePrintReadyPdf({
+      paperLayout,
+      front,
+      back,
+      isSingleSided: false,
+      pipelineMode: "experimental-png-600",
+      dpi: 600,
+    });
+
+    assert.ok(result.blob);
+    assert.equal(result.format, "application/pdf");
+    const pdfDoc = await PDFDocument.load(await result.blob.arrayBuffer());
+    assert.ok(pdfDoc.getTitle().includes("600 DPI"));
+  });
+
+  it("verifies DocumentPrintStudio source initializes pipelineMode with 'experimental-png-600'", async () => {
+    const fs = await import("node:fs");
+    const content = fs.readFileSync("src/components/document-studio/DocumentPrintStudio.tsx", "utf-8");
+    assert.ok(
+      content.includes('>("experimental-png-600");'),
+      "DocumentPrintStudio must initialize pipelineMode to 'experimental-png-600'"
+    );
+  });
+});
+

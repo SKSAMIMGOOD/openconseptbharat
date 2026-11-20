@@ -23,7 +23,6 @@ import {
   Moon,
   Monitor,
 } from "lucide-react";
-import { PrivacyBadge } from "./PrivacyBadge";
 import { usePreferences } from "@/hooks/usePreferences";
 import { cn } from "@/lib/utils/cn";
 
@@ -112,119 +111,117 @@ export const Header: React.FC = () => {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-surface-200/80 dark:border-surface-800 bg-white/95 dark:bg-surface-900/95 backdrop-blur-md transition-colors duration-150">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
-        {/* Brand Logo & Name */}
-        <Link
-          href="/"
-          className="flex items-center gap-2.5 group focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded-xl py-1 shrink-0"
-        >
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 via-indigo-600 to-teal-500 text-white flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
-            <Layers className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-bold text-base sm:text-lg text-surface-900 dark:text-surface-100 tracking-tight">
-                Browser Utility Studio
-              </span>
-            </div>
-            <p className="hidden sm:block text-[11px] text-surface-500 dark:text-surface-400 font-medium">
-              Zero-Upload Client Processing
-            </p>
-          </div>
-        </Link>
-
-        {/* Desktop Navigation */}
-        <nav
-          className="hidden lg:flex items-center gap-1 xl:gap-2"
-          aria-label="Main Navigation"
-        >
-          {PRIMARY_NAV_LINKS.map((item) => {
-            const active = isActive(item.href);
-            return (
-              <Link
-                key={item.label}
-                href={item.href}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500",
-                  active
-                    ? "bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300"
-                    : "text-surface-600 hover:text-surface-900 hover:bg-surface-100 dark:text-surface-300 dark:hover:text-surface-100 dark:hover:bg-surface-800"
-                )}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Header Right Actions */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="hidden sm:block">
-            <PrivacyBadge />
-          </div>
-
-          {/* Theme Quick Toggle Button */}
-          {isLoaded && (
-            <button
-              type="button"
-              onClick={cycleTheme}
-              className="p-2 rounded-xl text-surface-600 hover:text-surface-900 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-surface-100 dark:hover:bg-surface-800 transition-colors border border-surface-200/80 dark:border-surface-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-              title={`Theme: ${settings.theme} (Click to toggle Light / Dark / System)`}
-              aria-label={`Current theme is ${settings.theme}. Toggle theme.`}
-            >
-              {settings.theme === "dark" ? (
-                <Moon className="w-4 h-4 text-brand-400" />
-              ) : settings.theme === "light" ? (
-                <Sun className="w-4 h-4 text-amber-500" />
-              ) : (
-                <Monitor className="w-4 h-4 text-surface-500 dark:text-surface-400" />
-              )}
-            </button>
-          )}
-
-          {/* Direct Settings Link Button */}
+    <header className="sticky top-0 z-50 w-full transition-colors duration-150">
+      <div className="w-full border-b border-surface-200/80 dark:border-surface-800 bg-white/95 dark:bg-surface-900/95 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
+          {/* Brand Logo & Name */}
           <Link
-            href="/settings"
-            className={cn(
-              "hidden sm:flex p-2 rounded-xl text-surface-600 hover:text-surface-900 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-surface-100 dark:hover:bg-surface-800 transition-colors border border-surface-200/80 dark:border-surface-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500",
-              pathname === "/settings" && "bg-brand-50 dark:bg-brand-950/60 text-brand-700 dark:text-brand-300 border-brand-200 dark:border-brand-800"
-            )}
-            title="Application Settings & User Preferences"
-            aria-label="Settings"
+            href="/"
+            className="flex items-center gap-2.5 group focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded-xl py-1 shrink-0"
           >
-            <Settings className="w-4 h-4" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 via-indigo-600 to-teal-500 text-white flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
+              <Layers className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold text-base sm:text-lg text-surface-900 dark:text-surface-100 tracking-tight">
+                  Browser Utility Studio
+                </span>
+              </div>
+              <p className="hidden sm:block text-[11px] text-surface-500 dark:text-surface-400 font-medium">
+                Zero-Upload Client Processing
+              </p>
+            </div>
           </Link>
 
-          {/* Mobile Menu Button */}
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden p-2 rounded-xl text-surface-600 hover:text-surface-900 hover:bg-surface-100 dark:text-surface-300 dark:hover:text-surface-100 dark:hover:bg-surface-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 border border-surface-200/80 dark:border-surface-700"
-            aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
-            aria-expanded={mobileMenuOpen}
-            aria-controls="mobile-navigation-drawer"
+          {/* Desktop Navigation */}
+          <nav
+            className="hidden lg:flex items-center gap-1 xl:gap-2"
+            aria-label="Main Navigation"
           >
-            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
+            {PRIMARY_NAV_LINKS.map((item) => {
+              const active = isActive(item.href);
+              return (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500",
+                    active
+                      ? "bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300"
+                      : "text-surface-600 hover:text-surface-900 hover:bg-surface-100 dark:text-surface-300 dark:hover:text-surface-100 dark:hover:bg-surface-800"
+                  )}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+
+          {/* Header Right Actions */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Theme Quick Toggle Button */}
+            {isLoaded && (
+              <button
+                type="button"
+                onClick={cycleTheme}
+                className="p-2 rounded-xl text-surface-600 hover:text-surface-900 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-surface-100 dark:hover:bg-surface-800 transition-colors border border-surface-200/80 dark:border-surface-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                title={`Theme: ${settings.theme} (Click to toggle Light / Dark / System)`}
+                aria-label={`Current theme is ${settings.theme}. Toggle theme.`}
+              >
+                {settings.theme === "dark" ? (
+                  <Moon className="w-4 h-4 text-brand-400" />
+                ) : settings.theme === "light" ? (
+                  <Sun className="w-4 h-4 text-amber-500" />
+                ) : (
+                  <Monitor className="w-4 h-4 text-surface-500 dark:text-surface-400" />
+                )}
+              </button>
+            )}
+
+            {/* Direct Settings Link Button */}
+            <Link
+              href="/settings"
+              className={cn(
+                "hidden sm:flex p-2 rounded-xl text-surface-600 hover:text-surface-900 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-surface-100 dark:hover:bg-surface-800 transition-colors border border-surface-200/80 dark:border-surface-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500",
+                pathname === "/settings" && "bg-brand-50 dark:bg-brand-950/60 text-brand-700 dark:text-brand-300 border-brand-200 dark:border-brand-800"
+              )}
+              title="Application Settings & User Preferences"
+              aria-label="Settings"
+            >
+              <Settings className="w-4 h-4" />
+            </Link>
+
+            {/* Mobile Menu Button */}
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="lg:hidden p-2 rounded-xl text-surface-600 hover:text-surface-900 hover:bg-surface-100 dark:text-surface-300 dark:hover:text-surface-100 dark:hover:bg-surface-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 border border-surface-200/80 dark:border-surface-700"
+              aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-navigation-drawer"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Mobile Navigation Drawer & Backdrop */}
+      {/* Mobile Navigation Dropdown & Backdrop */}
       {mobileMenuOpen && (
         <div
           id="mobile-navigation-drawer"
-          className="fixed inset-0 z-50 lg:hidden flex flex-col justify-end"
+          className="fixed inset-x-0 top-16 bottom-0 z-50 lg:hidden flex flex-col justify-start"
         >
           {/* Backdrop */}
           <div
-            className="fixed inset-0 bg-surface-900/60 backdrop-blur-sm transition-opacity"
+            className="fixed inset-0 top-16 bg-surface-900/60 backdrop-blur-sm transition-opacity"
             onClick={() => setMobileMenuOpen(false)}
             aria-hidden="true"
           />
 
-          {/* Drawer Content */}
-          <div className="relative bg-white dark:bg-surface-900 border-t border-surface-200 dark:border-surface-800 rounded-t-3xl p-6 shadow-2xl max-h-[85vh] overflow-y-auto z-10 animate-in slide-in-from-bottom duration-200">
+          {/* Dropdown Content */}
+          <div className="relative bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-800 rounded-b-2xl p-6 shadow-2xl max-h-[calc(100dvh-4rem)] max-h-[calc(100vh-4rem)] overflow-y-auto z-10 animate-in slide-in-from-top duration-200">
             <div className="flex items-center justify-between pb-4 border-b border-surface-100 dark:border-surface-800">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-brand-600 text-white flex items-center justify-center">

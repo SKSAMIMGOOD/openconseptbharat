@@ -25,6 +25,7 @@ import {
 } from "@/lib/photo-studio/sheet-renderer";
 import {
   exportMultiSheetAsPdf,
+  exportMultiSheetAsPng,
   exportSheetAsImage,
   downloadSheet,
 } from "@/lib/photo-studio/sheet-exporter";
@@ -325,7 +326,22 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
     );
   }, [croppedCanvas, multiSheetPages, sheetConfig, jpegQuality]);
 
-  // Handle Export Download (multi-page calibrated PDF or high-resolution raster image)
+  // Shared calibrated PNG generator used by Download PNG (single-page PNG or multi-page ZIP)
+  const generateMultiSheetPrintPng = useCallback(async (): Promise<SheetExportResult> => {
+    if (!croppedCanvas) {
+      throw new Error("Cropped photograph is not ready.");
+    }
+    return exportMultiSheetAsPng(
+      multiSheetPages.map((p) => ({ imageSource: croppedCanvas, layout: p.layout })),
+      sheetConfig,
+      {
+        format: "image/png",
+        includeCutGuides: sheetConfig.cutGuides.includeInExport,
+      }
+    );
+  }, [croppedCanvas, multiSheetPages, sheetConfig]);
+
+  // Handle Export Download (multi-page calibrated PDF, high-resolution PNG, or JPEG)
   const handleExport = useCallback(async () => {
     if (!croppedCanvas || layout.totalPhotos === 0 || layout.isOverflowing || isExporting) {
       return;
@@ -348,6 +364,16 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
         setExportMessage({
           type: "success",
           text: `Print-ready ${paperName} PDF exported successfully (${result.fileName}). Exact page dimensions: ${pageGeometry.dimensionsLabel} (${result.pageWidthPt} × ${result.pageHeightPt} pt). Total sheets: ${totalSheets}.`,
+        });
+      } else if (exportFormat === "image/png") {
+        const result = await generateMultiSheetPrintPng();
+        downloadSheet(result);
+        const isZip = result.pageCount && result.pageCount > 1;
+        setExportMessage({
+          type: "success",
+          text: isZip
+            ? `High-quality ${paperName} photo sheets exported as ZIP archive (${result.fileName}, ${result.pageCount} sheets at ${layout.dpi} DPI).`
+            : `High-quality ${paperName} photo sheet exported as PNG (${result.fileName}, ${result.widthPx} × ${result.heightPx} px at ${layout.dpi} DPI).`,
         });
       } else {
         const result = await exportSheetAsImage(
@@ -383,6 +409,42 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
     isExporting,
     multiSheetPages.length,
     generateMultiSheetPrintPdf,
+    generateMultiSheetPrintPng,
+  ]);
+
+  // Handle Direct Export as PNG (Recommended high-quality image format / multi-page ZIP)
+  const handleExportPng = useCallback(async () => {
+    if (!croppedCanvas || layout.totalPhotos === 0 || layout.isOverflowing || isExporting) {
+      return;
+    }
+
+    setIsExporting(true);
+    setExportMessage(null);
+    const paperName = (layout.paperSize || "a4") === "a4" ? "A4" : "4×6″";
+
+    try {
+      const result = await generateMultiSheetPrintPng();
+      downloadSheet(result);
+      const isZip = result.pageCount && result.pageCount > 1;
+      setExportMessage({
+        type: "success",
+        text: isZip
+          ? `High-quality ${paperName} photo sheets exported as ZIP archive (${result.fileName}, ${result.pageCount} sheets at ${layout.dpi} DPI).`
+          : `High-quality ${paperName} photo sheet exported as PNG (${result.fileName}, ${result.widthPx} × ${result.heightPx} px at ${layout.dpi} DPI).`,
+      });
+    } catch (err) {
+      setExportMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Failed to generate print PNG.",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  }, [
+    croppedCanvas,
+    layout,
+    isExporting,
+    generateMultiSheetPrintPng,
   ]);
 
   // Handle Direct Export as PDF (Calibrated multi-page print document)
@@ -641,6 +703,8 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
             onExportFormatChange={setExportFormat}
             onJpegQualityChange={setJpegQuality}
             onExportClick={handleExport}
+            onExportPng={handleExportPng}
+            onExportPdf={handleExportPdf}
             onPrintClick={handlePrintSheet}
             onOpenPrintPreview={() => setIsPrintPreviewOpen(true)}
             onNavigateToCrop={onNavigateToCrop}
@@ -656,6 +720,8 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
             exportFormat={exportFormat}
             isExporting={isExporting}
             onExportClick={handleExport}
+            onExportPng={handleExportPng}
+            onExportPdf={handleExportPdf}
             onPrintClick={handlePrintSheet}
             onOpenPrintPreview={() => setIsPrintPreviewOpen(true)}
           />
@@ -675,6 +741,10 @@ export const PhotoSheetWorkspace: React.FC<PhotoSheetWorkspaceProps> = ({
         onPrintNow={() => {
           setIsPrintPreviewOpen(false);
           handlePrintSheet();
+        }}
+        onDownloadPng={() => {
+          setIsPrintPreviewOpen(false);
+          handleExportPng();
         }}
         onDownloadPdf={() => {
           setIsPrintPreviewOpen(false);

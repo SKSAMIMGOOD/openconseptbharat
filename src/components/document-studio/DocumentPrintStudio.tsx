@@ -39,8 +39,11 @@ import {
 import {
   executeBrowserPrint,
   generatePrintReadyPdf,
+  generatePrintReadyPng,
   checkSourceResolutionAdequacy,
   downloadPdfBlob,
+  downloadPngBlob,
+  getPaperDimensionsInPixels,
 } from "@/lib/document/document-print-pdf";
 import { PrintContainer } from "@/components/common/PrintContainer";
 import { DocumentPrintPreviewModal } from "./DocumentPrintPreviewModal";
@@ -62,6 +65,7 @@ import {
   Sliders,
   Move,
   File,
+  FileImage,
   LayoutTemplate,
   Copy,
   Download,
@@ -114,13 +118,16 @@ export const DocumentPrintStudio: React.FC<DocumentPrintStudioProps> = ({
   // Phase 5 State: Printing, PDF Generation, Preview Modal, Feedback
   const [isPrinting, setIsPrinting] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [isGeneratingPng, setIsGeneratingPng] = useState(false);
+  const [exportFormat, setExportFormat] = useState<"png" | "pdf">("png");
+  const [exportDpi, setExportDpi] = useState<300 | 600>(600); // 600 DPI recommended default
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [printImageUrls, setPrintImageUrls] = useState<string[]>([]);
   const [errorNotice, setErrorNotice] = useState<string | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
   const [pipelineMode, setPipelineMode] = useState<
     "standard" | "experimental-png-300" | "experimental-png-600"
-  >("standard");
+  >("experimental-png-600");
 
   // Local layout fallback ensuring immediate reactivity even without external state updater
   const [localLayout, setLocalLayout] = useState<DocumentPrintLayoutSettings>(
@@ -285,6 +292,34 @@ export const DocumentPrintStudio: React.FC<DocumentPrintStudioProps> = ({
     }
   };
 
+  // Action: Download High-Resolution Lossless PNG
+  const handleDownloadPng = async (selectedDpi: 300 | 600 = exportDpi) => {
+    setIsGeneratingPng(true);
+    setErrorNotice(null);
+    setSuccessNotice(null);
+
+    try {
+      const result = await generatePrintReadyPng({
+        paperLayout,
+        front,
+        back,
+        isSingleSided,
+        docDef,
+        dpi: selectedDpi,
+        source,
+      });
+
+      downloadPngBlob(result.blob, result.fileName);
+      setSuccessNotice(
+        `High-resolution PNG downloaded: ${result.fileName} (${(result.sizeBytes / 1024).toFixed(1)} KB, ${result.widthPx} × ${result.heightPx} px, ${result.dpi} DPI).`
+      );
+    } catch (err) {
+      setErrorNotice(err instanceof Error ? err.message : "Failed to generate high-resolution PNG.");
+    } finally {
+      setIsGeneratingPng(false);
+    }
+  };
+
   // Phase 5 Action: Download Print-Ready PDF
   const handleDownloadPdf = async () => {
     setIsGeneratingPdf(true);
@@ -405,24 +440,40 @@ export const DocumentPrintStudio: React.FC<DocumentPrintStudioProps> = ({
                 <span>Print Preview</span>
               </button>
 
+              {/* Download High-Resolution Lossless PNG (Recommended) */}
+              <button
+                type="button"
+                onClick={() => handleDownloadPng(exportDpi)}
+                disabled={isGeneratingPng || isGeneratingPdf || isPrinting}
+                data-testid="download-png-button"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-extrabold bg-white dark:bg-surface-800 hover:bg-surface-100 dark:hover:bg-surface-700 text-surface-900 dark:text-surface-100 border border-brand-300 dark:border-brand-700/80 shadow-2xs transition-all disabled:opacity-50 ring-1 ring-brand-500/20"
+                title={`Download high-resolution lossless PNG (${exportDpi} DPI)`}
+              >
+                <Download className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400" />
+                <span>{isGeneratingPng ? "Generating PNG..." : `Download PNG (${exportDpi} DPI)`}</span>
+                <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-brand-100 dark:bg-brand-950 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-800 uppercase tracking-wider">
+                  Recommended
+                </span>
+              </button>
+
               {/* Download Print-Ready PDF */}
               <button
                 type="button"
                 onClick={handleDownloadPdf}
-                disabled={isGeneratingPdf || isPrinting}
+                disabled={isGeneratingPdf || isGeneratingPng || isPrinting}
                 data-testid="download-pdf-button"
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-white dark:bg-surface-800 hover:bg-surface-100 dark:hover:bg-surface-700 text-surface-800 dark:text-surface-200 border border-surface-300 dark:border-surface-600 shadow-2xs transition-all disabled:opacity-50"
                 title="Download local vector-calibrated PDF"
               >
-                <Download className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400" />
-                <span>{isGeneratingPdf ? "Generating..." : "Download Print-Ready PDF"}</span>
+                <Download className="w-3.5 h-3.5 text-surface-600 dark:text-surface-400" />
+                <span>{isGeneratingPdf ? "Generating..." : "Download PDF"}</span>
               </button>
 
               {/* Print Document */}
               <button
                 type="button"
                 onClick={handlePrintDocument}
-                disabled={isPrinting || isGeneratingPdf}
+                disabled={isPrinting || isGeneratingPdf || isGeneratingPng}
                 data-testid="print-document-button"
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold bg-brand-600 hover:bg-brand-700 text-white shadow-md shadow-brand-600/20 transition-all hover:scale-[1.02] disabled:opacity-50"
                 title="Print via browser native print dialog"
@@ -433,67 +484,177 @@ export const DocumentPrintStudio: React.FC<DocumentPrintStudioProps> = ({
             </div>
           </div>
 
-          {/* PDF Export Quality Engine (Standard vs Experimental High-Res Lossless PNG Intermediate) */}
+          {/* Download Format & Resolution Selection Area */}
           <div
-            data-testid="pdf-export-pipeline-selector"
-            className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-surface-50/80 dark:bg-surface-800/60 border border-surface-200/90 dark:border-surface-700/80 text-xs shadow-2xs"
+            data-testid="download-format-selection-area"
+            className="p-4 rounded-xl bg-surface-50/80 dark:bg-surface-800/60 border border-surface-200/90 dark:border-surface-700/80 text-xs shadow-2xs space-y-3"
           >
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-brand-600 dark:text-brand-400 shrink-0" />
-              <div>
-                <span className="font-bold text-surface-900 dark:text-surface-100 block">
-                  PDF Export Quality Engine
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-2.5">
+                <Sparkles className="w-4 h-4 text-brand-600 dark:text-brand-400 shrink-0 mt-0.5" />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold text-surface-900 dark:text-surface-100 text-sm">
+                      Export Format & Quality
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand-100 dark:bg-brand-950 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-800">
+                      High-Resolution Export
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-surface-600 dark:text-surface-400 mt-0.5">
+                    Recommended for high-quality image downloads. Choose 600 DPI for the best available detail.
+                  </p>
+                </div>
+              </div>
+
+              {/* Format Switcher (PNG vs PDF) */}
+              <div className="inline-flex items-center gap-1 p-1 bg-surface-200/70 dark:bg-surface-700/70 rounded-xl shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setExportFormat("png")}
+                  data-testid="format-select-png"
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5",
+                    exportFormat === "png"
+                      ? "bg-white dark:bg-surface-800 text-brand-700 dark:text-brand-300 shadow-2xs font-extrabold ring-1 ring-brand-500/20"
+                      : "text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-100"
+                  )}
+                  title="Lossless PNG: Recommended for high-quality image downloads"
+                >
+                  <FileImage className="w-3.5 h-3.5" />
+                  <span>PNG Image</span>
+                  <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-brand-100 dark:bg-brand-900 text-brand-700 dark:text-brand-300">
+                    Rec
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExportFormat("pdf")}
+                  data-testid="format-select-pdf"
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5",
+                    exportFormat === "pdf"
+                      ? "bg-white dark:bg-surface-800 text-brand-700 dark:text-brand-300 shadow-2xs font-extrabold ring-1 ring-brand-500/20"
+                      : "text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-100"
+                  )}
+                  title="PDF Document: Print-ready vector calibrated document"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>PDF Document</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Resolution Selector & Dimension Details */}
+            <div className="pt-2.5 border-t border-surface-200/70 dark:border-surface-700/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold text-surface-700 dark:text-surface-300">
+                  Export Resolution:
                 </span>
-                <span className="text-[11px] text-surface-500 dark:text-surface-400">
-                  Select export pipeline: preserve original text thickness and eliminate thinning
+                <div className="inline-flex items-center gap-1 p-0.5 bg-surface-200/60 dark:bg-surface-700/60 rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setExportDpi(600);
+                      setPipelineMode("experimental-png-600");
+                    }}
+                    data-testid="dpi-select-600"
+                    className={cn(
+                      "px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all",
+                      exportDpi === 600
+                        ? "bg-white dark:bg-surface-800 text-brand-700 dark:text-brand-300 shadow-2xs font-bold ring-1 ring-brand-500/20"
+                        : "text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-100"
+                    )}
+                    title="600 DPI — High quality (recommended for sharp text, fine Hindi characters, and QR codes)"
+                  >
+                    600 DPI (High Quality - Recommended)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setExportDpi(300);
+                      setPipelineMode("experimental-png-300");
+                    }}
+                    data-testid="dpi-select-300"
+                    className={cn(
+                      "px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all",
+                      exportDpi === 300
+                        ? "bg-white dark:bg-surface-800 text-brand-700 dark:text-brand-300 shadow-2xs font-bold"
+                        : "text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-100"
+                    )}
+                    title="300 DPI — Standard print quality"
+                  >
+                    300 DPI (Standard)
+                  </button>
+                </div>
+              </div>
+
+              {/* Pixel Dimension Info Pill */}
+              <div className="flex items-center gap-1.5 text-[11px] font-mono text-surface-500 dark:text-surface-400">
+                <span className="font-semibold text-surface-700 dark:text-surface-300">
+                  {paperLayout.paperSize.toUpperCase()}:
+                </span>
+                <span>
+                  {getPaperDimensionsInPixels(paperLayout.paperWidthMm, paperLayout.paperHeightMm, exportDpi).widthPx} × {getPaperDimensionsInPixels(paperLayout.paperWidthMm, paperLayout.paperHeightMm, exportDpi).heightPx} px
+                </span>
+                <span className="text-[10px] uppercase font-sans text-surface-400">
+                  ({exportFormat.toUpperCase()})
                 </span>
               </div>
             </div>
 
-            <div className="inline-flex items-center gap-1 p-1 bg-surface-200/70 dark:bg-surface-700/70 rounded-xl">
-              <button
-                type="button"
-                onClick={() => setPipelineMode("standard")}
-                data-testid="pipeline-mode-standard"
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all",
-                  pipelineMode === "standard"
-                    ? "bg-white dark:bg-surface-800 text-brand-700 dark:text-brand-300 shadow-2xs font-bold"
-                    : "text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-100"
-                )}
-                title="Standard export: Vector PDF for PDF uploads, direct card image for raster"
+            {/* If PDF is active, show PDF pipeline selector */}
+            {exportFormat === "pdf" && (
+              <div
+                data-testid="pdf-export-pipeline-selector"
+                className="pt-2 border-t border-surface-200/60 dark:border-surface-700/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
               >
-                Standard (Auto)
-              </button>
-              <button
-                type="button"
-                onClick={() => setPipelineMode("experimental-png-300")}
-                data-testid="pipeline-mode-png-300"
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all",
-                  pipelineMode === "experimental-png-300"
-                    ? "bg-white dark:bg-surface-800 text-brand-700 dark:text-brand-300 shadow-2xs font-bold"
-                    : "text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-100"
-                )}
-                title="Experimental 300 DPI: In-memory lossless PNG embedding without artificial sharpening"
-              >
-                300 DPI PNG
-              </button>
-              <button
-                type="button"
-                onClick={() => setPipelineMode("experimental-png-600")}
-                data-testid="pipeline-mode-png-600"
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all",
-                  pipelineMode === "experimental-png-600"
-                    ? "bg-white dark:bg-surface-800 text-brand-700 dark:text-brand-300 shadow-2xs font-bold ring-1 ring-brand-500/20"
-                    : "text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-100"
-                )}
-                title="Experimental 600 DPI: High-density lossless PNG embedding (preserves natural text stroke thickness, crisp Hindi characters, and QR codes)"
-              >
-                600 DPI PNG (Ultra-Sharp)
-              </button>
-            </div>
+                <span className="text-[11px] text-surface-600 dark:text-surface-400">
+                  PDF Embedding Pipeline:
+                </span>
+                <div className="inline-flex items-center gap-1 p-0.5 bg-surface-200/60 dark:bg-surface-700/60 rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => setPipelineMode("standard")}
+                    data-testid="pipeline-mode-standard"
+                    className={cn(
+                      "px-2 py-0.5 rounded text-[10px] font-semibold transition-all",
+                      pipelineMode === "standard"
+                        ? "bg-white dark:bg-surface-800 text-brand-700 dark:text-brand-300 shadow-2xs font-bold"
+                        : "text-surface-600 dark:text-surface-400 hover:text-surface-900"
+                    )}
+                  >
+                    Standard (Auto)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPipelineMode("experimental-png-300")}
+                    data-testid="pipeline-mode-png-300"
+                    className={cn(
+                      "px-2 py-0.5 rounded text-[10px] font-semibold transition-all",
+                      pipelineMode === "experimental-png-300"
+                        ? "bg-white dark:bg-surface-800 text-brand-700 dark:text-brand-300 shadow-2xs font-bold"
+                        : "text-surface-600 dark:text-surface-400 hover:text-surface-900"
+                    )}
+                  >
+                    300 DPI PNG
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPipelineMode("experimental-png-600")}
+                    data-testid="pipeline-mode-png-600"
+                    className={cn(
+                      "px-2 py-0.5 rounded text-[10px] font-semibold transition-all",
+                      pipelineMode === "experimental-png-600"
+                        ? "bg-white dark:bg-surface-800 text-brand-700 dark:text-brand-300 shadow-2xs font-bold"
+                        : "text-surface-600 dark:text-surface-400 hover:text-surface-900"
+                    )}
+                  >
+                    600 DPI PNG (Ultra-Sharp)
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Feedback Banners */}
@@ -1577,8 +1738,13 @@ export const DocumentPrintStudio: React.FC<DocumentPrintStudioProps> = ({
           setIsPreviewModalOpen(false);
           handleDownloadPdf();
         }}
+        onDownloadPng={() => {
+          setIsPreviewModalOpen(false);
+          handleDownloadPng(exportDpi);
+        }}
         isPrinting={isPrinting}
         isGeneratingPdf={isGeneratingPdf}
+        isGeneratingPng={isGeneratingPng}
         resolutionCheck={resolutionCheck}
       />
     </section>

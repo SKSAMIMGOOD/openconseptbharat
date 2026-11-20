@@ -30,8 +30,10 @@ export interface DocumentPrintPreviewModalProps {
   docDef: DocumentTypeDefinition;
   onPrint: () => void;
   onDownloadPdf: () => void;
+  onDownloadPng?: () => void;
   isPrinting?: boolean;
   isGeneratingPdf?: boolean;
+  isGeneratingPng?: boolean;
   resolutionCheck?: ResolutionAdequacyResult;
 }
 
@@ -44,8 +46,10 @@ export const DocumentPrintPreviewModal: React.FC<DocumentPrintPreviewModalProps>
   docDef,
   onPrint,
   onDownloadPdf,
+  onDownloadPng,
   isPrinting = false,
   isGeneratingPdf = false,
+  isGeneratingPng = false,
   resolutionCheck,
 }) => {
   // Close on Escape key
@@ -327,7 +331,22 @@ export const DocumentPrintPreviewModal: React.FC<DocumentPrintPreviewModalProps>
             Back to Editor
           </button>
 
-          <div className="flex items-center gap-2.5 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+            {/* Download High-Resolution Lossless PNG Button */}
+            {onDownloadPng && (
+              <button
+                type="button"
+                onClick={onDownloadPng}
+                disabled={isGeneratingPng || isGeneratingPdf || isPrinting}
+                data-testid="modal-download-png-button"
+                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white dark:bg-surface-700 hover:bg-surface-100 dark:hover:bg-surface-600 text-surface-900 dark:text-surface-100 font-extrabold text-xs border border-brand-300 dark:border-brand-700/80 shadow-xs transition-all disabled:opacity-50 ring-1 ring-brand-500/20"
+                title="Download high-resolution lossless PNG (600 DPI recommended)"
+              >
+                <Download className="w-4 h-4 text-brand-600 dark:text-brand-400" />
+                <span>{isGeneratingPng ? "Generating PNG..." : "Download PNG (600 DPI)"}</span>
+              </button>
+            )}
+
             {/* Download Print-Ready PDF Button */}
             <button
               type="button"

@@ -8,7 +8,7 @@ export type SheetDpiPreset = 150 | 200 | 300 | 600 | "custom";
 
 export type CutGuideStyle = "none" | "thin_solid" | "dashed" | "corner_crop_marks";
 
-export type SheetExportFormat = "application/pdf" | "image/png" | "image/jpeg";
+export type SheetExportFormat = "application/pdf" | "image/png" | "image/jpeg" | "application/zip";
 
 export interface SheetMargins {
   topMm: number;

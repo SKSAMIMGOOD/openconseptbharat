@@ -56,6 +56,8 @@ export interface SheetControlsPanelProps {
   onExportFormatChange: (format: SheetExportFormat) => void;
   onJpegQualityChange: (quality: number) => void;
   onExportClick: () => void;
+  onExportPng?: () => void;
+  onExportPdf?: () => void;
   onPrintClick?: () => void;
   onOpenPrintPreview?: () => void;
   onNavigateToCrop?: () => void;
@@ -73,6 +75,8 @@ export const SheetControlsPanel: React.FC<SheetControlsPanelProps> = ({
   onExportFormatChange,
   onJpegQualityChange,
   onExportClick,
+  onExportPng,
+  onExportPdf,
   onPrintClick,
   onOpenPrintPreview,
   onNavigateToCrop,
@@ -1080,7 +1084,7 @@ export const SheetControlsPanel: React.FC<SheetControlsPanelProps> = ({
             )}
           >
             <span className="block text-xs font-bold">PNG</span>
-            <span className="block text-[10px] text-surface-500">Lossless</span>
+            <span className="block text-[10px] text-brand-600 font-semibold">Recommended</span>
           </button>
         </div>
 
@@ -1107,12 +1111,36 @@ export const SheetControlsPanel: React.FC<SheetControlsPanelProps> = ({
 
         {/* Action Triggers in Controls Panel */}
         <div className="pt-2 border-t border-surface-100 space-y-2">
+          {onExportPng && (
+            <button
+              type="button"
+              onClick={onExportPng}
+              disabled={isExporting || layout.totalPhotos === 0 || layout.isOverflowing}
+              className="w-full py-3 px-4 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
+            >
+              <Download className="w-4 h-4 text-white" />
+              <span>Download PNG (Recommended)</span>
+            </button>
+          )}
+
+          {onExportPdf && (
+            <button
+              type="button"
+              onClick={onExportPdf}
+              disabled={isExporting || layout.totalPhotos === 0 || layout.isOverflowing}
+              className="w-full py-2.5 px-3 rounded-xl bg-surface-100 hover:bg-surface-200 text-surface-800 font-semibold text-xs flex items-center justify-center gap-2 transition-colors border border-surface-200 disabled:opacity-50"
+            >
+              <FileText className="w-3.5 h-3.5 text-surface-600" />
+              <span>Download PDF</span>
+            </button>
+          )}
+
           {onPrintClick && (
             <button
               type="button"
               onClick={onPrintClick}
               disabled={isExporting || layout.totalPhotos === 0 || layout.isOverflowing}
-              className="w-full py-3 px-4 rounded-xl bg-surface-900 hover:bg-black text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
+              className="w-full py-2.5 px-4 rounded-xl bg-surface-900 hover:bg-black text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
             >
               <Printer className="w-4 h-4 text-brand-400" />
               <span>Print Sheet Directly</span>

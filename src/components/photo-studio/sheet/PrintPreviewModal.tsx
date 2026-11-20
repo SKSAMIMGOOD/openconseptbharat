@@ -28,6 +28,7 @@ export interface PrintPreviewModalProps {
   layout: SheetCalculationResult;
   imageSource: any;
   onPrintNow: () => void;
+  onDownloadPng?: () => void;
   onDownloadPdf: () => void;
   isExporting?: boolean;
   totalPages?: number;
@@ -42,6 +43,7 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
   layout,
   imageSource,
   onPrintNow,
+  onDownloadPng,
   onDownloadPdf,
   isExporting = false,
   totalPages = 1,
@@ -273,6 +275,18 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
                   </>
                 )}
               </button>
+
+              {onDownloadPng && (
+                <button
+                  type="button"
+                  onClick={onDownloadPng}
+                  disabled={isExporting || layout.totalPhotos === 0}
+                  className="w-full py-3 px-4 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-950 font-bold text-xs flex items-center justify-center gap-2 transition-colors border border-amber-300"
+                >
+                  <Download className="w-4 h-4 text-amber-700" />
+                  <span>Download PNG (Recommended)</span>
+                </button>
+              )}
 
               <button
                 type="button"
