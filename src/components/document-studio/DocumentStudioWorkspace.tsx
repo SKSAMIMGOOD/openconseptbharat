@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef, useState } from "react";
+import Link from "next/link";
 import { useDocumentStudio } from "@/hooks/useDocumentStudio";
 import { DocumentSideWorkspace } from "./DocumentSideWorkspace";
 import { DocumentCropEditor } from "./DocumentCropEditor";
@@ -41,6 +42,7 @@ import {
   CheckCircle2,
   SlidersHorizontal,
   Printer,
+  Maximize2,
 } from "lucide-react";
 
 const LAYOUT_OPTIONS: Array<{
@@ -270,6 +272,25 @@ export const DocumentStudioWorkspace: React.FC<DocumentStudioWorkspaceProps> = (
                   <CheckCircle2 className="w-3.5 h-3.5" /> 100% In-Browser Private
                 </span>
               </div>
+            </div>
+
+            {/* Document Straightener Entry Point Banner */}
+            <div className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-800/60 text-xs">
+              <div className="flex items-center gap-2.5 text-blue-950 dark:text-blue-100">
+                <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0">
+                  <Maximize2 className="w-3.5 h-3.5" />
+                </div>
+                <span>
+                  <strong>Have a crooked or tilted mobile photograph?</strong> Try <strong>Document Straightener</strong> for precision 4-corner perspective correction.
+                </span>
+              </div>
+              <Link
+                href="/tools/document-straightener"
+                className="shrink-0 flex items-center gap-1 font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 ml-2"
+              >
+                <span>Straightener</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
             </div>
 
             {supportsPasswordPdf && pdfPassword.status !== "idle" && (

@@ -55,7 +55,7 @@ class MockLocalStorage {
 
 describe("PHASE 06 — Tool Registry & Configuration", () => {
   test("registers all tools in the project", () => {
-    assert.equal(TOOLS.length, 9, "Expected 9 tools in the registry");
+    assert.equal(TOOLS.length, 10, "Expected 10 tools in the registry");
   });
 
   test("all tools have unique IDs", () => {
@@ -136,10 +136,11 @@ describe("PHASE 06 — Tool Categories Organization", () => {
     assert.ok(utilityTools.some((t) => t.id === "ration-card-crop"));
     assert.ok(utilityTools.some((t) => t.id === "resume-maker"));
     assert.ok(utilityTools.some((t) => t.id === "document-studio"));
+    assert.ok(utilityTools.some((t) => t.id === "document-straightener"));
 
     // Total tools returned across 'all'
     const allTools = getToolsByCategory("all");
-    assert.equal(allTools.length, 9);
+    assert.equal(allTools.length, 10);
   });
 
   test("getCategoryMetadata retrieves correct category details", () => {

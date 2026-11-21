@@ -22,6 +22,7 @@ import {
   Sun,
   Moon,
   Monitor,
+  Maximize2,
 } from "lucide-react";
 import { usePreferences } from "@/hooks/usePreferences";
 import { cn } from "@/lib/utils/cn";
@@ -45,6 +46,7 @@ const PRIMARY_NAV_LINKS: NavLinkItem[] = [
 
 const FEATURED_DRAWER_TOOLS = [
   { name: "Free Document Studio", route: "/tools/document-studio", icon: FileCheck },
+  { name: "Document Straightener", route: "/tools/document-straightener", icon: Maximize2 },
   { name: "Free Passport Photo Studio", route: "/tools/photo-studio", icon: Camera },
   { name: "Free Background Remover", route: "/tools/background-remover", icon: Scissors },
   { name: "Free Multiple Photo Maker", route: "/tools/multiple-photo-maker", icon: Printer },

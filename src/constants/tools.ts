@@ -35,7 +35,7 @@ export const TOOL_CATEGORIES: CategoryMetadata[] = [
     description:
       "Crop PAN, Aadhaar, and Ration cards to strict ISO ID-1 physical card proportions for laminated printing, and craft ATS-ready resumes.",
     iconName: "SlidersHorizontal",
-    toolCount: 5,
+    toolCount: 6,
   },
 ];
 
@@ -236,6 +236,28 @@ export const TOOLS: ToolMetadata[] = [
       "JPG, PNG & multi-page PDF rendering",
     ],
     fileAccept: ["application/pdf", "image/jpeg", "image/png", "image/webp"],
+    maxFileSizeMB: 30,
+  },
+  {
+    id: "document-straightener",
+    name: "Free Document Straightener",
+    category: "utilities",
+    categories: ["utilities", "document", "image-tools"],
+    shortDescription:
+      "Straighten crooked, tilted, or perspective-distorted document photographs into clean rectangular images.",
+    description:
+      "Correct perspective distortion in smartphone or WhatsApp document photos using precision 4-corner homography with high-resolution magnifying loupe and dual-side processing.",
+    route: "/tools/document-straightener",
+    status: "ready",
+    badge: "Perspective Correction",
+    iconName: "Maximize2",
+    features: [
+      "4-corner independent perspective warping",
+      "Precision circular magnification loupe",
+      "Independent Front & Back side processing",
+      "Export to High-Res PNG, JPEG & Print PDF",
+    ],
+    fileAccept: ["image/jpeg", "image/png", "image/webp"],
     maxFileSizeMB: 30,
   },
 ];
