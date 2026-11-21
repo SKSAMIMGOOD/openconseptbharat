@@ -1,4 +1,4 @@
-import { ToolMetadata } from "@/types/tools";
+import type { ToolMetadata } from "@/types/tools";
 
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.printreadydesigns.in";
 
