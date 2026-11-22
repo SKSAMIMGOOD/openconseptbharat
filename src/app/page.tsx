@@ -23,6 +23,11 @@ import {
 } from "lucide-react";
 import { TOOLS, TOOL_CATEGORIES } from "@/constants/tools";
 import { ToolCategory } from "@/types/tools";
+import {
+  HOMEPAGE_TOOLS,
+  VOTER_ID_TOOL,
+  CUSTOM_DOCUMENT_TOOL,
+} from "@/constants/homepage-tools";
 import { CategoryCard } from "@/components/common/CategoryCard";
 import { ToolCard } from "@/components/common/ToolCard";
 import { PrivacyNotice } from "@/components/common/PrivacyNotice";
@@ -61,7 +66,7 @@ export default function HomePage() {
   const filteredTools = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
 
-    return TOOLS.filter((tool) => {
+    return HOMEPAGE_TOOLS.filter((tool) => {
       // Category filter
       let matchesCategory = true;
       if (selectedCategory !== "all") {
@@ -88,11 +93,11 @@ export default function HomePage() {
 
   // Compute tool counts per category tab
   const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: TOOLS.length };
+    const counts: Record<string, number> = { all: HOMEPAGE_TOOLS.length };
     CATEGORY_FILTER_TABS.forEach((tab) => {
       if (tab.id === "all") return;
       const catId = tab.id as ToolCategory;
-      counts[catId] = TOOLS.filter(
+      counts[catId] = HOMEPAGE_TOOLS.filter(
         (t) => t.category === catId || (t.categories && t.categories.includes(catId))
       ).length;
     });
@@ -123,15 +128,12 @@ export default function HomePage() {
 
             {/* Headline */}
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-surface-900 tracking-tight leading-[1.15]">
-              Free Online Tools to{" "}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 via-indigo-600 to-teal-600">
-                Edit, Crop & Print.
-              </span>
+              Free Online Document Cropper, <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 via-indigo-600 to-teal-600">Passport Photo &amp; Resume Maker</span>
             </h1>
 
-            {/* Subtitle */}
+            {/* Introductory Paragraph */}
             <p className="mt-5 text-base sm:text-lg text-surface-600 leading-relaxed max-w-2xl mx-auto">
-              Explore our 100% free online tools for photo editing, passport photo creation, background remover, government ID card cropping, and resume maker. Fast, browser-based processing with an uncompromising zero-upload privacy guarantee.
+              Print Ready Designs offers fast, privacy-focused browser tools to crop ID cards, create passport photos, arrange photos on A4 and 4×6 sheets, remove image backgrounds, straighten documents and generate print-ready PDFs — without uploading your files to a server.
             </p>
 
             {/* Actions: Primary Explore Tools & Secondary Privacy Information */}
@@ -184,7 +186,7 @@ export default function HomePage() {
               <span className="text-surface-300 hidden sm:inline">•</span>
               <div className="flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-                <span>8 In-Browser Utilities</span>
+                <span>11 In-Browser Utilities</span>
               </div>
             </div>
           </div>
@@ -437,7 +439,7 @@ export default function HomePage() {
               <div className="flex items-center justify-between md:justify-end gap-3 text-xs text-surface-500">
                 <span>
                   Showing <strong className="text-surface-900 font-bold">{filteredTools.length}</strong> of{" "}
-                  <strong className="text-surface-900">{TOOLS.length}</strong> utilities
+                  <strong className="text-surface-900">{HOMEPAGE_TOOLS.length}</strong> utilities
                 </span>
                 {(searchQuery || selectedCategory !== "all") && (
                   <button

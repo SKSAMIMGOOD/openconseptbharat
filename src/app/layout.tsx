@@ -11,59 +11,65 @@ const siteUrl = SITE_URL;
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Browser Utility Studio | Free Online Tools to Edit, Crop & Print",
-    template: "%s | Browser Utility Studio",
+    default: "Print Ready Designs – Free Aadhaar/PAN Card Cropper, Passport Photo & Resume Maker",
+    template: "%s | Print Ready Designs",
   },
   description:
-    "100% free online tools for photo editing, passport photo creation, background remover, government ID card cropping, and ATS resume making. Completely private in-browser processing with zero server uploads.",
-  applicationName: "Browser Utility Studio",
-  authors: [{ name: "Browser Utility Studio" }],
+    "Crop e-Aadhaar, PAN, and Ration cards to PVC print size, create 35×45mm Indian passport photos, straighten crooked documents, and build ATS resumes. 100% browser-based with zero file uploads.",
+  applicationName: "Print Ready Designs",
+  authors: [{ name: "Print Ready Designs" }],
   keywords: [
-    "free online tools",
-    "photo editing",
-    "passport photo",
-    "free passport photo studio",
-    "government id card cropping",
-    "free pan card crop tool",
+    "print ready designs",
     "free aadhaar card crop tool",
+    "aadhaar card cropper",
+    "free pan card crop tool",
+    "pan card cropper",
     "free ration card crop tool",
+    "ration card cropper",
+    "pvc print size card crop",
+    "free passport photo studio",
+    "35x45mm indian passport photo",
+    "passport photo maker",
+    "free background remover",
+    "document straightener",
+    "multiple photo maker",
     "resume maker",
     "free resume cv maker",
-    "background remover",
-    "free background remover",
-    "multiple photo maker",
+    "ats resume builder",
+    "free online tools",
+    "free online document cropper",
     "in-browser photo editor",
     "client-side pdf",
     "zero-upload privacy",
     "all free online utilities",
   ],
-  creator: "Browser Utility Studio",
-  publisher: "Browser Utility Studio",
+  creator: "Print Ready Designs",
+  publisher: "Print Ready Designs",
   alternates: {
     canonical: "/",
   },
   openGraph: {
     type: "website",
-    locale: "en_US",
+    locale: "en_IN",
     url: siteUrl,
-    siteName: "Browser Utility Studio",
-    title: "Browser Utility Studio | Free Online Tools to Edit, Crop & Print",
+    siteName: "Print Ready Designs",
+    title: "Print Ready Designs – Free Aadhaar/PAN Card Cropper, Passport Photo & Resume Maker",
     description:
-      "100% free online tools for photo editing, passport photos, background remover, government ID card cropping, and ATS resumes. Completely private, client-side execution with zero server uploads.",
+      "Crop e-Aadhaar, PAN, and Ration cards to PVC print size, create 35×45mm Indian passport photos, straighten crooked documents, and build ATS resumes. 100% browser-based with zero file uploads.",
     images: [
       {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "Browser Utility Studio - Free Online Tools to Edit, Crop & Print",
+        alt: "Print Ready Designs – Free Aadhaar/PAN Card Cropper, Passport Photo & Resume Maker",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Browser Utility Studio | Free Online Tools to Edit, Crop & Print",
+    title: "Print Ready Designs – Free Aadhaar/PAN Card Cropper, Passport Photo & Resume Maker",
     description:
-      "100% free online tools for photo editing, passport photos, ID card cropping, and ATS resumes. Zero server uploads.",
+      "Crop e-Aadhaar, PAN, and Ration cards to PVC print size, create 35×45mm Indian passport photos, straighten crooked documents, and build ATS resumes. 100% browser-based with zero file uploads.",
     images: ["/og-image.png"],
   },
   icons: {
@@ -127,6 +133,8 @@ export default function RootLayout({
   return (
     <html lang="en" className="scroll-smooth" suppressHydrationWarning>
       <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <script
           dangerouslySetInnerHTML={{ __html: themeInitScript }}
         />

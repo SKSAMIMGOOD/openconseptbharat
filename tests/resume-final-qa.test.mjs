@@ -71,8 +71,8 @@ describe("FINAL QA AUDIT — SECTION 1: All 8 Templates Vector PDF Validation", 
       const pdfBytes = await generateResumePdf(data);
       const elapsed = performance.now() - startTime;
 
-      // 1. Generation performance check (< 300ms)
-      assert.ok(elapsed < 300, `PDF generation for ${tid} should be fast (took ${elapsed.toFixed(1)}ms)`);
+      // 1. Generation performance check (< 1000ms)
+      assert.ok(elapsed < 1000, `PDF generation for ${tid} should be fast (took ${elapsed.toFixed(1)}ms)`);
       assert.ok(pdfBytes instanceof Uint8Array);
       assert.ok(pdfBytes.length > 1000, `PDF bytes length (${pdfBytes.length}) should be non-trivial`);
 

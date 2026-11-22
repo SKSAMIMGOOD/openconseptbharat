@@ -466,9 +466,9 @@ async function tryGenerateVectorPdf(options: {
     const canvasDims = options.source.dimensions || { width: 4961, height: 7016 };
 
     const pdfDoc = await PDFDocument.create();
-    pdfDoc.setTitle(`${options.docName} — Vector Print Studio (Browser Utility Studio)`);
-    pdfDoc.setAuthor("Browser Utility Studio (Privacy-First Client Engine)");
-    pdfDoc.setCreator("Browser Utility Studio Document Studio");
+    pdfDoc.setTitle(`${options.docName} — Vector Print Studio (Print Ready Designs)`);
+    pdfDoc.setAuthor("Print Ready Designs (Privacy-First Client Engine)");
+    pdfDoc.setCreator("Print Ready Designs Document Studio");
     pdfDoc.setProducer("pdf-lib Non-Destructive Vector Embedding Engine");
 
     const copies = Math.max(1, Math.min(20, options.paperLayout.copies || 1));
@@ -615,9 +615,9 @@ async function tryGenerateDirectImagePdf(options: {
     }
 
     const pdfDoc = await PDFDocument.create();
-    pdfDoc.setTitle(`${options.docName} — Print Studio (Browser Utility Studio)`);
-    pdfDoc.setAuthor("Browser Utility Studio (Privacy-First Client Engine)");
-    pdfDoc.setCreator("Browser Utility Studio Document Studio");
+    pdfDoc.setTitle(`${options.docName} — Print Studio (Print Ready Designs)`);
+    pdfDoc.setAuthor("Print Ready Designs (Privacy-First Client Engine)");
+    pdfDoc.setCreator("Print Ready Designs Document Studio");
     pdfDoc.setProducer("pdf-lib High-Resolution Direct Card Embedding Engine");
 
     const embeddedImages = new Map<"front" | "back", any>();
@@ -887,9 +887,9 @@ export async function generatePrintReadyPdf(options: {
 
     // 4. Create calibrated PDF Document
     const pdfDoc = await PDFDocument.create();
-    pdfDoc.setTitle(`${docName} — Print Studio (Browser Utility Studio)`);
-    pdfDoc.setAuthor("Browser Utility Studio (Privacy-First Client Engine)");
-    pdfDoc.setCreator("Browser Utility Studio Document Studio");
+    pdfDoc.setTitle(`${docName} — Print Studio (Print Ready Designs)`);
+    pdfDoc.setAuthor("Print Ready Designs (Privacy-First Client Engine)");
+    pdfDoc.setCreator("Print Ready Designs Document Studio");
     pdfDoc.setProducer("pdf-lib (In-Browser Execution)");
     pdfDoc.setProducer("pdf-lib (In-Browser Execution)");
 

@@ -112,9 +112,9 @@ export async function exportMultiSheetAsPdf(
   const firstLayout = pages[0].layout;
   const paperName = firstLayout.paperSize === "a4" ? "A4" : "4x6";
   const pdfDoc = await PDFDocument.create();
-  pdfDoc.setTitle(`${paperName} Photo Sheet — Browser Utility Studio`);
-  pdfDoc.setAuthor("Browser Utility Studio (Client-Side)");
-  pdfDoc.setCreator("Browser Utility Studio Photo Sheet Generator");
+  pdfDoc.setTitle(`${paperName} Photo Sheet — Print Ready Designs`);
+  pdfDoc.setAuthor("Print Ready Designs (Client-Side)");
+  pdfDoc.setCreator("Print Ready Designs Photo Sheet Generator");
   pdfDoc.setProducer("pdf-lib (In-Browser Execution)");
 
   for (const pageItem of pages) {

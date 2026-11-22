@@ -1,7 +1,7 @@
 /**
  * Ephemeral In-Memory Image Transfer Service
  * 
- * Safely passes image files between Browser Utility Studio tools in RAM
+ * Safely passes image files between Print Ready Designs tools in RAM
  * during client-side navigation.
  * 
  * Strict Privacy Invariant:

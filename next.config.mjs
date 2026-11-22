@@ -9,6 +9,31 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          {
+            key: "X-Frame-Options",
+            value: "SAMEORIGIN",
+          },
+          {
+            key: "X-Content-Type-Options",
+            value: "nosniff",
+          },
+          {
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+          },
+        ],
+      },
+    ];
+  },
   async redirects() {
     return [
       {
@@ -42,6 +67,11 @@ const nextConfig = {
           },
         ],
         destination: "https://www.printreadydesigns.in/:path*",
+        permanent: true,
+      },
+      {
+        source: "/tools/multiple-photos",
+        destination: "/tools/multiple-photo-maker",
         permanent: true,
       },
     ];

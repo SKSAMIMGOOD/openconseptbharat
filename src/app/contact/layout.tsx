@@ -3,15 +3,22 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Contact & Support",
   description:
-    "Contact Browser Utility Studio for feedback, support, feature suggestions, or security disclosures.",
+    "Contact Print Ready Designs for feedback, technical support, feature suggestions, or security disclosures.",
   alternates: {
     canonical: "/contact",
   },
   openGraph: {
-    title: "Contact & Support | Browser Utility Studio",
+    title: "Contact & Support | Print Ready Designs",
     description:
-      "Get in touch with the Browser Utility Studio team for technical support, feedback, or inquiries.",
+      "Get in touch with the Print Ready Designs team for technical support, feedback, or inquiries.",
     url: "/contact",
+    siteName: "Print Ready Designs",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Contact & Support | Print Ready Designs",
+    description:
+      "Get in touch with the Print Ready Designs team for technical support, feedback, or inquiries.",
   },
 };
 

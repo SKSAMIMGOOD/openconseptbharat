@@ -58,7 +58,7 @@ export const Footer: React.FC = () => {
                 <Layers className="w-4 h-4" />
               </div>
               <span className="font-bold text-base text-surface-900 dark:text-surface-100 tracking-tight">
-                Browser Utility Studio
+                Print Ready Designs
               </span>
             </Link>
             <p className="text-xs text-surface-500 dark:text-surface-400 max-w-sm leading-relaxed mb-4">
@@ -87,13 +87,18 @@ export const Footer: React.FC = () => {
                 </Link>
               </li>
               <li>
+                <Link href="/guides" className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors font-medium">
+                  Guides & Tutorials
+                </Link>
+              </li>
+              <li>
                 <Link href="/settings" className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors font-medium">
                   Preferences & Settings
                 </Link>
               </li>
               <li>
                 <Link href="/about" className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">
-                  About the Studio
+                  About Print Ready Designs
                 </Link>
               </li>
               <li>
@@ -174,7 +179,7 @@ export const Footer: React.FC = () => {
         {/* Footer Bottom / Copyright */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-surface-500 dark:text-surface-400">
           <div>
-            <p>© {new Date().getFullYear()} Browser Utility Studio. All rights reserved.</p>
+            <p>© {new Date().getFullYear()} Print Ready Designs. All rights reserved.</p>
             <p className="mt-0.5 text-[11px] text-surface-400 dark:text-surface-500">
               Built with Next.js App Router, TypeScript, and Tailwind CSS. Zero cloud processing.
             </p>

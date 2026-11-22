@@ -10,10 +10,10 @@ export const PrivacyHighlights: React.FC = () => {
           <span>Strict Client-Side Guarantee</span>
         </div>
         <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-          How Browser Utility Studio Protects Your Privacy
+          How Print Ready Designs Protects Your Privacy
         </h2>
         <p className="text-sm text-surface-300 mt-2 leading-relaxed">
-          Traditional web tools upload your personal identity cards and private photos to remote servers. Browser Utility Studio takes a completely different path: 100% of the image manipulation, card cropping, and PDF synthesis happens locally inside your device.
+          Traditional web tools upload your personal identity cards and private photos to remote servers. Print Ready Designs takes a completely different path: 100% of the image manipulation, card cropping, and PDF synthesis happens locally inside your device.
         </p>
       </div>
 

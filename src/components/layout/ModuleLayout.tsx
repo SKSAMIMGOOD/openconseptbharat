@@ -7,12 +7,17 @@ import { Badge } from "@/components/common/Badge";
 import { Breadcrumb } from "@/components/common/Breadcrumb";
 import { ToolMetadata } from "@/types/tools";
 import { recordToolUsage } from "@/lib/utils/recent-tools";
-import { getToolSoftwareApplicationData } from "@/lib/seo/structured-data";
+import {
+  getToolSoftwareApplicationData,
+  getToolFaqStructuredData,
+} from "@/lib/seo/structured-data";
 import {
   getToolVisualBreadcrumbs,
   getToolCategoryBreadcrumb,
 } from "@/lib/seo/breadcrumbs";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
+import { getToolSeoData } from "@/constants/tool-seo";
+import { ToolSeoSection } from "@/components/seo/ToolSeoSection";
 
 export interface ModuleLayoutProps {
   tool: ToolMetadata;
@@ -29,6 +34,11 @@ export const ModuleLayout: React.FC<ModuleLayoutProps> = ({ tool, children }) =>
 
   const categoryInfo = useMemo(() => getToolCategoryBreadcrumb(tool), [tool]);
   const visualBreadcrumbs = useMemo(() => getToolVisualBreadcrumbs(tool), [tool]);
+  const toolSeo = useMemo(() => (tool?.id ? getToolSeoData(tool.id) : undefined), [tool?.id]);
+  const faqJsonLd = useMemo(() => (tool?.id ? getToolFaqStructuredData(tool.id) : null), [tool?.id]);
+
+  const displayH1 = toolSeo?.h1 || tool.name;
+  const displayIntro = toolSeo?.intro || tool.description;
 
   return (
     <div className="min-h-[calc(100vh-4rem)] flex flex-col bg-surface-50 dark:bg-surface-950">
@@ -39,6 +49,15 @@ export const ModuleLayout: React.FC<ModuleLayoutProps> = ({ tool, children }) =>
           __html: JSON.stringify(getToolSoftwareApplicationData(tool)),
         }}
       />
+      {/* Tool FAQPage Structured Data */}
+      {faqJsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(faqJsonLd),
+          }}
+        />
+      )}
       {/* BreadcrumbList JSON-LD Structured Data */}
       <BreadcrumbJsonLd tool={tool} />
 
@@ -78,10 +97,10 @@ export const ModuleLayout: React.FC<ModuleLayoutProps> = ({ tool, children }) =>
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-surface-900 dark:text-surface-100 tracking-tight">
-                {tool.name}
+                {displayH1}
               </h1>
               <p className="text-xs sm:text-sm text-surface-600 dark:text-surface-400 mt-1.5 max-w-3xl leading-relaxed">
-                {tool.description}
+                {displayIntro}
               </p>
             </div>
 
@@ -104,6 +123,7 @@ export const ModuleLayout: React.FC<ModuleLayoutProps> = ({ tool, children }) =>
       {/* Main Workspace Area */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
         {children}
+        <ToolSeoSection toolId={tool.id} />
       </main>
     </div>
   );

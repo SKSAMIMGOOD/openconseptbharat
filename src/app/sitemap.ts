@@ -1,6 +1,7 @@
-import { MetadataRoute } from "next";
-import { TOOLS } from "@/constants/tools";
-import { SITE_URL } from "@/lib/seo/structured-data";
+import type { MetadataRoute } from "next";
+import { TOOLS } from "../constants/tools.ts";
+import { GUIDES } from "../constants/guides.ts";
+import { SITE_URL } from "../lib/seo/structured-data.ts";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || SITE_URL;
@@ -18,6 +19,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified,
       changeFrequency: "daily",
       priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/guides`,
+      lastModified,
+      changeFrequency: "weekly",
+      priority: 0.8,
     },
     {
       url: `${baseUrl}/privacy`,
@@ -58,5 +65,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.9,
   }));
 
-  return [...coreRoutes, ...toolRoutes];
+  const guideRoutes: MetadataRoute.Sitemap = GUIDES.map((guide) => ({
+    url: `${baseUrl}/guides/${guide.slug}`,
+    lastModified,
+    changeFrequency: "weekly",
+    priority: 0.8,
+  }));
+
+  return [...coreRoutes, ...toolRoutes, ...guideRoutes];
 }

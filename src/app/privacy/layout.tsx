@@ -8,10 +8,17 @@ export const metadata: Metadata = {
     canonical: "/privacy",
   },
   openGraph: {
-    title: "Privacy Guarantee & Verification | Browser Utility Studio",
+    title: "Privacy Guarantee & Verification | Print Ready Designs",
     description:
       "Strict zero-upload privacy architecture. Verify client-side data isolation directly in your browser network tab.",
     url: "/privacy",
+    siteName: "Print Ready Designs",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Privacy Guarantee & Verification | Print Ready Designs",
+    description:
+      "Strict zero-upload privacy architecture. Verify client-side data isolation directly in your browser network tab.",
   },
 };
 

@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Printer,
   Sparkles,
+  Award,
 } from "lucide-react";
 import { ToolMetadata } from "@/types/tools";
 import { Badge } from "@/components/common/Badge";
@@ -33,6 +34,7 @@ const TOOL_ICON_MAP: Record<string, React.ElementType> = {
   Grid: Grid3x3,
   Printer,
   Sparkles,
+  Award,
 };
 
 const CATEGORY_ACCENTS: Record<

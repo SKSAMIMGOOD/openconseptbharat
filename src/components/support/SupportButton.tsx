@@ -47,7 +47,7 @@ export const SupportButton: React.FC<SupportButtonProps> = ({
         variantStyles[variant],
         className
       )}
-      title="Help keep this tool free — Support Browser Utility Studio"
+      title="Help keep this tool free — Support Print Ready Designs"
       aria-label="Help Us — Help keep this tool free"
     >
       <Heart

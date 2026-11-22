@@ -23,6 +23,7 @@ import {
   Moon,
   Monitor,
   Maximize2,
+  BookOpen,
 } from "lucide-react";
 import { usePreferences } from "@/hooks/usePreferences";
 import { cn } from "@/lib/utils/cn";
@@ -36,6 +37,7 @@ interface NavLinkItem {
 const PRIMARY_NAV_LINKS: NavLinkItem[] = [
   { label: "Dashboard", href: "/" },
   { label: "All Tools", href: "/tools", icon: Grid },
+  { label: "Guides", href: "/guides", icon: BookOpen },
   { label: "Photo Studio", href: "/tools/photo-studio", icon: Camera },
   { label: "Document Studio", href: "/tools/document-studio", icon: FileCheck },
   { label: "Background Remover", href: "/tools/background-remover", icon: Scissors },
@@ -127,7 +129,7 @@ export const Header: React.FC = () => {
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="font-bold text-base sm:text-lg text-surface-900 dark:text-surface-100 tracking-tight">
-                  Browser Utility Studio
+                  Print Ready Designs
                 </span>
               </div>
               <p className="hidden sm:block text-[11px] text-surface-500 dark:text-surface-400 font-medium">

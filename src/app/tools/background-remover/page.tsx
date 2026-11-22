@@ -162,7 +162,7 @@ export default function BackgroundRemoverPage() {
                 <span>Client-Side Privacy Architecture</span>
               </h4>
               <p className="text-xs text-surface-600 leading-relaxed">
-                Commercial background removers routinely transmit user photos to remote third-party cloud servers. In Browser Utility Studio, all tensor calculations, neural inference passes, and pixel matting operations run <strong>100% inside your browser&apos;s memory</strong>. Your sensitive biometric photo never leaves your device.
+                Commercial background removers routinely transmit user photos to remote third-party cloud servers. In Print Ready Designs, all tensor calculations, neural inference passes, and pixel matting operations run <strong>100% inside your browser&apos;s memory</strong>. Your sensitive biometric photo never leaves your device.
               </p>
               <div className="grid grid-cols-3 gap-2 pt-2 border-t border-surface-200 text-center text-[11px] font-mono">
                 <div className="p-2 rounded-xl bg-white border border-surface-200">

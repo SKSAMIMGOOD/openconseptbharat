@@ -482,9 +482,9 @@ export const SAMPLE_RESUME_DATA: ResumeData = {
   projects: [
     {
       id: "proj-1",
-      title: "Browser Utility Studio",
+      title: "Print Ready Designs",
       description:
-        "High-performance client-side image processing and document utility suite running completely in local browser RAM without cloud servers.",
+        "High-performance client-side document cropping, photo editing, and PDF utility suite running completely in local browser RAM without cloud servers.",
       technologies:
         "Next.js, TypeScript, WebAssembly, Canvas API, Tailwind CSS",
       projectUrl: "https://github.com/openconseptbharat/browser-utility-studio",

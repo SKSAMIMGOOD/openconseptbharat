@@ -1,4 +1,5 @@
 import type { ToolMetadata } from "@/types/tools";
+import { getToolSeoData } from "../../constants/tool-seo.ts";
 
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.printreadydesigns.in";
 
@@ -10,9 +11,9 @@ export function getWebsiteStructuredData(baseUrl = SITE_URL) {
         "@type": "WebSite",
         "@id": `${baseUrl}/#website`,
         "url": baseUrl,
-        "name": "Browser Utility Studio",
+        "name": "Print Ready Designs",
         "description":
-          "100% free online tools for photo editing, passport photos, background remover, government ID card cropping, and resume making with zero server uploads.",
+          "Crop e-Aadhaar, PAN, and Ration cards to PVC print size, create 35×45mm Indian passport photos, straighten crooked documents, and build ATS resumes. 100% browser-based with zero file uploads.",
         "publisher": {
           "@id": `${baseUrl}/#organization`,
         },
@@ -28,7 +29,7 @@ export function getWebsiteStructuredData(baseUrl = SITE_URL) {
       {
         "@type": "Organization",
         "@id": `${baseUrl}/#organization`,
-        "name": "Browser Utility Studio",
+        "name": "Print Ready Designs",
         "url": baseUrl,
         "logo": {
           "@type": "ImageObject",
@@ -58,5 +59,24 @@ export function getToolSoftwareApplicationData(tool: ToolMetadata, baseUrl = SIT
     "url": `${baseUrl}${tool.route}`,
     "browserRequirements": "Requires JavaScript and HTML5 Canvas/WebAssembly support",
     "permissions": "None. Runs entirely within client-side browser memory.",
+  };
+}
+
+export function getToolFaqStructuredData(toolId: string) {
+  const seoData = getToolSeoData(toolId);
+  if (!seoData || !seoData.faqs || seoData.faqs.length === 0) {
+    return null;
+  }
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": seoData.faqs.map((faq) => ({
+      "@type": "Question",
+      "name": faq.question,
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": faq.answer,
+      },
+    })),
   };
 }

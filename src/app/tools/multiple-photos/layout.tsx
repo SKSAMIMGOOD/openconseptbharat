@@ -7,6 +7,10 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/tools/multiple-photo-maker",
   },
+  robots: {
+    index: false,
+    follow: true,
+  },
 };
 
 export default function Layout({ children }: { children: React.ReactNode }) {
