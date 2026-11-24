@@ -35,7 +35,7 @@ export const TOOL_CATEGORIES: CategoryMetadata[] = [
     description:
       "Crop PAN, Aadhaar, and Ration cards to strict ISO ID-1 physical card proportions for laminated printing, and craft ATS-ready resumes.",
     iconName: "SlidersHorizontal",
-    toolCount: 6,
+    toolCount: 7,
   },
 ];
 
@@ -259,6 +259,28 @@ export const TOOLS: ToolMetadata[] = [
     ],
     fileAccept: ["image/jpeg", "image/png", "image/webp"],
     maxFileSizeMB: 30,
+  },
+  {
+    id: "raw-image-to-pdf",
+    name: "Raw Image to Clean PDF",
+    category: "utilities",
+    categories: ["utilities", "document", "image-tools", "pdf"],
+    shortDescription:
+      "Transform smartphone photos of documents, notes and receipts into clean, straightened multi-page A4 PDFs.",
+    description:
+      "Upload up to 5 document photographs to straighten perspective distortion, enhance contrast and readability, annotate, and compile into a single print-ready A4 PDF in browser memory.",
+    route: "/tools/raw-image-to-pdf",
+    status: "ready",
+    badge: "Multi-Image PDF",
+    iconName: "FileText",
+    features: [
+      "Upload up to 5 document photos",
+      "Memory-safe lightweight thumbnail previews",
+      "Interactive page reordering & replacement",
+      "100% in-browser client-side execution",
+    ],
+    fileAccept: ["image/jpeg", "image/png", "image/webp"],
+    maxFileSizeMB: 25,
   },
 ];
 
