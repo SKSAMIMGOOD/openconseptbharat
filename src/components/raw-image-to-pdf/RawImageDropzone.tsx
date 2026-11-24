@@ -18,9 +18,9 @@ export interface RawImageDropzoneProps {
 
 export const RawImageDropzone: React.FC<RawImageDropzoneProps> = ({
   onFilesSelected,
-  maxBatchSize = 5,
+  maxBatchSize = 10,
   currentCount = 0,
-  maxSizeMB = 25,
+  maxSizeMB = 5,
   allowedFormats = ["image/jpeg", "image/png", "image/webp"],
   disabled = false,
   compact = false,
@@ -115,7 +115,7 @@ export const RawImageDropzone: React.FC<RawImageDropzoneProps> = ({
             {isFull ? "Batch Limit Reached" : "Add More Images"}
           </p>
           <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">
-            {isFull ? "Maximum 5 images per document" : `${remaining} slot${remaining === 1 ? "" : "s"} remaining`}
+            {isFull ? `Maximum ${maxBatchSize} images per document` : `${remaining} slot${remaining === 1 ? "" : "s"} remaining`}
           </p>
         </button>
       </div>

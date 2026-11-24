@@ -23,6 +23,7 @@ export interface PageGalleryGridProps {
   pages: RawDocumentPage[];
   activePageIndex: number;
   maxBatchSize: number;
+  maxSizeMB?: number;
   onSelectPage: (index: number) => void;
   onRemovePage: (id: string) => void;
   onReplacePage: (id: string, newFile: File) => void;
@@ -40,6 +41,7 @@ export const PageGalleryGrid: React.FC<PageGalleryGridProps> = ({
   pages,
   activePageIndex,
   maxBatchSize,
+  maxSizeMB,
   onSelectPage,
   onRemovePage,
   onReplacePage,
@@ -374,6 +376,7 @@ export const PageGalleryGrid: React.FC<PageGalleryGridProps> = ({
             <RawImageDropzone
               onFilesSelected={onAddMoreFiles}
               maxBatchSize={maxBatchSize}
+              maxSizeMB={maxSizeMB}
               currentCount={pages.length}
               disabled={disabled}
               compact

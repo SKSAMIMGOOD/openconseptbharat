@@ -6,7 +6,7 @@
  *
  * Implements independent, memory-conscious multi-page state management:
  * - Sequentially processes and generates lightweight thumbnails
- * - Strictly enforces configurable batch size (default 5 images)
+ * - Strictly enforces configurable batch size (default 10 images)
  * - Safely manages and revokes tracked Object URLs (thumbnails, cropped, edited previews)
  * - Supports reordering, replacing, deleting, and adding pages
  * - Manages independent 4-corner perspective crop configurations per page
@@ -463,26 +463,42 @@ export function useRawImageToPdf(config: Partial<RawImageToPdfConfig> = {}) {
 
   /**
    * Phase 2: Opens perspective crop editor modal for a specific page.
+   * If pageIndex is omitted, starts at the first unfinished page by default.
    */
   const openCropEditor = useCallback(
     (pageIndex?: number) => {
       if (pageIndex !== undefined && pageIndex >= 0 && pageIndex < pages.length) {
         setCropActivePageIndex(pageIndex);
-      } else if (activePageIndex >= 0 && activePageIndex < pages.length) {
-        setCropActivePageIndex(activePageIndex);
       } else {
-        setCropActivePageIndex(0);
+        // Start at first unfinished page by default
+        const firstUnfinishedIdx = pages.findIndex((p) => !p.isCropped && !p.cropConfirmed);
+        if (firstUnfinishedIdx !== -1) {
+          setCropActivePageIndex(firstUnfinishedIdx);
+        } else if (activePageIndex >= 0 && activePageIndex < pages.length) {
+          setCropActivePageIndex(activePageIndex);
+        } else {
+          setCropActivePageIndex(0);
+        }
       }
       setWorkflowStep("crop");
       setIsCropModalOpen(true);
     },
-    [pages.length, activePageIndex]
+    [pages, activePageIndex]
   );
+
+  /**
+   * Resumes the crop workflow starting at the first unfinished page.
+   */
+  const resumeCropWorkflow = useCallback(() => {
+    openCropEditor();
+  }, [openCropEditor]);
 
   const closeCropEditor = useCallback(() => {
     setIsCropModalOpen(false);
     if (pages.length > 0 && pages.every((p) => p.isCropped || p.cropConfirmed)) {
       setWorkflowStep("edit");
+    } else {
+      setWorkflowStep("upload");
     }
   }, [pages]);
 
@@ -775,6 +791,7 @@ export function useRawImageToPdf(config: Partial<RawImageToPdfConfig> = {}) {
       (p) => (p.annotations && p.annotations.length > 0) || (p.watermark && p.watermark.enabled)
     ).length,
     maxBatchSize: mergedConfig.maxBatchSize,
+    maxFileSizeMB: mergedConfig.maxFileSizeMB,
     remainingCapacity: Math.max(0, mergedConfig.maxBatchSize - pages.length),
     isProcessing,
     statusMessage,
@@ -793,6 +810,7 @@ export function useRawImageToPdf(config: Partial<RawImageToPdfConfig> = {}) {
     isCropModalOpen,
     cropActivePageIndex,
     openCropEditor,
+    resumeCropWorkflow,
     closeCropEditor,
     setCropActivePageIndex,
     savePageCrop,

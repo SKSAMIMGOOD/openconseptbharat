@@ -41,13 +41,56 @@ export const MultiplePhotoDimensionsPanel: React.FC<MultiplePhotoDimensionsPanel
   };
 
   // Quick preset shortcuts
-  const applyPreset = (w: number, h: number, u: DimensionUnit) => {
+  const applyPreset = (w: number, h: number, u: DimensionUnit, presetId?: string) => {
     onDimensionsChange(() => ({
       width: w,
       height: h,
       unit: u,
+      presetId,
     }));
   };
+
+  const isA4DefaultActive =
+    dimensions.presetId === "a4_compact_default" ||
+    (dimensions.unit === "mm" &&
+      Math.abs(dimensions.width - 26.94) < 0.1 &&
+      Math.abs(dimensions.height - 32.33) < 0.1) ||
+    (dimensions.unit === "mm" && dimensions.width === 27 && dimensions.height === 32);
+
+  const isCompactDefaultActive =
+    dimensions.presetId === "compact_default" ||
+    (dimensions.unit === "inch" && dimensions.width === 1.1 && dimensions.height === 1.35) ||
+    (dimensions.unit === "mm" &&
+      Math.abs(dimensions.width - 27.94) < 0.1 &&
+      Math.abs(dimensions.height - 34.29) < 0.1);
+
+  const is4x6LandscapeActive =
+    dimensions.presetId === "compact_4x6_landscape" ||
+    (dimensions.unit === "mm" &&
+      Math.abs(dimensions.width - 24.55) < 0.1 &&
+      Math.abs(dimensions.height - 30.14) < 0.1);
+
+  const isPassportActive =
+    dimensions.presetId === "passport_standard" ||
+    (dimensions.unit === "mm" && dimensions.width === 35 && dimensions.height === 45);
+
+  const isUsVisaActive =
+    dimensions.presetId === "us_visa" ||
+    (dimensions.unit === "inch" && dimensions.width === 2 && dimensions.height === 2) ||
+    (dimensions.unit === "mm" &&
+      Math.abs(dimensions.width - 50.8) < 0.1 &&
+      Math.abs(dimensions.height - 50.8) < 0.1);
+
+  const isPanCardActive =
+    dimensions.presetId === "pan_card_photo" ||
+    (dimensions.unit === "mm" && dimensions.width === 25 && dimensions.height === 35);
+
+  const isStampActive =
+    dimensions.presetId === "stamp_size" ||
+    (dimensions.unit === "mm" && dimensions.width === 20 && dimensions.height === 25);
+
+  const isPortraitActive =
+    dimensions.unit === "mm" && dimensions.width === 40 && dimensions.height === 50;
 
   return (
     <div className={cn("bg-white rounded-3xl border border-surface-200 p-5 sm:p-6 shadow-card space-y-6", className)}>
@@ -78,32 +121,64 @@ export const MultiplePhotoDimensionsPanel: React.FC<MultiplePhotoDimensionsPanel
         </div>
       </div>
 
-      {/* Quick Dimension Presets */}
+      {/* Quick Dimension Presets Synchronized with Professional Photo Studio */}
       <div>
         <label className="text-xs font-semibold text-surface-700 block mb-2">
-          Standard Size Presets
+          Standard Size Presets (Photo Studio Standards)
         </label>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {/* A4 Standard Compact: 27 × 32 mm (26.94 × 32.33 mm) */}
           <button
             type="button"
-            onClick={() => applyPreset(1.1, 1.35, "inch")}
+            onClick={() => applyPreset(26.94, 32.33, "mm", "a4_compact_default")}
             className={cn(
               "p-2.5 rounded-xl border text-left transition-all",
-              dimensions.unit === "inch" && dimensions.width === 1.1 && dimensions.height === 1.35
+              isA4DefaultActive
+                ? "border-brand-500 bg-brand-50/70 text-brand-900 ring-1 ring-brand-500"
+                : "border-surface-200 hover:border-surface-300 bg-surface-50/50 text-surface-800"
+            )}
+          >
+            <span className="text-xs font-bold block">27 × 32 mm</span>
+            <span className="text-[10px] text-surface-500 block">A4 Sheet Default (56)</span>
+          </button>
+
+          {/* 4×6 Portrait Standard Compact: 1.1 × 1.35 in */}
+          <button
+            type="button"
+            onClick={() => applyPreset(1.1, 1.35, "inch", "compact_default")}
+            className={cn(
+              "p-2.5 rounded-xl border text-left transition-all",
+              isCompactDefaultActive
                 ? "border-brand-500 bg-brand-50/70 text-brand-900 ring-1 ring-brand-500"
                 : "border-surface-200 hover:border-surface-300 bg-surface-50/50 text-surface-800"
             )}
           >
             <span className="text-xs font-bold block">1.1 × 1.35 in</span>
-            <span className="text-[10px] text-surface-500 block">Default Photo</span>
+            <span className="text-[10px] text-surface-500 block">4×6″ Portrait (12)</span>
           </button>
 
+          {/* 4×6 Landscape Standard Compact: 24.55 × 30.14 mm */}
           <button
             type="button"
-            onClick={() => applyPreset(35, 45, "mm")}
+            onClick={() => applyPreset(24.55, 30.14, "mm", "compact_4x6_landscape")}
             className={cn(
               "p-2.5 rounded-xl border text-left transition-all",
-              dimensions.unit === "mm" && dimensions.width === 35 && dimensions.height === 45
+              is4x6LandscapeActive
+                ? "border-brand-500 bg-brand-50/70 text-brand-900 ring-1 ring-brand-500"
+                : "border-surface-200 hover:border-surface-300 bg-surface-50/50 text-surface-800"
+            )}
+          >
+            <span className="text-xs font-bold block">24.55 × 30.14 mm</span>
+            <span className="text-[10px] text-surface-500 block">4×6″ Landscape (15)</span>
+          </button>
+
+          {/* Standard Passport: 35 × 45 mm */}
+          <button
+            type="button"
+            onClick={() => applyPreset(35, 45, "mm", "passport_standard")}
+            className={cn(
+              "p-2.5 rounded-xl border text-left transition-all",
+              isPassportActive
                 ? "border-brand-500 bg-brand-50/70 text-brand-900 ring-1 ring-brand-500"
                 : "border-surface-200 hover:border-surface-300 bg-surface-50/50 text-surface-800"
             )}
@@ -112,12 +187,13 @@ export const MultiplePhotoDimensionsPanel: React.FC<MultiplePhotoDimensionsPanel
             <span className="text-[10px] text-surface-500 block">Passport Standard</span>
           </button>
 
+          {/* US Visa: 2 × 2 in */}
           <button
             type="button"
-            onClick={() => applyPreset(2, 2, "inch")}
+            onClick={() => applyPreset(2, 2, "inch", "us_visa")}
             className={cn(
               "p-2.5 rounded-xl border text-left transition-all",
-              dimensions.unit === "inch" && dimensions.width === 2 && dimensions.height === 2
+              isUsVisaActive
                 ? "border-brand-500 bg-brand-50/70 text-brand-900 ring-1 ring-brand-500"
                 : "border-surface-200 hover:border-surface-300 bg-surface-50/50 text-surface-800"
             )}
@@ -126,12 +202,43 @@ export const MultiplePhotoDimensionsPanel: React.FC<MultiplePhotoDimensionsPanel
             <span className="text-[10px] text-surface-500 block">US Visa / Square</span>
           </button>
 
+          {/* Indian PAN Card: 25 × 35 mm */}
+          <button
+            type="button"
+            onClick={() => applyPreset(25, 35, "mm", "pan_card_photo")}
+            className={cn(
+              "p-2.5 rounded-xl border text-left transition-all",
+              isPanCardActive
+                ? "border-brand-500 bg-brand-50/70 text-brand-900 ring-1 ring-brand-500"
+                : "border-surface-200 hover:border-surface-300 bg-surface-50/50 text-surface-800"
+            )}
+          >
+            <span className="text-xs font-bold block">25 × 35 mm</span>
+            <span className="text-[10px] text-surface-500 block">Indian PAN / Govt</span>
+          </button>
+
+          {/* Stamp Size: 20 × 25 mm */}
+          <button
+            type="button"
+            onClick={() => applyPreset(20, 25, "mm", "stamp_size")}
+            className={cn(
+              "p-2.5 rounded-xl border text-left transition-all",
+              isStampActive
+                ? "border-brand-500 bg-brand-50/70 text-brand-900 ring-1 ring-brand-500"
+                : "border-surface-200 hover:border-surface-300 bg-surface-50/50 text-surface-800"
+            )}
+          >
+            <span className="text-xs font-bold block">20 × 25 mm</span>
+            <span className="text-[10px] text-surface-500 block">Stamp Size</span>
+          </button>
+
+          {/* Studio Portrait: 40 × 50 mm */}
           <button
             type="button"
             onClick={() => applyPreset(40, 50, "mm")}
             className={cn(
               "p-2.5 rounded-xl border text-left transition-all",
-              dimensions.unit === "mm" && dimensions.width === 40 && dimensions.height === 50
+              isPortraitActive
                 ? "border-brand-500 bg-brand-50/70 text-brand-900 ring-1 ring-brand-500"
                 : "border-surface-200 hover:border-surface-300 bg-surface-50/50 text-surface-800"
             )}

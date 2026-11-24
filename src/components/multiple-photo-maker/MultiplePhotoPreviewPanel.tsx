@@ -45,9 +45,19 @@ import {
   SHEET_4X6_LONG_EDGE_INCHES,
   DEFAULT_A4_SHEET_MARGINS,
   DEFAULT_SHEET_MARGINS,
+  DEFAULT_4X6_LANDSCAPE_SHEET_MARGINS,
   DEFAULT_A4_SHEET_SPACING,
   DEFAULT_4X6_SHEET_SPACING,
+  DEFAULT_4X6_LANDSCAPE_SHEET_SPACING,
 } from "@/constants/photo-sheet";
+import {
+  DEFAULT_A4_PHOTO_WIDTH_MM,
+  DEFAULT_A4_PHOTO_HEIGHT_MM,
+  DEFAULT_4X6_LANDSCAPE_PHOTO_WIDTH_MM,
+  DEFAULT_4X6_LANDSCAPE_PHOTO_HEIGHT_MM,
+  DEFAULT_4X6_PHOTO_WIDTH_MM,
+  DEFAULT_4X6_PHOTO_HEIGHT_MM,
+} from "@/constants/photo-dimensions";
 import { unitToMm } from "@/lib/crop/unit-converter";
 import {
   calculatePhotoSheetLayout,
@@ -213,6 +223,8 @@ export const MultiplePhotoPreviewPanel: React.FC<MultiplePhotoPreviewPanelProps>
           ? config.margins
           : isTargetA4
           ? { ...DEFAULT_A4_SHEET_MARGINS }
+          : orientation === "landscape"
+          ? { ...DEFAULT_4X6_LANDSCAPE_SHEET_MARGINS }
           : { ...DEFAULT_SHEET_MARGINS };
 
       const spacing =
@@ -220,10 +232,12 @@ export const MultiplePhotoPreviewPanel: React.FC<MultiplePhotoPreviewPanelProps>
           ? config.spacing
           : isTargetA4
           ? { ...DEFAULT_A4_SHEET_SPACING }
+          : orientation === "landscape"
+          ? { ...DEFAULT_4X6_LANDSCAPE_SHEET_SPACING }
           : { ...DEFAULT_4X6_SHEET_SPACING };
 
       const isManualCols = typeof config.columnsMode === "number";
-      const manualCols = isManualCols ? Math.min(4, Math.max(1, config.columnsMode as number)) : 4;
+      const manualCols = isManualCols ? Math.max(1, config.columnsMode as number) : 4;
       const flatPhotos = flattenPhotoCopies(photos);
       const manualRows = Math.max(1, Math.ceil(Math.max(1, flatPhotos.length) / manualCols));
 
@@ -233,6 +247,8 @@ export const MultiplePhotoPreviewPanel: React.FC<MultiplePhotoPreviewPanelProps>
       const paperHeightInches = isTargetA4
         ? (orientation === "landscape" ? SHEET_A4_SHORT_EDGE_INCHES : SHEET_A4_LONG_EDGE_INCHES)
         : (orientation === "landscape" ? SHEET_4X6_SHORT_EDGE_INCHES : SHEET_4X6_LONG_EDGE_INCHES);
+
+      const centerAlignment = targetPaperSize === "4x6" && orientation === "portrait";
 
       const exportSheetConfig: PhotoSheetConfig = {
         paperSize: targetPaperSize,
@@ -244,14 +260,35 @@ export const MultiplePhotoPreviewPanel: React.FC<MultiplePhotoPreviewPanelProps>
         manualCols,
         manualRows,
         copies: Math.max(1, flatPhotos.length),
-        centerAlignment: false, // Top-aligned, NO vertical centering
+        centerAlignment,
         margins,
         spacing,
         cutGuides: config.cutGuides,
       };
 
-      const photoWidthMm = unitToMm(config.dimensions.width, config.dimensions.unit);
-      const photoHeightMm = unitToMm(config.dimensions.height, config.dimensions.unit);
+      // Effective dimensions if using standard default presets when switching paper sizes
+      let photoWidthMm = unitToMm(config.dimensions.width, config.dimensions.unit);
+      let photoHeightMm = unitToMm(config.dimensions.height, config.dimensions.unit);
+
+      if (targetPaperSize !== config.paperSize) {
+        if (
+          !config.dimensions.presetId ||
+          config.dimensions.presetId === "a4_compact_default" ||
+          config.dimensions.presetId === "compact_default" ||
+          config.dimensions.presetId === "compact_4x6_landscape"
+        ) {
+          if (isTargetA4) {
+            photoWidthMm = DEFAULT_A4_PHOTO_WIDTH_MM;
+            photoHeightMm = DEFAULT_A4_PHOTO_HEIGHT_MM;
+          } else if (orientation === "landscape") {
+            photoWidthMm = DEFAULT_4X6_LANDSCAPE_PHOTO_WIDTH_MM;
+            photoHeightMm = DEFAULT_4X6_LANDSCAPE_PHOTO_HEIGHT_MM;
+          } else {
+            photoWidthMm = DEFAULT_4X6_PHOTO_WIDTH_MM;
+            photoHeightMm = DEFAULT_4X6_PHOTO_HEIGHT_MM;
+          }
+        }
+      }
 
       const targetLayout = calculatePhotoSheetLayout(exportSheetConfig, {
         widthMm: photoWidthMm,
@@ -271,7 +308,18 @@ export const MultiplePhotoPreviewPanel: React.FC<MultiplePhotoPreviewPanelProps>
       if (format === "pdf") {
         const targetPages = calculateMultiSheetPages(
           photos,
-          { ...config, paperSize: targetPaperSize, orientation },
+          {
+            ...config,
+            paperSize: targetPaperSize,
+            orientation,
+            margins,
+            spacing,
+            dimensions: {
+              width: photoWidthMm,
+              height: photoHeightMm,
+              unit: "mm",
+            },
+          },
           calculatePhotoSheetLayout
         );
         result = await exportMultiSheetAsPdf(
@@ -398,7 +446,7 @@ export const MultiplePhotoPreviewPanel: React.FC<MultiplePhotoPreviewPanelProps>
     const isTargetA4 = config.paperSize === "a4";
     const orientation = config.orientation;
     const isManualCols = typeof config.columnsMode === "number";
-    const manualCols = isManualCols ? Math.min(4, Math.max(1, config.columnsMode as number)) : 4;
+    const manualCols = isManualCols ? Math.max(1, config.columnsMode as number) : 4;
     const flatPhotos = flattenPhotoCopies(photos);
     const manualRows = Math.max(1, Math.ceil(Math.max(1, flatPhotos.length) / manualCols));
 
@@ -417,6 +465,8 @@ export const MultiplePhotoPreviewPanel: React.FC<MultiplePhotoPreviewPanelProps>
       ? SHEET_4X6_SHORT_EDGE_INCHES
       : SHEET_4X6_LONG_EDGE_INCHES;
 
+    const centerAlignment = config.paperSize === "4x6" && config.orientation === "portrait";
+
     return {
       paperSize: config.paperSize,
       orientation,
@@ -427,7 +477,7 @@ export const MultiplePhotoPreviewPanel: React.FC<MultiplePhotoPreviewPanelProps>
       manualCols,
       manualRows,
       copies: Math.max(1, flatPhotos.length),
-      centerAlignment: false,
+      centerAlignment,
       margins: config.margins,
       spacing: config.spacing,
       cutGuides: config.cutGuides,

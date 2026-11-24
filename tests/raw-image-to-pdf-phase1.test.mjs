@@ -37,12 +37,12 @@ import {
 describe('Raw Image to Clean PDF — Phase 1 Test Suite', () => {
 
   describe('1. Configuration & Default Constraints', () => {
-    it('enforces maximum batch size of 5 images by default', () => {
-      assert.equal(DEFAULT_RAW_IMAGE_CONFIG.maxBatchSize, 5);
+    it('enforces maximum batch size of 10 images by default', () => {
+      assert.equal(DEFAULT_RAW_IMAGE_CONFIG.maxBatchSize, 10);
     });
 
-    it('sets maximum file size limit to 25 MB', () => {
-      assert.equal(DEFAULT_RAW_IMAGE_CONFIG.maxFileSizeMB, 25);
+    it('sets maximum file size limit to 5 MB', () => {
+      assert.equal(DEFAULT_RAW_IMAGE_CONFIG.maxFileSizeMB, 5);
     });
 
     it('allows standard web image formats: JPEG, PNG, WebP', () => {
@@ -78,7 +78,7 @@ describe('Raw Image to Clean PDF — Phase 1 Test Suite', () => {
   });
 
   describe('3. File Validation & Batch Constraints', () => {
-    it('accepts valid JPEG and PNG files under 25 MB', () => {
+    it('accepts valid JPEG and PNG files under 5 MB', () => {
       const mockJpg = {
         name: 'scan1.jpg',
         size: 4 * 1024 * 1024,
@@ -91,10 +91,10 @@ describe('Raw Image to Clean PDF — Phase 1 Test Suite', () => {
       assert.equal(res.isValid, true);
     });
 
-    it('rejects files exceeding 25 MB', () => {
+    it('rejects files exceeding 5 MB', () => {
       const oversized = {
         name: 'huge_scan.png',
-        size: 30 * 1024 * 1024,
+        size: 6 * 1024 * 1024,
         type: 'image/png',
       };
       const res = validateFile(oversized, {
@@ -121,33 +121,38 @@ describe('Raw Image to Clean PDF — Phase 1 Test Suite', () => {
   });
 
   describe('4. Batch Capacity Slicing Simulation', () => {
-    it('correctly caps incoming uploads when approaching the 5-image limit', () => {
+    it('correctly caps incoming uploads when approaching the 10-image limit', () => {
       const currentPages = [
         { id: 'p1', name: 'img1.jpg' },
         { id: 'p2', name: 'img2.jpg' },
         { id: 'p3', name: 'img3.jpg' },
+        { id: 'p4', name: 'img4.jpg' },
+        { id: 'p5', name: 'img5.jpg' },
+        { id: 'p6', name: 'img6.jpg' },
+        { id: 'p7', name: 'img7.jpg' },
       ];
       const incoming = [
         { name: 'new1.jpg' },
         { name: 'new2.jpg' },
         { name: 'new3.jpg' },
         { name: 'new4.jpg' },
+        { name: 'new5.jpg' },
       ];
 
       const maxLimit = DEFAULT_RAW_IMAGE_CONFIG.maxBatchSize;
       const remainingCapacity = Math.max(0, maxLimit - currentPages.length);
-      assert.equal(remainingCapacity, 2);
+      assert.equal(remainingCapacity, 3);
 
       const accepted = incoming.slice(0, remainingCapacity);
       const rejectedCount = incoming.length - remainingCapacity;
 
-      assert.equal(accepted.length, 2);
+      assert.equal(accepted.length, 3);
       assert.equal(rejectedCount, 2);
-      assert.equal(currentPages.length + accepted.length, 5);
+      assert.equal(currentPages.length + accepted.length, 10);
     });
 
-    it('rejects all incoming files if batch is already at full capacity (5)', () => {
-      const currentPages = Array.from({ length: 5 }, (_, i) => ({ id: `p${i}` }));
+    it('rejects all incoming files if batch is already at full capacity (10)', () => {
+      const currentPages = Array.from({ length: 10 }, (_, i) => ({ id: `p${i}` }));
       const incoming = [{ name: 'extra.jpg' }];
 
       const remainingCapacity = Math.max(0, DEFAULT_RAW_IMAGE_CONFIG.maxBatchSize - currentPages.length);

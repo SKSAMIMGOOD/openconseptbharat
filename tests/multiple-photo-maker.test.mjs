@@ -69,14 +69,20 @@ describe('PHASE 03F: Multiple Photo Maker Test Suite', () => {
   // 1. PHOTO UPLOAD & STATE OPERATIONS
   // =========================================================================
   describe('1. Photo Upload & State Operations', () => {
-    it('initializes default config with 1.1 × 1.35 inches at 300 DPI', () => {
-      const config = createDefaultMultiplePhotoConfig('a4');
-      assert.equal(config.dimensions.width, 1.1);
-      assert.equal(config.dimensions.height, 1.35);
-      assert.equal(config.dimensions.unit, 'inch');
-      assert.equal(config.dpi, 300);
-      assert.equal(config.paperSize, 'a4');
-      assert.equal(config.defaultCopiesPerPhoto, 3);
+    it('initializes default config with 27 × 32 mm at 300 DPI matching Professional Photo Studio', () => {
+      const configA4 = createDefaultMultiplePhotoConfig('a4');
+      assert.equal(configA4.dimensions.width, 26.94);
+      assert.equal(configA4.dimensions.height, 32.33);
+      assert.equal(configA4.dimensions.unit, 'mm');
+      assert.equal(configA4.dpi, 300);
+      assert.equal(configA4.paperSize, 'a4');
+      assert.equal(configA4.defaultCopiesPerPhoto, 3);
+
+      const config4x6 = createDefaultMultiplePhotoConfig('4x6', 'portrait');
+      assert.equal(config4x6.dimensions.width, 1.1);
+      assert.equal(config4x6.dimensions.height, 1.35);
+      assert.equal(config4x6.dimensions.unit, 'inch');
+      assert.equal(config4x6.paperSize, '4x6');
     });
 
     it('adds new images without removing existing ones', () => {
@@ -422,14 +428,12 @@ describe('PHASE 03F: Multiple Photo Maker Test Suite', () => {
   });
 
   // =========================================================================
-  // 6. MAXIMUM 4 PHOTOGRAPHS PER ROW ENFORCEMENT
+  // 6. SYNCHRONIZED SHEET LAYOUT & COLUMN CAPACITY
   // =========================================================================
-  describe('6. Maximum Four Photographs Per Row Enforcement', () => {
-    it('strictly caps columns at 4 on A4 paper even when available width permits more', () => {
-      // 1.1 inch photo (27.94 mm) on A4 (width 210 mm) could physically fit 6 cols,
-      // but specification strictly mandates maximum 4 photographs per row.
+  describe('6. Synchronized Sheet Layout & Column Capacity (Photo Studio Parity)', () => {
+    it('calculates 7 columns and 56 photo capacity on A4 with 27 × 32 mm matching Photo Studio', () => {
       const photos = [
-        createMockPhoto('p1', 'p1.jpg', 800, 1000, 16),
+        createMockPhoto('p1', 'p1.jpg', 800, 1000, 56),
       ];
 
       const config = {
@@ -439,16 +443,14 @@ describe('PHASE 03F: Multiple Photo Maker Test Suite', () => {
 
       const arrangement = calculateMultiPhotoArrangement(photos, config, calculatePhotoSheetLayout);
 
-      assert.ok(arrangement.layout.activeColumns <= 4, 'Columns must be <= 4');
-      assert.equal(arrangement.layout.activeColumns, 4);
-
-      // Verify that every placement has col index in [0, 1, 2, 3]
-      for (const p of arrangement.layout.placements) {
-        assert.ok(p.col >= 0 && p.col <= 3, `Col index (${p.col}) must be between 0 and 3`);
-      }
+      assert.equal(arrangement.layout.activeColumns, 7);
+      assert.equal(arrangement.layout.maxColumns, 7);
+      assert.equal(arrangement.layout.activeRows, 8);
+      assert.equal(arrangement.layout.maxCapacity, 56);
+      assert.equal(arrangement.totalPlacedPhotos, 56);
     });
 
-    it('strictly clamps manual column selection to maximum 4', () => {
+    it('respects manual column selection when explicitly configured', () => {
       const photos = [createMockPhoto('p1', 'p1.jpg', 800, 1000, 8)];
       const config = {
         ...createDefaultMultiplePhotoConfig('a4'),
@@ -520,6 +522,7 @@ describe('PHASE 03F: Multiple Photo Maker Test Suite', () => {
 
       const config = {
         ...createDefaultMultiplePhotoConfig('a4'),
+        dimensions: { width: 1.1, height: 1.35, unit: 'inch' },
         margins: { topMm: topMargin, bottomMm: topMargin, leftMm: 6, rightMm: 6, uniform: true },
         spacing: { horizontalMm: 1.5, verticalMm: vSpacing, uniform: true },
         columnsMode: 4,
@@ -592,10 +595,10 @@ describe('PHASE 03F: Multiple Photo Maker Test Suite', () => {
     });
 
     it('flags capacity exceeded when requested copies exceed sheet capacity without silent loss', () => {
-      // 4×6 landscape has capacity 8 for 1.1 × 1.35 in photos
-      // Request 12 copies
+      // 4×6 landscape has capacity 15 for 24.55 × 30.14 mm photos (5 cols × 3 rows)
+      // Request 20 copies
       const photos = [
-        createMockPhoto('p1', 'p1.jpg', 800, 1000, 12),
+        createMockPhoto('p1', 'p1.jpg', 800, 1000, 20),
       ];
 
       const config = {
@@ -607,9 +610,9 @@ describe('PHASE 03F: Multiple Photo Maker Test Suite', () => {
 
       const arrangement = calculateMultiPhotoArrangement(photos, config, calculatePhotoSheetLayout);
 
-      assert.equal(arrangement.totalRequestedCopies, 12);
-      assert.equal(arrangement.totalPlacedPhotos, 8);
-      assert.equal(arrangement.unplacedCopiesCount, 4);
+      assert.equal(arrangement.totalRequestedCopies, 20);
+      assert.equal(arrangement.totalPlacedPhotos, 15);
+      assert.equal(arrangement.unplacedCopiesCount, 5);
       assert.equal(arrangement.isCapacityExceeded, true);
     });
 

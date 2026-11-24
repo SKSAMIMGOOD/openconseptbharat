@@ -46,6 +46,8 @@ export interface MultiplePhotoDimensions {
   height: number;
   /** Measurement unit (inch, cm, mm) */
   unit: DimensionUnit;
+  /** Optional standard preset identifier (e.g. 'a4_compact_default', 'compact_default') */
+  presetId?: string;
 }
 
 /**
@@ -66,8 +68,8 @@ export interface MultiplePhotoConfig {
   margins: SheetMargins;
   /** Inter-photo spacing in millimeters */
   spacing: SheetSpacing;
-  /** Columns per row constraint: 'auto' (up to 4) or 1..4 */
-  columnsMode: "auto" | 1 | 2 | 3 | 4;
+  /** Columns per row constraint: 'auto' or explicit column count (e.g. 1..7) */
+  columnsMode: "auto" | number;
   /** Cutting guides configuration */
   cutGuides: CutGuidesConfig;
 }

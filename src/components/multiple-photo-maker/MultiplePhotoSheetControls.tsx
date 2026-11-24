@@ -22,11 +22,19 @@ import type { MultiplePhotoConfig } from "@/types/multiple-photo";
 import {
   DEFAULT_A4_SHEET_MARGINS,
   DEFAULT_SHEET_MARGINS,
+  DEFAULT_4X6_LANDSCAPE_SHEET_MARGINS,
   DEFAULT_A4_SHEET_SPACING,
   DEFAULT_4X6_SHEET_SPACING,
+  DEFAULT_4X6_LANDSCAPE_SHEET_SPACING,
   CUT_GUIDE_STYLES,
   CUT_GUIDE_COLORS,
 } from "@/constants/photo-sheet";
+import {
+  DEFAULT_A4_PHOTO_WIDTH_MM,
+  DEFAULT_A4_PHOTO_HEIGHT_MM,
+  DEFAULT_4X6_LANDSCAPE_PHOTO_WIDTH_MM,
+  DEFAULT_4X6_LANDSCAPE_PHOTO_HEIGHT_MM,
+} from "@/constants/photo-dimensions";
 import { cn } from "@/lib/utils/cn";
 
 export interface MultiplePhotoSheetControlsProps {
@@ -40,30 +48,135 @@ export const MultiplePhotoSheetControls: React.FC<MultiplePhotoSheetControlsProp
   onConfigChange,
   className,
 }) => {
-  // Switch Paper Size (4x6 vs A4)
+  // Switch Paper Size (4x6 vs A4) synchronized with Professional Photo Studio
   const handlePaperSizeChange = (paperSize: SheetPaperSize) => {
     onConfigChange((prev) => {
       const isA4 = paperSize === "a4";
+      let orientation: SheetOrientation = isA4 ? "portrait" : prev.orientation;
+      let margins: SheetMargins;
+      let spacing: SheetSpacing;
+      let dimensions = prev.dimensions;
+
+      if (isA4) {
+        margins = { ...DEFAULT_A4_SHEET_MARGINS };
+        spacing = { ...DEFAULT_A4_SHEET_SPACING };
+        if (
+          !dimensions.presetId ||
+          dimensions.presetId === "compact_default" ||
+          dimensions.presetId === "a4_compact_default" ||
+          dimensions.presetId === "compact_4x6_landscape"
+        ) {
+          dimensions = {
+            width: DEFAULT_A4_PHOTO_WIDTH_MM,
+            height: DEFAULT_A4_PHOTO_HEIGHT_MM,
+            unit: "mm",
+            presetId: "a4_compact_default",
+          };
+        }
+      } else {
+        if (orientation === "landscape") {
+          margins = { ...DEFAULT_4X6_LANDSCAPE_SHEET_MARGINS };
+          spacing = { ...DEFAULT_4X6_LANDSCAPE_SHEET_SPACING };
+          if (
+            !dimensions.presetId ||
+            dimensions.presetId === "compact_default" ||
+            dimensions.presetId === "a4_compact_default" ||
+            dimensions.presetId === "compact_4x6_landscape"
+          ) {
+            dimensions = {
+              width: DEFAULT_4X6_LANDSCAPE_PHOTO_WIDTH_MM,
+              height: DEFAULT_4X6_LANDSCAPE_PHOTO_HEIGHT_MM,
+              unit: "mm",
+              presetId: "compact_4x6_landscape",
+            };
+          }
+        } else {
+          margins = { ...DEFAULT_SHEET_MARGINS };
+          spacing = { ...DEFAULT_4X6_SHEET_SPACING };
+          if (
+            !dimensions.presetId ||
+            dimensions.presetId === "compact_default" ||
+            dimensions.presetId === "a4_compact_default" ||
+            dimensions.presetId === "compact_4x6_landscape"
+          ) {
+            dimensions = {
+              width: 1.1,
+              height: 1.35,
+              unit: "inch",
+              presetId: "compact_default",
+            };
+          }
+        }
+      }
+
       return {
         ...prev,
         paperSize,
-        orientation: isA4 ? "portrait" : "landscape",
-        margins: isA4 ? { ...DEFAULT_A4_SHEET_MARGINS } : { ...DEFAULT_SHEET_MARGINS },
-        spacing: isA4 ? { ...DEFAULT_A4_SHEET_SPACING } : { ...DEFAULT_4X6_SHEET_SPACING },
+        orientation,
+        margins,
+        spacing,
+        dimensions,
       };
     });
   };
 
   // Toggle orientation
   const handleOrientationToggle = () => {
-    onConfigChange((prev) => ({
-      ...prev,
-      orientation: prev.orientation === "portrait" ? "landscape" : "portrait",
-    }));
+    onConfigChange((prev) => {
+      const newOrientation: SheetOrientation =
+        prev.orientation === "portrait" ? "landscape" : "portrait";
+      let margins = prev.margins;
+      let spacing = prev.spacing;
+      let dimensions = prev.dimensions;
+
+      if (prev.paperSize === "4x6") {
+        if (newOrientation === "landscape") {
+          margins = { ...DEFAULT_4X6_LANDSCAPE_SHEET_MARGINS };
+          spacing = { ...DEFAULT_4X6_LANDSCAPE_SHEET_SPACING };
+          if (
+            !dimensions.presetId ||
+            dimensions.presetId === "compact_default" ||
+            dimensions.presetId === "a4_compact_default" ||
+            dimensions.presetId === "compact_4x6_landscape"
+          ) {
+            dimensions = {
+              width: DEFAULT_4X6_LANDSCAPE_PHOTO_WIDTH_MM,
+              height: DEFAULT_4X6_LANDSCAPE_PHOTO_HEIGHT_MM,
+              unit: "mm",
+              presetId: "compact_4x6_landscape",
+            };
+          }
+        } else {
+          margins = { ...DEFAULT_SHEET_MARGINS };
+          spacing = { ...DEFAULT_4X6_SHEET_SPACING };
+          if (
+            !dimensions.presetId ||
+            dimensions.presetId === "compact_default" ||
+            dimensions.presetId === "a4_compact_default" ||
+            dimensions.presetId === "compact_4x6_landscape"
+          ) {
+            dimensions = {
+              width: 1.1,
+              height: 1.35,
+              unit: "inch",
+              presetId: "compact_default",
+            };
+          }
+        }
+      }
+
+      return {
+        ...prev,
+        orientation: newOrientation,
+        margins,
+        spacing,
+        dimensions,
+      };
+    });
   };
 
-  // Columns per row constraint: 'auto' | 1 | 2 | 3 | 4
-  const handleColumnsModeChange = (mode: "auto" | 1 | 2 | 3 | 4) => {
+  // Columns per row constraint: 'auto' or manual count
+  const handleColumnsModeChange = (mode: "auto" | number) => {
     onConfigChange((prev) => ({
       ...prev,
       columnsMode: mode,
@@ -202,35 +315,35 @@ export const MultiplePhotoSheetControls: React.FC<MultiplePhotoSheetControlsProp
         </div>
       </div>
 
-      {/* 2. Grid Arrangement: Max 4 Photographs Per Row */}
+      {/* 2. Grid Arrangement: Columns Per Row */}
       <div>
         <div className="flex items-center justify-between mb-2">
           <label className="text-xs font-semibold text-surface-700">
-            Columns Per Row (Max 4 Photos Per Row)
+            Columns Per Row
           </label>
           <span className="text-[11px] text-surface-500 font-medium">
             Top-aligned, Left-to-Right
           </span>
         </div>
 
-        <div className="grid grid-cols-5 gap-2">
+        <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
           <button
             type="button"
             onClick={() => handleColumnsModeChange("auto")}
             className={cn(
-              "py-2 px-2 text-xs font-bold rounded-xl border text-center transition-all",
+              "py-2 px-2 text-xs font-bold rounded-xl border text-center transition-all col-span-2 sm:col-span-1",
               config.columnsMode === "auto"
                 ? "border-brand-500 bg-brand-50 text-brand-700 ring-1 ring-brand-500"
                 : "border-surface-200 hover:border-surface-300 bg-white text-surface-700"
             )}
           >
-            Auto (≤4)
+            Auto
           </button>
-          {[1, 2, 3, 4].map((colCount) => (
+          {[1, 2, 3, 4, 5, 6, 7].map((colCount) => (
             <button
               key={colCount}
               type="button"
-              onClick={() => handleColumnsModeChange(colCount as 1 | 2 | 3 | 4)}
+              onClick={() => handleColumnsModeChange(colCount)}
               className={cn(
                 "py-2 px-2 text-xs font-bold rounded-xl border text-center transition-all",
                 config.columnsMode === colCount
@@ -238,7 +351,7 @@ export const MultiplePhotoSheetControls: React.FC<MultiplePhotoSheetControlsProp
                   : "border-surface-200 hover:border-surface-300 bg-white text-surface-700"
               )}
             >
-              {colCount} {colCount === 1 ? "Col" : "Cols"}
+              {colCount}
             </button>
           ))}
         </div>

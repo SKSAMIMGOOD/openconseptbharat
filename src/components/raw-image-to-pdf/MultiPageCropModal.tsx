@@ -79,6 +79,10 @@ export const MultiPageCropModal: React.FC<MultiPageCropModalProps> = ({
   }, [currentPageIndex, totalPages, onSelectPage]);
 
   const handleClose = useCallback(() => {
+    onClose();
+  }, [onClose]);
+
+  const handleProceedToFinalEdit = useCallback(() => {
     if (allCompleted) {
       if (onCompleteAll) {
         onCompleteAll();
@@ -87,7 +91,7 @@ export const MultiPageCropModal: React.FC<MultiPageCropModalProps> = ({
       }
     } else {
       setIncompleteWarning(true);
-      setTimeout(() => setIncompleteWarning(false), 3000);
+      setTimeout(() => setIncompleteWarning(false), 3500);
     }
   }, [allCompleted, onCompleteAll, onClose]);
 
@@ -291,12 +295,21 @@ export const MultiPageCropModal: React.FC<MultiPageCropModalProps> = ({
           {/* Navigation & Action Buttons */}
           <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             {/* Proceed to Edit Workspace when all pages are completed */}
-            {allCompleted && onCompleteAll && (
+            {onCompleteAll && (
               <button
                 type="button"
-                onClick={onCompleteAll}
-                className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-xs transition-all cursor-pointer"
-                title="Proceed to Final Editing Workspace"
+                onClick={handleProceedToFinalEdit}
+                className={cn(
+                  "inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                  allCompleted
+                    ? "bg-blue-600 hover:bg-blue-500 text-white shadow-xs"
+                    : "bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700"
+                )}
+                title={
+                  allCompleted
+                    ? "Proceed to Final Editing Workspace"
+                    : `Complete all pages before proceeding (${completedCount}/${totalPages} done)`
+                }
               >
                 <span>Done</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -341,8 +354,8 @@ export const MultiPageCropModal: React.FC<MultiPageCropModalProps> = ({
               type="button"
               onClick={handleClose}
               className="p-1 sm:p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-              title={allCompleted ? "Done Cropping (Esc)" : "Close Cropper"}
-              aria-label="Close Cropper"
+              title="Close and continue later (Esc)"
+              aria-label="Close and continue later"
             >
               <X className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>

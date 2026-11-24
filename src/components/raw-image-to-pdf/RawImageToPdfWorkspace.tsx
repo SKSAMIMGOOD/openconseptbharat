@@ -37,6 +37,7 @@ export const RawImageToPdfWorkspace: React.FC = () => {
     croppedPagesCount,
     annotatedPagesCount,
     maxBatchSize,
+    maxFileSizeMB,
     remainingCapacity,
     isProcessing,
     statusMessage,
@@ -82,6 +83,9 @@ export const RawImageToPdfWorkspace: React.FC = () => {
     closeEditStudio,
     setEditActivePageIndex,
   } = useRawImageToPdf();
+
+  const [incompleteEditNotice, setIncompleteEditNotice] = React.useState<boolean>(false);
+  const completedPagesCount = pages.filter((p) => p.isCropped || p.cropConfirmed).length;
 
   return (
     <div className="w-full space-y-6">
@@ -143,21 +147,31 @@ export const RawImageToPdfWorkspace: React.FC = () => {
               ? "bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500/30"
               : allPagesCropCompleted
               ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60"
+              : completedPagesCount > 0
+              ? "bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60"
               : "bg-surface-100 dark:bg-surface-800 text-surface-400"
           )}
         >
           <span
             className={cn(
               "w-4 h-4 rounded-full text-white text-[10px] flex items-center justify-center font-bold",
-              allPagesCropCompleted ? "bg-emerald-600" : "bg-blue-600"
+              allPagesCropCompleted
+                ? "bg-emerald-600"
+                : completedPagesCount > 0
+                ? "bg-amber-600"
+                : "bg-blue-600"
             )}
           >
             2
           </span>
           <span>Crop All Pages</span>
-          {allPagesCropCompleted && (
+          {allPagesCropCompleted ? (
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-          )}
+          ) : completedPagesCount > 0 ? (
+            <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300">
+              ({completedPagesCount}/{totalPages})
+            </span>
+          ) : null}
         </div>
 
         <ArrowRight className="w-3.5 h-3.5 text-surface-400 shrink-0" />
@@ -237,6 +251,7 @@ export const RawImageToPdfWorkspace: React.FC = () => {
           <RawImageDropzone
             onFilesSelected={addImages}
             maxBatchSize={maxBatchSize}
+            maxSizeMB={maxFileSizeMB}
             currentCount={totalPages}
             disabled={isProcessing}
           />
@@ -282,11 +297,60 @@ export const RawImageToPdfWorkspace: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-4">
+          {/* Non-blocking Cropping Paused Notice */}
+          {!allPagesCropCompleted && !isCropModalOpen && (
+            <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-900 dark:text-amber-200 shadow-2xs">
+              <div className="flex items-start gap-2.5">
+                <Info className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <p className="text-xs sm:text-sm font-semibold">
+                    Cropping paused. Your images and completed edits are saved. You can continue cropping anytime.
+                  </p>
+                  <p className="text-xs text-amber-700/90 dark:text-amber-400/90">
+                    {completedPagesCount} of {totalPages} pages completed. You can select additional images from different folders or resume cropping when ready.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  onClick={() => openCropEditor()}
+                  disabled={isProcessing}
+                  className="bg-amber-600 hover:bg-amber-500 text-white shadow-xs"
+                >
+                  <Crop className="w-3.5 h-3.5 mr-1.5" />
+                  <span>Resume Cropping</span>
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Incomplete Edit Notice Alert */}
+          {incompleteEditNotice && (
+            <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 rounded-xl p-3 flex items-center justify-between gap-2 text-amber-900 dark:text-amber-200 animate-in fade-in">
+              <div className="flex items-center gap-2 text-xs font-medium">
+                <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                <span>
+                  Please crop or confirm &quot;Keep Original&quot; for all pages before proceeding to final editing ({completedPagesCount} of {totalPages} completed).
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIncompleteEditNotice(false)}
+                className="text-xs text-amber-700 dark:text-amber-400 hover:underline shrink-0"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
           {/* Gallery Top Action Bar */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-surface-900 rounded-xl border border-surface-200 dark:border-surface-800 px-4 py-3 shadow-2xs">
             <div className="flex flex-wrap items-center gap-2.5">
               <span className="text-sm font-bold text-surface-900 dark:text-surface-100">
-                Final Editing Workspace
+                {allPagesCropCompleted ? "Final Editing Workspace" : "Selected Pages & Upload"}
               </span>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300">
                 {totalPages} of {maxBatchSize} pages
@@ -316,21 +380,44 @@ export const RawImageToPdfWorkspace: React.FC = () => {
                 type="button"
                 variant="primary"
                 size="sm"
-                onClick={() => openCropEditor(activePageIndex)}
+                onClick={() => openCropEditor(allPagesCropCompleted ? activePageIndex : undefined)}
                 disabled={isProcessing}
                 className="shadow-xs"
               >
                 <Crop className="w-3.5 h-3.5 mr-1.5" />
-                <span>{allPagesCropCompleted ? "Re-crop Pages" : "Crop All Pages"}</span>
+                <span>
+                  {allPagesCropCompleted
+                    ? "Re-crop Pages"
+                    : completedPagesCount > 0
+                    ? "Resume Cropping"
+                    : "Crop All Pages"}
+                </span>
               </Button>
 
               <Button
                 type="button"
                 variant="secondary"
                 size="sm"
-                onClick={() => openEditStudio(activePageIndex)}
+                onClick={() => {
+                  if (!allPagesCropCompleted) {
+                    setIncompleteEditNotice(true);
+                    setTimeout(() => setIncompleteEditNotice(false), 4000);
+                  } else {
+                    openEditStudio(activePageIndex);
+                  }
+                }}
                 disabled={isProcessing}
-                className="shadow-xs bg-indigo-600 hover:bg-indigo-700 text-white"
+                className={cn(
+                  "shadow-xs text-white",
+                  allPagesCropCompleted
+                    ? "bg-indigo-600 hover:bg-indigo-700"
+                    : "bg-surface-400 dark:bg-surface-700 hover:bg-surface-500 cursor-not-allowed opacity-80"
+                )}
+                title={
+                  !allPagesCropCompleted
+                    ? "Complete cropping for all pages before enhancing & annotating"
+                    : "Open Enhance & Annotation Studio"
+                }
               >
                 <Sliders className="w-3.5 h-3.5 mr-1.5" />
                 <span>Enhance & Annotate</span>
@@ -355,13 +442,21 @@ export const RawImageToPdfWorkspace: React.FC = () => {
             pages={pages}
             activePageIndex={activePageIndex}
             maxBatchSize={maxBatchSize}
+            maxSizeMB={maxFileSizeMB}
             onSelectPage={setActivePageIndex}
             onRemovePage={removePage}
             onReplacePage={replacePage}
             onMoveLeft={movePageLeft}
             onMoveRight={movePageRight}
             onCropPage={(idx) => openCropEditor(idx)}
-            onEditPage={(idx) => openEditStudio(idx)}
+            onEditPage={(idx) => {
+              if (!allPagesCropCompleted) {
+                setIncompleteEditNotice(true);
+                setTimeout(() => setIncompleteEditNotice(false), 4000);
+              } else {
+                openEditStudio(idx);
+              }
+            }}
             onAddMoreFiles={addImages}
             onToggleApplyGlobalEdits={setPageApplyGlobalEdits}
             disabled={isProcessing}
@@ -373,7 +468,7 @@ export const RawImageToPdfWorkspace: React.FC = () => {
             activePageIndex={activePageIndex}
             globalEnhancements={globalEnhancements}
             globalColorFilter={globalColorFilter}
-            disabled={isProcessing}
+            disabled={isProcessing || !allPagesCropCompleted}
           />
 
           {/* Phase 4 Status Banner */}

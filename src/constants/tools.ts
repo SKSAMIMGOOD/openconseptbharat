@@ -268,19 +268,19 @@ export const TOOLS: ToolMetadata[] = [
     shortDescription:
       "Transform smartphone photos of documents, notes and receipts into clean, straightened multi-page A4 PDFs.",
     description:
-      "Upload up to 5 document photographs to straighten perspective distortion, enhance contrast and readability, annotate, and compile into a single print-ready A4 PDF in browser memory.",
+      "Upload up to 10 document photographs to straighten perspective distortion, enhance contrast and readability, annotate, and compile into a single print-ready A4 PDF in browser memory.",
     route: "/tools/raw-image-to-pdf",
     status: "ready",
     badge: "Multi-Image PDF",
     iconName: "FileText",
     features: [
-      "Upload up to 5 document photos",
+      "Upload up to 10 document photos",
       "Memory-safe lightweight thumbnail previews",
       "Interactive page reordering & replacement",
       "100% in-browser client-side execution",
     ],
     fileAccept: ["image/jpeg", "image/png", "image/webp"],
-    maxFileSizeMB: 25,
+    maxFileSizeMB: 5,
   },
 ];
 

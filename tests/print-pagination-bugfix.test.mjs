@@ -20,6 +20,8 @@ import {
   calculateMultiSheetPages,
   createDefaultMultiplePhotoConfig,
   flattenPhotoCopies,
+  buildPhotoSheetConfig,
+  unitToMm,
 } from "../src/lib/multiple-photo/multiple-photo-engine.ts";
 
 import {
@@ -138,27 +140,12 @@ describe("PRINTING BUG FIX & MULTI-TOOL PAGINATION VERIFICATION", () => {
   describe("2. Multiple Photo Maker: Multi-Page Overflow (Page full -> Shift to next page)", () => {
     test("shifts to Sheet 2 when photo count exceeds Sheet 1 max capacity", () => {
       const config = createDefaultMultiplePhotoConfig("a4");
-      // Calculate capacity of single A4 sheet
-      const probe = calculatePhotoSheetLayout(
-        {
-          paperSize: "a4",
-          orientation: "portrait",
-          paperWidthInches: 8.2677,
-          paperHeightInches: 11.6929,
-          dpi: 300,
-          layoutMode: "auto",
-          manualCols: 4,
-          manualRows: 8,
-          copies: 100,
-          centerAlignment: false,
-          margins: config.margins,
-          spacing: config.spacing,
-          cutGuides: config.cutGuides,
-          maxColumnLimit: 4,
-        },
-        { widthMm: 27.94, heightMm: 34.29 }
-      );
-      const capacity = probe.maxCapacity; // Typically 32 on A4 portrait
+      // Calculate capacity of single A4 sheet using the config's actual dimensions
+      const probeWidthMm = unitToMm(config.dimensions.width, config.dimensions.unit);
+      const probeHeightMm = unitToMm(config.dimensions.height, config.dimensions.unit);
+      const probeConfig = buildPhotoSheetConfig(config, 100);
+      const probe = calculatePhotoSheetLayout(probeConfig, { widthMm: probeWidthMm, heightMm: probeHeightMm });
+      const capacity = probe.maxCapacity; // 56 on A4 portrait
       assert.ok(capacity > 0);
 
       // Create photos exceeding capacity by 8
@@ -175,8 +162,8 @@ describe("PRINTING BUG FIX & MULTI-TOOL PAGINATION VERIFICATION", () => {
     });
 
     test("shifts to Sheet 3 when photo count exceeds Sheet 2 capacity", () => {
-      const config = createDefaultMultiplePhotoConfig("4x6");
-      // 4x6 capacity is typically 12 photos
+      const config = createDefaultMultiplePhotoConfig("4x6", "portrait");
+      // 4x6 portrait capacity is 12 photos (3 cols × 4 rows) -> 28 photos = 3 sheets (12 + 12 + 4)
       const photos = [createMockUploadedPhoto("p1", "photo.jpg", 28)];
 
       const pages = calculateMultiSheetPages(photos, config, calculatePhotoSheetLayout);

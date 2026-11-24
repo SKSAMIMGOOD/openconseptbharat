@@ -87,7 +87,7 @@ export default function MultiplePhotoMakerPage() {
                 </span>
               </div>
               <p className="text-xs text-surface-600 mt-0.5 max-w-2xl">
-                Upload multiple photographs, configure physical dimensions and DPI, and arrange them seamlessly on A4 or 4×6″ sheets with top-aligned grid math, maximum 4 photos per row, and print-ready PDF export.
+                Upload multiple photographs, configure physical dimensions and DPI, and arrange them seamlessly on A4 (up to 56 photos) or 4×6″ sheets with calibrated grid math, flexible columns, and print-ready PDF export.
               </p>
             </div>
           </div>

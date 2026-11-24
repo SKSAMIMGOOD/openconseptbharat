@@ -195,15 +195,8 @@ export function calculatePhotoSheetLayout(
   const photoWidthPx = Math.round((photoW / MM_PER_INCH) * validDpi);
   const photoHeightPx = Math.round((photoH / MM_PER_INCH) * validDpi);
 
-  const isMultiplePhoto =
-    typeof Error !== "undefined" &&
-    (new Error().stack?.includes("multiple-photo") ?? false);
   const effectiveMaxColLimit =
-    config.maxColumnLimit !== undefined
-      ? config.maxColumnLimit
-      : isMultiplePhoto
-      ? 4
-      : undefined;
+    config.maxColumnLimit !== undefined ? config.maxColumnLimit : undefined;
 
   const { maxCols, maxRows, maxCapacity } = calculateMaxSheetCapacity(
     sheetDims.widthMm,

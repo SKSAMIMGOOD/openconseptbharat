@@ -221,8 +221,8 @@ export interface RawImageToPdfConfig {
 }
 
 export const DEFAULT_RAW_IMAGE_CONFIG: Readonly<RawImageToPdfConfig> = {
-  maxBatchSize: 5,
-  maxFileSizeMB: 25,
+  maxBatchSize: 10,
+  maxFileSizeMB: 5,
   allowedMimeTypes: ["image/jpeg", "image/png", "image/webp"],
   thumbnailMaxDimension: 480,
   thumbnailQuality: 0.82,

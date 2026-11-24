@@ -202,4 +202,89 @@ describe("Raw Image to Clean PDF — Workflow Improvement Suite", () => {
       assert.equal(preservedPage.watermark.text, "OFFICIAL");
     });
   });
+
+  describe("4. Close Crop Editor & Resume Workflow", () => {
+    test("closing crop editor early returns to upload workspace without modifying pages or crops", () => {
+      const pages = [
+        { id: "p1", name: "p1.jpg", isCropped: true, cropConfirmed: true, croppedPreviewUrl: "blob:crop-1" },
+        { id: "p2", name: "p2.jpg", isCropped: false, cropConfirmed: false },
+        { id: "p3", name: "p3.jpg", isCropped: false, cropConfirmed: false },
+      ];
+
+      let isCropModalOpen = true;
+      let workflowStep = "crop";
+
+      // Simulate user clicking X button
+      const closeCropEditor = () => {
+        isCropModalOpen = false;
+        const allDone = pages.length > 0 && pages.every((p) => p.isCropped || p.cropConfirmed);
+        if (allDone) {
+          workflowStep = "edit";
+        } else {
+          workflowStep = "upload";
+        }
+      };
+
+      closeCropEditor();
+
+      assert.equal(isCropModalOpen, false);
+      assert.equal(workflowStep, "upload");
+      // Verify no pages were deleted or auto-confirmed
+      assert.equal(pages.length, 3);
+      assert.equal(pages[0].isCropped, true);
+      assert.equal(pages[0].croppedPreviewUrl, "blob:crop-1");
+      assert.equal(pages[1].isCropped, false);
+      assert.equal(pages[1].cropConfirmed, false);
+      assert.equal(pages[2].isCropped, false);
+      assert.equal(pages[2].cropConfirmed, false);
+    });
+
+    test("resumeCropWorkflow selects the first unfinished page by default", () => {
+      const pages = [
+        { id: "p1", isCropped: true, cropConfirmed: true },
+        { id: "p2", isCropped: true, cropConfirmed: true },
+        { id: "p3", isCropped: false, cropConfirmed: false }, // first unfinished
+        { id: "p4", isCropped: false, cropConfirmed: false },
+      ];
+
+      const getResumePageIndex = (arr) => {
+        const firstUnfinished = arr.findIndex((p) => !p.isCropped && !p.cropConfirmed);
+        return firstUnfinished !== -1 ? firstUnfinished : 0;
+      };
+
+      const targetIndex = getResumePageIndex(pages);
+      assert.equal(targetIndex, 2); // Page 3 (0-indexed 2)
+    });
+
+    test("adding additional images in upload workspace preserves existing crops and targets new page", () => {
+      const existingPages = [
+        { id: "p1", name: "front.jpg", isCropped: true, cropConfirmed: true },
+        { id: "p2", name: "back.jpg", isCropped: false, cropConfirmed: false },
+      ];
+
+      const newUploads = [
+        { id: "p3", name: "receipt.jpg", isCropped: false, cropConfirmed: false },
+      ];
+
+      const previousLength = existingPages.length;
+      const combined = [...existingPages, ...newUploads];
+      const targetCropIndex = previousLength === 0 ? 0 : previousLength;
+
+      assert.equal(combined.length, 3);
+      assert.equal(targetCropIndex, 2); // Targets new page p3
+      assert.equal(combined[0].isCropped, true);
+      assert.equal(combined[1].isCropped, false);
+      assert.equal(combined[2].isCropped, false);
+    });
+
+    test("proceeding to final editing is blocked when unfinished pages exist", () => {
+      const pages = [
+        { id: "p1", isCropped: true, cropConfirmed: true },
+        { id: "p2", isCropped: false, cropConfirmed: false },
+      ];
+
+      const canProceedToFinalEdit = pages.every((p) => Boolean(p.isCropped || p.cropConfirmed));
+      assert.equal(canProceedToFinalEdit, false);
+    });
+  });
 });

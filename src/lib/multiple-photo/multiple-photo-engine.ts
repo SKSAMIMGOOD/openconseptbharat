@@ -19,6 +19,28 @@ import type {
   SheetSpacing,
   CutGuidesConfig,
 } from "@/types/photo-sheet";
+import {
+  SHEET_A4_SHORT_EDGE_INCHES,
+  SHEET_A4_LONG_EDGE_INCHES,
+  SHEET_4X6_SHORT_EDGE_INCHES,
+  SHEET_4X6_LONG_EDGE_INCHES,
+  DEFAULT_A4_SHEET_MARGINS,
+  DEFAULT_SHEET_MARGINS,
+  DEFAULT_4X6_LANDSCAPE_SHEET_MARGINS,
+  DEFAULT_A4_SHEET_SPACING,
+  DEFAULT_4X6_SHEET_SPACING,
+  DEFAULT_4X6_LANDSCAPE_SHEET_SPACING,
+  DEFAULT_CUT_GUIDES,
+} from "../../constants/photo-sheet.ts";
+import {
+  DEFAULT_A4_PHOTO_WIDTH_MM,
+  DEFAULT_A4_PHOTO_HEIGHT_MM,
+  DEFAULT_4X6_PHOTO_WIDTH_MM,
+  DEFAULT_4X6_PHOTO_HEIGHT_MM,
+  DEFAULT_4X6_LANDSCAPE_PHOTO_WIDTH_MM,
+  DEFAULT_4X6_LANDSCAPE_PHOTO_HEIGHT_MM,
+  PHOTO_DIMENSION_PRESETS,
+} from "../../constants/photo-dimensions.ts";
 import type {
   UploadedPhoto,
   MultiplePhotoDimensions,
@@ -31,15 +53,20 @@ export const MM_PER_INCH = 25.4;
 export const MM_PER_CM = 10;
 export const CM_PER_INCH = 2.54;
 
-/** Standard ISO 216 A4 dimensions in inches */
-export const SHEET_A4_SHORT_EDGE_INCHES = 8.2677165;
-export const SHEET_A4_LONG_EDGE_INCHES = 11.6929134;
+export {
+  SHEET_A4_SHORT_EDGE_INCHES,
+  SHEET_A4_LONG_EDGE_INCHES,
+  SHEET_4X6_SHORT_EDGE_INCHES,
+  SHEET_4X6_LONG_EDGE_INCHES,
+  DEFAULT_A4_PHOTO_WIDTH_MM,
+  DEFAULT_A4_PHOTO_HEIGHT_MM,
+  DEFAULT_4X6_PHOTO_WIDTH_MM,
+  DEFAULT_4X6_PHOTO_HEIGHT_MM,
+  DEFAULT_4X6_LANDSCAPE_PHOTO_WIDTH_MM,
+  DEFAULT_4X6_LANDSCAPE_PHOTO_HEIGHT_MM,
+};
 
-/** Standard 4x6 dimensions in inches */
-export const SHEET_4X6_SHORT_EDGE_INCHES = 4.0;
-export const SHEET_4X6_LONG_EDGE_INCHES = 6.0;
-
-/** Default physical photo dimensions: 1.1 × 1.35 inches */
+/** Default physical photo dimensions: 1.1 × 1.35 inches (for 4×6 compact preset) */
 export const DEFAULT_PHOTO_WIDTH_INCHES = 1.1;
 export const DEFAULT_PHOTO_HEIGHT_INCHES = 1.35;
 export const DEFAULT_PHOTO_UNIT: DimensionUnit = "inch";
@@ -48,49 +75,45 @@ export const DEFAULT_PHOTO_UNIT: DimensionUnit = "inch";
 export const MULTI_PHOTO_DPI_PRESETS = [150, 200, 300, 600] as const;
 export const DEFAULT_MULTI_PHOTO_DPI = 300;
 
-/** Default physical dimensions in millimeters */
-export const DEFAULT_PHOTO_WIDTH_MM = Number((DEFAULT_PHOTO_WIDTH_INCHES * MM_PER_INCH).toFixed(2)); // 27.94 mm
-export const DEFAULT_PHOTO_HEIGHT_MM = Number((DEFAULT_PHOTO_HEIGHT_INCHES * MM_PER_INCH).toFixed(2)); // 34.29 mm
+/** Default physical dimensions in millimeters for 1.1 × 1.35 in photos */
+export const DEFAULT_PHOTO_WIDTH_MM = 27.94;
+export const DEFAULT_PHOTO_HEIGHT_MM = 34.29;
 
-/** Default cutting guides */
+/** Default cutting guides synchronized with Photo Studio */
 export const DEFAULT_MULTI_PHOTO_CUT_GUIDES: CutGuidesConfig = {
-  enabled: true,
+  ...DEFAULT_CUT_GUIDES,
   style: "corner_crop_marks",
   color: "#94a3b8",
-  thicknessPx: 1,
-  includeInExport: true,
 };
 
-/** Default A4 margins in millimeters */
+/** Default A4 margins in millimeters (synchronized with Professional Photo Studio) */
 export const DEFAULT_MULTI_PHOTO_A4_MARGINS: SheetMargins = {
-  topMm: 6,
-  bottomMm: 6,
-  leftMm: 6,
-  rightMm: 6,
-  uniform: true,
+  ...DEFAULT_A4_SHEET_MARGINS,
 };
 
-/** Default 4x6 margins in millimeters */
+/** Default 4x6 portrait margins in millimeters (synchronized with Professional Photo Studio) */
 export const DEFAULT_MULTI_PHOTO_4X6_MARGINS: SheetMargins = {
-  topMm: 4,
-  bottomMm: 4,
-  leftMm: 4,
-  rightMm: 4,
-  uniform: true,
+  ...DEFAULT_SHEET_MARGINS,
 };
 
-/** Default A4 spacing in millimeters */
+/** Default 4x6 landscape margins in millimeters (synchronized with Professional Photo Studio) */
+export const DEFAULT_MULTI_PHOTO_4X6_LANDSCAPE_MARGINS: SheetMargins = {
+  ...DEFAULT_4X6_LANDSCAPE_SHEET_MARGINS,
+};
+
+/** Default A4 spacing in millimeters (synchronized with Professional Photo Studio) */
 export const DEFAULT_MULTI_PHOTO_A4_SPACING: SheetSpacing = {
-  horizontalMm: 1.5,
-  verticalMm: 1.5,
-  uniform: true,
+  ...DEFAULT_A4_SHEET_SPACING,
 };
 
-/** Default 4x6 spacing in millimeters */
+/** Default 4x6 portrait spacing in millimeters (synchronized with Professional Photo Studio) */
 export const DEFAULT_MULTI_PHOTO_4X6_SPACING: SheetSpacing = {
-  horizontalMm: 2,
-  verticalMm: 2,
-  uniform: true,
+  ...DEFAULT_4X6_SHEET_SPACING,
+};
+
+/** Default 4x6 landscape spacing in millimeters (synchronized with Professional Photo Studio) */
+export const DEFAULT_MULTI_PHOTO_4X6_LANDSCAPE_SPACING: SheetSpacing = {
+  ...DEFAULT_4X6_LANDSCAPE_SHEET_SPACING,
 };
 
 /**
@@ -213,23 +236,58 @@ export function flattenPhotoCopies(photos: UploadedPhoto[]): UploadedPhoto[] {
 
 /**
  * Creates default configuration for the Multiple Photo Maker tool.
+ * Default dimensions, margins, and spacing match Professional Photo Studio source of truth.
  */
 export function createDefaultMultiplePhotoConfig(
-  paperSize: SheetPaperSize = "a4"
+  paperSize: SheetPaperSize = "a4",
+  orientation?: SheetOrientation
 ): MultiplePhotoConfig {
   const isA4 = paperSize === "a4";
+  const defaultOrientation: SheetOrientation =
+    orientation || (isA4 ? "portrait" : "landscape");
+  const isLandscape = defaultOrientation === "landscape";
+
+  let dimensions: MultiplePhotoDimensions;
+  let margins: SheetMargins;
+  let spacing: SheetSpacing;
+
+  if (isA4) {
+    dimensions = {
+      width: DEFAULT_A4_PHOTO_WIDTH_MM, // 26.94 mm (27 × 32 mm standard)
+      height: DEFAULT_A4_PHOTO_HEIGHT_MM, // 32.33 mm
+      unit: "mm",
+      presetId: "a4_compact_default",
+    };
+    margins = { ...DEFAULT_MULTI_PHOTO_A4_MARGINS };
+    spacing = { ...DEFAULT_MULTI_PHOTO_A4_SPACING };
+  } else if (isLandscape) {
+    dimensions = {
+      width: DEFAULT_4X6_LANDSCAPE_PHOTO_WIDTH_MM, // 24.5533333333333 mm
+      height: DEFAULT_4X6_LANDSCAPE_PHOTO_HEIGHT_MM, // 30.1413333333333 mm
+      unit: "mm",
+      presetId: "compact_4x6_landscape",
+    };
+    margins = { ...DEFAULT_MULTI_PHOTO_4X6_LANDSCAPE_MARGINS };
+    spacing = { ...DEFAULT_MULTI_PHOTO_4X6_LANDSCAPE_SPACING };
+  } else {
+    dimensions = {
+      width: DEFAULT_PHOTO_WIDTH_INCHES, // 1.1 in (27.94 mm)
+      height: DEFAULT_PHOTO_HEIGHT_INCHES, // 1.35 in (34.29 mm)
+      unit: "inch",
+      presetId: "compact_default",
+    };
+    margins = { ...DEFAULT_MULTI_PHOTO_4X6_MARGINS };
+    spacing = { ...DEFAULT_MULTI_PHOTO_4X6_SPACING };
+  }
+
   return {
-    dimensions: {
-      width: DEFAULT_PHOTO_WIDTH_INCHES,
-      height: DEFAULT_PHOTO_HEIGHT_INCHES,
-      unit: DEFAULT_PHOTO_UNIT,
-    },
+    dimensions,
     dpi: DEFAULT_MULTI_PHOTO_DPI,
     paperSize,
-    orientation: isA4 ? "portrait" : "landscape",
+    orientation: defaultOrientation,
     defaultCopiesPerPhoto: 3,
-    margins: isA4 ? { ...DEFAULT_MULTI_PHOTO_A4_MARGINS } : { ...DEFAULT_MULTI_PHOTO_4X6_MARGINS },
-    spacing: isA4 ? { ...DEFAULT_MULTI_PHOTO_A4_SPACING } : { ...DEFAULT_MULTI_PHOTO_4X6_SPACING },
+    margins,
+    spacing,
     columnsMode: "auto",
     cutGuides: { ...DEFAULT_MULTI_PHOTO_CUT_GUIDES },
   };
@@ -251,8 +309,11 @@ export function buildPhotoSheetConfig(
     : (config.orientation === "landscape" ? SHEET_4X6_SHORT_EDGE_INCHES : SHEET_4X6_LONG_EDGE_INCHES);
 
   const isManualCols = typeof config.columnsMode === "number";
-  const manualCols = isManualCols ? Math.min(4, Math.max(1, config.columnsMode as number)) : 4;
+  const manualCols = isManualCols ? Math.max(1, config.columnsMode as number) : 4;
   const manualRows = Math.max(1, Math.ceil(Math.max(1, totalRequestedCopies) / manualCols));
+
+  // 4x6 portrait centers horizontally while staying top-aligned; A4 and 4x6 landscape are top-left printable region
+  const centerAlignment = config.paperSize === "4x6" && config.orientation === "portrait";
 
   return {
     paperSize: config.paperSize,
@@ -264,7 +325,7 @@ export function buildPhotoSheetConfig(
     manualCols,
     manualRows,
     copies: Math.max(1, totalRequestedCopies),
-    centerAlignment: false, // Invariant: top-aligned placement, ZERO vertical centering
+    centerAlignment,
     margins: config.margins,
     spacing: config.spacing,
     cutGuides: config.cutGuides,
