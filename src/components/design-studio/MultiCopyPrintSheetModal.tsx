@@ -25,9 +25,7 @@ import type {
   DuplexFlipEdge,
   CutGuideStyle,
 } from "@/types/design-print-sheet";
-import {
-  calculatePrintSheetLayout,
-} from "@/lib/design-studio/print-sheet/sheet-calculation";
+import { calculatePrintSheetLayout } from "@/lib/design-studio/print-sheet/sheet-calculation";
 import {
   renderPrintSheetToCanvas,
   compilePrintSheetPdf,
@@ -41,19 +39,20 @@ export interface MultiCopyPrintSheetModalProps {
   document: DesignDocument;
 }
 
-export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> = ({
-  isOpen,
-  onClose,
-  document,
-}) => {
+export const MultiCopyPrintSheetModal: React.FC<
+  MultiCopyPrintSheetModalProps
+> = ({ isOpen, onClose, document }) => {
   // Configuration State
   const [paperSize, setPaperSize] = useState<PrintPaperSize>("a4");
-  const [orientation, setOrientation] = useState<"portrait" | "landscape">("portrait");
-  const [copies, setCopies] = useState<number>(10);
-  const [pageSelection, setPageSelection] = useState<"front-only" | "back-only" | "both-duplex">(
-    document.pages.length > 1 ? "both-duplex" : "front-only"
+  const [orientation, setOrientation] = useState<"portrait" | "landscape">(
+    "portrait",
   );
-  const [duplexFlipEdge, setDuplexFlipEdge] = useState<DuplexFlipEdge>("long-edge");
+  const [copies, setCopies] = useState<number>(10);
+  const [pageSelection, setPageSelection] = useState<
+    "front-only" | "back-only" | "both-duplex"
+  >(document.pages.length > 1 ? "both-duplex" : "front-only");
+  const [duplexFlipEdge, setDuplexFlipEdge] =
+    useState<DuplexFlipEdge>("long-edge");
   const [rotateCard, setRotateCard] = useState<boolean>(false);
   const [alignment, setAlignment] = useState<"center" | "top-left">("center");
 
@@ -192,10 +191,12 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
         config,
         (current, total) => {
           setExportProgress(`Compiling sheet ${current} of ${total}...`);
-        }
+        },
       );
 
-      const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" });
+      const blob = new Blob([pdfBytes.buffer as ArrayBuffer], {
+        type: "application/pdf",
+      });
       const cleanTitle = (document.metadata.title || "design-print-sheet")
         .toLowerCase()
         .replace(/[^a-z0-9_-]/g, "-")
@@ -230,11 +231,15 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
               <Printer className="w-4 h-4" />
             </div>
             <div>
-              <h2 id="print-sheet-modal-title" className="text-base font-bold text-[#38ff4f] dark:text-surface-100">
+              <h2
+                id="print-sheet-modal-title"
+                className="text-base font-bold text-[#38ff4f] dark:text-surface-100"
+              >
                 Multi-Copy Print Sheet Generator
               </h2>
               <p className="text-xs text-[#9bdcff] dark:text-surface-400">
-                Print multiple cards on standard paper with cut marks and duplex alignment
+                Print multiple cards on standard paper with cut marks and duplex
+                alignment
               </p>
             </div>
           </div>
@@ -260,11 +265,13 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
                     Sheet Preview
                   </span>
                   {currentSheet && (
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
-                      currentSheet.isBackSide
-                        ? "bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300"
-                        : "bg-blue-100 dark:bg-blue-950/60 text-[#3464e9] dark:text-blue-300"
-                    }`}>
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                        currentSheet.isBackSide
+                          ? "bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300"
+                          : "bg-blue-100 dark:bg-blue-950/60 text-[#3464e9] dark:text-blue-300"
+                      }`}
+                    >
                       {currentSheet.isBackSide ? "Back Side" : "Front Side"}
                     </span>
                   )}
@@ -275,7 +282,9 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
                     <button
                       type="button"
                       disabled={activeSheetIndex === 0}
-                      onClick={() => setActiveSheetIndex((idx) => Math.max(0, idx - 1))}
+                      onClick={() =>
+                        setActiveSheetIndex((idx) => Math.max(0, idx - 1))
+                      }
                       className="p-1 rounded border border-surface-200 dark:border-surface-700 disabled:opacity-30 hover:bg-surface-100 text-[#b3d3ff] dark:text-surface-200"
                     >
                       <ChevronLeft className="w-3.5 h-3.5" />
@@ -286,7 +295,11 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
                     <button
                       type="button"
                       disabled={activeSheetIndex >= layout.sheets.length - 1}
-                      onClick={() => setActiveSheetIndex((idx) => Math.min(layout.sheets.length - 1, idx + 1))}
+                      onClick={() =>
+                        setActiveSheetIndex((idx) =>
+                          Math.min(layout.sheets.length - 1, idx + 1),
+                        )
+                      }
                       className="p-1 rounded border border-surface-200 dark:border-surface-700 disabled:opacity-30 hover:bg-surface-100 text-[#1F2937] dark:text-surface-200"
                     >
                       <ChevronRight className="w-3.5 h-3.5" />
@@ -300,7 +313,9 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
                 {isPreviewLoading ? (
                   <div className="flex flex-col items-center gap-2 text-surface-400">
                     <Loader2 className="w-6 h-6 animate-spin text-primary-500" />
-                    <span className="text-xs">Calculating & rendering sheet...</span>
+                    <span className="text-xs">
+                      Calculating & rendering sheet...
+                    </span>
                   </div>
                 ) : previewDataUrl ? (
                   <img
@@ -310,7 +325,8 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
                   />
                 ) : (
                   <div className="text-xs text-red-500 text-center px-4">
-                    {layout.warning || "Cannot place cards with current dimensions"}
+                    {layout.warning ||
+                      "Cannot place cards with current dimensions"}
                   </div>
                 )}
               </div>
@@ -318,25 +334,33 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
               {/* Stats Bar */}
               <div className="grid grid-cols-4 gap-2 mt-3 text-center text-xs">
                 <div className="p-2 rounded-lg bg-surface-0 dark:bg-surface-800 border border-surface-200 dark:border-surface-700">
-                  <div className="text-[10px] text-[#475569] dark:text-surface-400 font-semibold uppercase">Grid</div>
+                  <div className="text-[10px] text-[#475569] dark:text-surface-400 font-semibold uppercase">
+                    Grid
+                  </div>
                   <div className="font-bold text-[#0d1017] dark:text-surface-100 mt-0.5">
                     {layout.columns} × {layout.rows}
                   </div>
                 </div>
                 <div className="p-2 rounded-lg bg-surface-0 dark:bg-surface-800 border border-surface-200 dark:border-surface-700">
-                  <div className="text-[10px] text-[#475569] dark:text-surface-400 font-semibold uppercase">Per Sheet</div>
+                  <div className="text-[10px] text-[#475569] dark:text-surface-400 font-semibold uppercase">
+                    Per Sheet
+                  </div>
                   <div className="font-bold text-[#0F172A] dark:text-surface-100 mt-0.5">
                     {layout.capacityPerSheet} Cards
                   </div>
                 </div>
                 <div className="p-2 rounded-lg bg-surface-0 dark:bg-surface-800 border border-surface-200 dark:border-surface-700">
-                  <div className="text-[10px] text-[#475569] dark:text-surface-400 font-semibold uppercase">Total Copies</div>
+                  <div className="text-[10px] text-[#475569] dark:text-surface-400 font-semibold uppercase">
+                    Total Copies
+                  </div>
                   <div className="font-bold text-[#0F172A] dark:text-surface-100 mt-0.5">
                     {config.copies}
                   </div>
                 </div>
                 <div className="p-2 rounded-lg bg-surface-0 dark:bg-surface-800 border border-surface-200 dark:border-surface-700">
-                  <div className="text-[10px] text-[#475569] dark:text-surface-400 font-semibold uppercase">Sheets</div>
+                  <div className="text-[10px] text-[#475569] dark:text-surface-400 font-semibold uppercase">
+                    Sheets
+                  </div>
                   <div className="font-bold text-[#0F172A] dark:text-surface-100 mt-0.5">
                     {layout.sheets.length} Pages
                   </div>
@@ -371,8 +395,12 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
                         : "border-surface-200 dark:border-surface-700 hover:bg-surface-50 text-[#1F2937] dark:text-surface-200"
                     }`}
                   >
-                    <div className="font-bold text-[#bdd1ff] dark:text-surface-100">ISO A4</div>
-                    <div className="text-[10px] text-[#d0e4ff] dark:text-surface-400">210 × 297 mm</div>
+                    <div className="font-bold text-[#bdd1ff] dark:text-surface-100">
+                      ISO A4
+                    </div>
+                    <div className="text-[10px] text-[#d0e4ff] dark:text-surface-400">
+                      210 × 297 mm
+                    </div>
                   </button>
 
                   <button
@@ -384,8 +412,12 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
                         : "border-surface-200 dark:border-surface-700 hover:bg-surface-50 text-[#1F2937] dark:text-surface-200"
                     }`}
                   >
-                    <div className="font-bold text-[#bed2ff] dark:text-surface-100">4 × 6 in</div>
-                    <div className="text-[10px] text-[#bfdaff] dark:text-surface-400">101.6 × 152.4 mm</div>
+                    <div className="font-bold text-[#bed2ff] dark:text-surface-100">
+                      4 × 6 in
+                    </div>
+                    <div className="text-[10px] text-[#bfdaff] dark:text-surface-400">
+                      101.6 × 152.4 mm
+                    </div>
                   </button>
                 </div>
 
@@ -426,7 +458,9 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
                     min="1"
                     max="100"
                     value={copies}
-                    onChange={(e) => setCopies(Math.max(1, parseInt(e.target.value) || 1))}
+                    onChange={(e) =>
+                      setCopies(Math.max(1, parseInt(e.target.value) || 1))
+                    }
                     className="w-full px-2.5 py-1.5 rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-0 dark:bg-surface-800 text-xs font-semibold text-[#0F172A] dark:text-surface-100"
                   />
                 </div>
@@ -539,7 +573,10 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
                       max="20"
                       value={spacingH}
                       onChange={(e) => {
-                        const val = Math.max(0, parseFloat(e.target.value) || 0);
+                        const val = Math.max(
+                          0,
+                          parseFloat(e.target.value) || 0,
+                        );
                         setSpacingH(val);
                         setSpacingV(val);
                       }}
@@ -557,7 +594,10 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
                       max="40"
                       value={marginLeft}
                       onChange={(e) => {
-                        const val = Math.max(0, parseFloat(e.target.value) || 0);
+                        const val = Math.max(
+                          0,
+                          parseFloat(e.target.value) || 0,
+                        );
                         setMarginLeft(val);
                         setMarginRight(val);
                         setMarginTop(val);
@@ -583,7 +623,9 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
                   {cutGuidesEnabled && (
                     <select
                       value={cutGuideStyle}
-                      onChange={(e) => setCutGuideStyle(e.target.value as CutGuideStyle)}
+                      onChange={(e) =>
+                        setCutGuideStyle(e.target.value as CutGuideStyle)
+                      }
                       className="px-2 py-0.5 text-[11px] rounded border border-surface-200 dark:border-surface-700 bg-surface-0 dark:bg-surface-800 text-[#0F172A] dark:text-surface-100 font-medium"
                     >
                       <option value="corners">Corner Ticks</option>
