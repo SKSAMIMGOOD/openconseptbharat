@@ -20,6 +20,7 @@ import {
   Layers,
   X,
   MessageSquare,
+  Palette,
 } from "lucide-react";
 import { TOOLS, TOOL_CATEGORIES } from "@/constants/tools";
 import { ToolCategory } from "@/types/tools";
@@ -45,6 +46,7 @@ const CATEGORY_FILTER_TABS: { id: "all" | ToolCategory; label: string; icon: Rea
   { id: "image-tools", label: "Image Tools", icon: Scissors },
   { id: "photo-printing", label: "Photo Printing", icon: Printer },
   { id: "utilities", label: "Utilities", icon: SlidersHorizontal },
+  { id: "design-studio", label: "Design Studio", icon: Palette },
 ];
 
 export default function HomePage() {

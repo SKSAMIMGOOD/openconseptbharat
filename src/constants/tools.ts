@@ -37,6 +37,15 @@ export const TOOL_CATEGORIES: CategoryMetadata[] = [
     iconName: "SlidersHorizontal",
     toolCount: 7,
   },
+  {
+    id: "design-studio",
+    title: "Design Studio",
+    subtitle: "Cards, project covers & certificates designer",
+    description:
+      "Create professional visiting cards, wedding invitations, project covers and ID cards using customizable templates.",
+    iconName: "Palette",
+    toolCount: 1,
+  },
 ];
 
 export const TOOLS: ToolMetadata[] = [
@@ -281,6 +290,28 @@ export const TOOLS: ToolMetadata[] = [
     ],
     fileAccept: ["image/jpeg", "image/png", "image/webp"],
     maxFileSizeMB: 5,
+  },
+  {
+    id: "design-studio",
+    name: "Design Studio",
+    category: "design-studio",
+    categories: ["design-studio", "document"],
+    shortDescription:
+      "Create professional visiting cards, wedding invitations, project covers and ID cards using customizable templates.",
+    description:
+      "Create professional visiting cards, wedding invitations, project covers and ID cards using customizable templates with vector PDF export, cut marks and multi-copy print sheet generation.",
+    route: "/tools/design-studio",
+    status: "ready",
+    badge: "New",
+    iconName: "Palette",
+    features: [
+      "Visiting Cards, Wedding Cards, Project Covers & ID Cards",
+      "Interactive Konva Canvas with Text, Shapes & Images",
+      "100% In-Browser Privacy — 0 Bytes Uploaded",
+      "Vector PDF, High-Res PNG & Multi-Copy A4 Print Sheets",
+    ],
+    fileAccept: ["image/jpeg", "image/png", "image/webp"],
+    maxFileSizeMB: 20,
   },
 ];
 

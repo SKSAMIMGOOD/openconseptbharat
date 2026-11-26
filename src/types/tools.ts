@@ -3,6 +3,7 @@ export type ToolCategory =
   | "image-tools"
   | "photo-printing"
   | "utilities"
+  | "design-studio"
   | "photo"
   | "document"
   | "pdf"

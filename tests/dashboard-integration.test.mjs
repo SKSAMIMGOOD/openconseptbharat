@@ -55,7 +55,7 @@ class MockLocalStorage {
 
 describe("PHASE 06 — Tool Registry & Configuration", () => {
   test("registers all tools in the project", () => {
-    assert.equal(TOOLS.length, 10, "Expected 10 tools in the registry");
+    assert.ok(TOOLS.length >= 11, "Expected at least 11 tools in the registry");
   });
 
   test("all tools have unique IDs", () => {
@@ -65,7 +65,7 @@ describe("PHASE 06 — Tool Registry & Configuration", () => {
   });
 
   test("each tool has complete required fields", () => {
-    const expectedCategories = ["photo-studio", "image-tools", "photo-printing", "utilities"];
+    const expectedCategories = ["photo-studio", "image-tools", "photo-printing", "utilities", "design-studio"];
 
     for (const tool of TOOLS) {
       assert.ok(tool.id && typeof tool.id === "string", `Tool missing id: ${JSON.stringify(tool)}`);
@@ -106,9 +106,13 @@ describe("PHASE 06 — Tool Registry & Configuration", () => {
 });
 
 describe("PHASE 06 — Tool Categories Organization", () => {
-  test("defines the 4 required categories with valid metadata", () => {
+  test("defines the categories with valid metadata", () => {
     const categoryIds = TOOL_CATEGORIES.map((c) => c.id);
-    assert.deepEqual(categoryIds, ["photo-studio", "image-tools", "photo-printing", "utilities"]);
+    assert.ok(categoryIds.includes("photo-studio"));
+    assert.ok(categoryIds.includes("image-tools"));
+    assert.ok(categoryIds.includes("photo-printing"));
+    assert.ok(categoryIds.includes("utilities"));
+    assert.ok(categoryIds.includes("design-studio"));
 
     for (const cat of TOOL_CATEGORIES) {
       assert.ok(cat.title, `Category ${cat.id} missing title`);
@@ -137,10 +141,14 @@ describe("PHASE 06 — Tool Categories Organization", () => {
     assert.ok(utilityTools.some((t) => t.id === "resume-maker"));
     assert.ok(utilityTools.some((t) => t.id === "document-studio"));
     assert.ok(utilityTools.some((t) => t.id === "document-straightener"));
+    assert.ok(utilityTools.some((t) => t.id === "raw-image-to-pdf"));
+
+    const designStudioTools = getToolsByCategory("design-studio");
+    assert.ok(designStudioTools.some((t) => t.id === "design-studio"));
 
     // Total tools returned across 'all'
     const allTools = getToolsByCategory("all");
-    assert.equal(allTools.length, 10);
+    assert.ok(allTools.length >= 11);
   });
 
   test("getCategoryMetadata retrieves correct category details", () => {

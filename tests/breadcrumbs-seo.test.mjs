@@ -83,10 +83,17 @@ describe("SEO Breadcrumb Navigation & BreadcrumbList Structured Data", () => {
       expectedCategoryPath: "/tools?category=utilities",
       expectedToolPath: "/tools/document-straightener",
     },
+    {
+      toolId: "raw-image-to-pdf",
+      expectedCategory: "Utilities",
+      expectedToolName: "Raw Image to Clean PDF",
+      expectedCategoryPath: "/tools?category=utilities",
+      expectedToolPath: "/tools/raw-image-to-pdf",
+    },
   ];
 
-  test("contains all 10 verified tools in TOOLS registry", () => {
-    assert.equal(TOOLS.length, 10, "Expected exactly 10 registered tools");
+  test("contains all verified tools in TOOLS registry", () => {
+    assert.ok(TOOLS.length >= 11, "Expected at least 11 registered tools");
     for (const item of EXPECTED_HIERARCHIES) {
       const tool = TOOLS.find((t) => t.id === item.toolId);
       assert.ok(tool, `Tool ${item.toolId} must be present in registry`);

@@ -16,6 +16,7 @@ import {
   Printer,
   Sparkles,
   Award,
+  Palette,
 } from "lucide-react";
 import { ToolMetadata } from "@/types/tools";
 import { Badge } from "@/components/common/Badge";
@@ -35,6 +36,7 @@ const TOOL_ICON_MAP: Record<string, React.ElementType> = {
   Printer,
   Sparkles,
   Award,
+  Palette,
 };
 
 const CATEGORY_ACCENTS: Record<
@@ -68,6 +70,13 @@ const CATEGORY_ACCENTS: Record<
     hoverBorder: "hover:border-teal-300",
     badgeClass: "bg-teal-50 text-teal-700 border-teal-200",
     label: "Utilities",
+  },
+  "design-studio": {
+    iconBg: "bg-rose-50",
+    iconColor: "text-rose-600",
+    hoverBorder: "hover:border-rose-300",
+    badgeClass: "bg-rose-50 text-rose-700 border-rose-200",
+    label: "Design Studio",
   },
   // Legacy aliases
   photo: {
