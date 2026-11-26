@@ -230,10 +230,10 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
               <Printer className="w-4 h-4" />
             </div>
             <div>
-              <h2 id="print-sheet-modal-title" className="text-base font-bold text-surface-900 dark:text-surface-100">
+              <h2 id="print-sheet-modal-title" className="text-base font-bold text-[#38ff4f] dark:text-surface-100">
                 Multi-Copy Print Sheet Generator
               </h2>
-              <p className="text-xs text-surface-500 dark:text-surface-400">
+              <p className="text-xs text-[#9bdcff] dark:text-surface-400">
                 Print multiple cards on standard paper with cut marks and duplex alignment
               </p>
             </div>
@@ -242,7 +242,7 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
             type="button"
             onClick={onClose}
             disabled={isExporting}
-            className="p-1.5 text-surface-400 hover:text-surface-600 dark:hover:text-surface-200 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
+            className="p-1.5 text-[#ffa8f9] hover:text-[#0F172A] dark:text-surface-400 dark:hover:text-surface-200 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -256,14 +256,14 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
               {/* Sheet Navigation Header */}
               <div className="flex items-center justify-between mb-2.5">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-surface-700 dark:text-surface-300 uppercase tracking-wider">
+                  <span className="text-xs font-bold text-[#005b23] dark:text-blue-300 uppercase tracking-wider">
                     Sheet Preview
                   </span>
                   {currentSheet && (
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
                       currentSheet.isBackSide
-                        ? "bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300"
-                        : "bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300"
+                        ? "bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300"
+                        : "bg-blue-100 dark:bg-blue-950/60 text-[#3464e9] dark:text-blue-300"
                     }`}>
                       {currentSheet.isBackSide ? "Back Side" : "Front Side"}
                     </span>
@@ -271,23 +271,23 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
                 </div>
 
                 {layout.sheets.length > 1 && (
-                  <div className="flex items-center gap-1.5 text-xs">
+                  <div className="flex items-center gap-1.5 text-xs text-[#b2d2ff] dark:text-surface-200">
                     <button
                       type="button"
                       disabled={activeSheetIndex === 0}
                       onClick={() => setActiveSheetIndex((idx) => Math.max(0, idx - 1))}
-                      className="p-1 rounded border border-surface-200 dark:border-surface-700 disabled:opacity-30 hover:bg-surface-100"
+                      className="p-1 rounded border border-surface-200 dark:border-surface-700 disabled:opacity-30 hover:bg-surface-100 text-[#b3d3ff] dark:text-surface-200"
                     >
                       <ChevronLeft className="w-3.5 h-3.5" />
                     </button>
-                    <span className="font-semibold px-1">
+                    <span className="font-semibold px-1 text-[#003cd3] dark:text-surface-100">
                       Sheet {activeSheetIndex + 1} of {layout.sheets.length}
                     </span>
                     <button
                       type="button"
                       disabled={activeSheetIndex >= layout.sheets.length - 1}
                       onClick={() => setActiveSheetIndex((idx) => Math.min(layout.sheets.length - 1, idx + 1))}
-                      className="p-1 rounded border border-surface-200 dark:border-surface-700 disabled:opacity-30 hover:bg-surface-100"
+                      className="p-1 rounded border border-surface-200 dark:border-surface-700 disabled:opacity-30 hover:bg-surface-100 text-[#1F2937] dark:text-surface-200"
                     >
                       <ChevronRight className="w-3.5 h-3.5" />
                     </button>
@@ -318,26 +318,26 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
               {/* Stats Bar */}
               <div className="grid grid-cols-4 gap-2 mt-3 text-center text-xs">
                 <div className="p-2 rounded-lg bg-surface-0 dark:bg-surface-800 border border-surface-200 dark:border-surface-700">
-                  <div className="text-[10px] text-surface-400 font-semibold uppercase">Grid</div>
-                  <div className="font-bold text-surface-800 dark:text-surface-200 mt-0.5">
+                  <div className="text-[10px] text-[#475569] dark:text-surface-400 font-semibold uppercase">Grid</div>
+                  <div className="font-bold text-[#0d1017] dark:text-surface-100 mt-0.5">
                     {layout.columns} × {layout.rows}
                   </div>
                 </div>
                 <div className="p-2 rounded-lg bg-surface-0 dark:bg-surface-800 border border-surface-200 dark:border-surface-700">
-                  <div className="text-[10px] text-surface-400 font-semibold uppercase">Per Sheet</div>
-                  <div className="font-bold text-surface-800 dark:text-surface-200 mt-0.5">
+                  <div className="text-[10px] text-[#475569] dark:text-surface-400 font-semibold uppercase">Per Sheet</div>
+                  <div className="font-bold text-[#0F172A] dark:text-surface-100 mt-0.5">
                     {layout.capacityPerSheet} Cards
                   </div>
                 </div>
                 <div className="p-2 rounded-lg bg-surface-0 dark:bg-surface-800 border border-surface-200 dark:border-surface-700">
-                  <div className="text-[10px] text-surface-400 font-semibold uppercase">Total Copies</div>
-                  <div className="font-bold text-surface-800 dark:text-surface-200 mt-0.5">
+                  <div className="text-[10px] text-[#475569] dark:text-surface-400 font-semibold uppercase">Total Copies</div>
+                  <div className="font-bold text-[#0F172A] dark:text-surface-100 mt-0.5">
                     {config.copies}
                   </div>
                 </div>
                 <div className="p-2 rounded-lg bg-surface-0 dark:bg-surface-800 border border-surface-200 dark:border-surface-700">
-                  <div className="text-[10px] text-surface-400 font-semibold uppercase">Sheets</div>
-                  <div className="font-bold text-surface-800 dark:text-surface-200 mt-0.5">
+                  <div className="text-[10px] text-[#475569] dark:text-surface-400 font-semibold uppercase">Sheets</div>
+                  <div className="font-bold text-[#0F172A] dark:text-surface-100 mt-0.5">
                     {layout.sheets.length} Pages
                   </div>
                 </div>
@@ -358,7 +358,7 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
             <div className="space-y-4">
               {/* Paper Selection */}
               <div>
-                <label className="block font-bold text-surface-700 dark:text-surface-300 uppercase tracking-wider mb-1.5">
+                <label className="block font-bold text-[#f9ffac] dark:text-blue-300 uppercase tracking-wider mb-1.5">
                   1. Paper Size & Orientation
                 </label>
                 <div className="grid grid-cols-2 gap-2 mb-2">
@@ -367,12 +367,12 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
                     onClick={() => setPaperSize("a4")}
                     className={`p-2 rounded-lg border font-medium text-left transition-colors ${
                       paperSize === "a4"
-                        ? "bg-primary-50 dark:bg-primary-950/40 border-primary-500 text-primary-700 dark:text-primary-300"
-                        : "border-surface-200 dark:border-surface-700 hover:bg-surface-50"
+                        ? "bg-primary-50 dark:bg-primary-950/40 border-primary-500 text-[#c4fff6] dark:text-primary-300"
+                        : "border-surface-200 dark:border-surface-700 hover:bg-surface-50 text-[#1F2937] dark:text-surface-200"
                     }`}
                   >
-                    <div className="font-bold">ISO A4</div>
-                    <div className="text-[10px] text-surface-400">210 × 297 mm</div>
+                    <div className="font-bold text-[#bdd1ff] dark:text-surface-100">ISO A4</div>
+                    <div className="text-[10px] text-[#d0e4ff] dark:text-surface-400">210 × 297 mm</div>
                   </button>
 
                   <button
@@ -380,12 +380,12 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
                     onClick={() => setPaperSize("4x6")}
                     className={`p-2 rounded-lg border font-medium text-left transition-colors ${
                       paperSize === "4x6"
-                        ? "bg-primary-50 dark:bg-primary-950/40 border-primary-500 text-primary-700 dark:text-primary-300"
-                        : "border-surface-200 dark:border-surface-700 hover:bg-surface-50"
+                        ? "bg-primary-50 dark:bg-primary-950/40 border-primary-500 text-[#62fa16] dark:text-primary-300"
+                        : "border-surface-200 dark:border-surface-700 hover:bg-surface-50 text-[#1F2937] dark:text-surface-200"
                     }`}
                   >
-                    <div className="font-bold">4 × 6 in</div>
-                    <div className="text-[10px] text-surface-400">101.6 × 152.4 mm</div>
+                    <div className="font-bold text-[#bed2ff] dark:text-surface-100">4 × 6 in</div>
+                    <div className="text-[10px] text-[#bfdaff] dark:text-surface-400">101.6 × 152.4 mm</div>
                   </button>
                 </div>
 
@@ -395,8 +395,8 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
                     onClick={() => setOrientation("portrait")}
                     className={`flex-1 py-1.5 px-2 rounded-lg border font-medium text-center transition-colors ${
                       orientation === "portrait"
-                        ? "bg-primary-600 text-white border-primary-600"
-                        : "border-surface-200 dark:border-surface-700 hover:bg-surface-50"
+                        ? "bg-primary-600 text-white border-primary-600 font-semibold"
+                        : "border-surface-200 dark:border-surface-700 hover:bg-surface-50 text-[#e0c2ff] dark:text-surface-200"
                     }`}
                   >
                     Portrait Sheet
@@ -406,8 +406,8 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
                     onClick={() => setOrientation("landscape")}
                     className={`flex-1 py-1.5 px-2 rounded-lg border font-medium text-center transition-colors ${
                       orientation === "landscape"
-                        ? "bg-primary-600 text-white border-primary-600"
-                        : "border-surface-200 dark:border-surface-700 hover:bg-surface-50"
+                        ? "bg-primary-600 text-white border-primary-600 font-semibold"
+                        : "border-surface-200 dark:border-surface-700 hover:bg-surface-50 text-[#e8b8ff] dark:text-surface-200"
                     }`}
                   >
                     Landscape Sheet
@@ -418,7 +418,7 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
               {/* Copies Count & Rotation */}
               <div className="grid grid-cols-2 gap-3 pt-2 border-t border-surface-200 dark:border-surface-800">
                 <div>
-                  <label className="block font-bold text-surface-700 dark:text-surface-300 uppercase tracking-wider mb-1">
+                  <label className="block font-bold text-[#e7caff] dark:text-blue-300 uppercase tracking-wider mb-1">
                     Copies Required
                   </label>
                   <input
@@ -427,12 +427,12 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
                     max="100"
                     value={copies}
                     onChange={(e) => setCopies(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-0 dark:bg-surface-800 text-xs font-semibold"
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-0 dark:bg-surface-800 text-xs font-semibold text-[#0F172A] dark:text-surface-100"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-surface-700 dark:text-surface-300 uppercase tracking-wider mb-1">
+                  <label className="block font-bold text-[#a6ffdb] dark:text-blue-300 uppercase tracking-wider mb-1">
                     Optimize Fill
                   </label>
                   <button
@@ -440,8 +440,8 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
                     onClick={() => setRotateCard(!rotateCard)}
                     className={`w-full py-1.5 px-2 rounded-lg border flex items-center justify-center gap-1.5 font-medium transition-colors ${
                       rotateCard
-                        ? "bg-primary-50 dark:bg-primary-950/40 border-primary-500 text-primary-700 dark:text-primary-300"
-                        : "border-surface-200 dark:border-surface-700 hover:bg-surface-50"
+                        ? "bg-primary-50 dark:bg-primary-950/40 border-primary-500 text-[#1D4ED8] dark:text-primary-300 font-semibold"
+                        : "border-surface-200 dark:border-surface-700 hover:bg-surface-50 text-[#c4a9ff] dark:text-surface-200"
                     }`}
                   >
                     <RotateCw className="w-3.5 h-3.5" />
@@ -452,7 +452,7 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
 
               {/* Duplex / Page Selection */}
               <div className="pt-2 border-t border-surface-200 dark:border-surface-800">
-                <label className="block font-bold text-surface-700 dark:text-surface-300 uppercase tracking-wider mb-1.5">
+                <label className="block font-bold text-[#ddffc8] dark:text-blue-300 uppercase tracking-wider mb-1.5">
                   Print Sides & Duplex Alignment
                 </label>
                 <div className="grid grid-cols-3 gap-1.5 mb-2">
@@ -462,7 +462,7 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
                     className={`py-1 px-2 rounded-lg border text-center transition-colors ${
                       pageSelection === "front-only"
                         ? "bg-primary-600 text-white border-primary-600 font-semibold"
-                        : "border-surface-200 dark:border-surface-700"
+                        : "border-surface-200 dark:border-surface-700 text-[#1F2937] dark:text-surface-200"
                     }`}
                   >
                     Front Only
@@ -474,7 +474,7 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
                     className={`py-1 px-2 rounded-lg border text-center transition-colors disabled:opacity-40 ${
                       pageSelection === "back-only"
                         ? "bg-primary-600 text-white border-primary-600 font-semibold"
-                        : "border-surface-200 dark:border-surface-700"
+                        : "border-surface-200 dark:border-surface-700 text-[#1F2937] dark:text-surface-200"
                     }`}
                   >
                     Back Only
@@ -486,7 +486,7 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
                     className={`py-1 px-2 rounded-lg border text-center transition-colors disabled:opacity-40 ${
                       pageSelection === "both-duplex"
                         ? "bg-primary-600 text-white border-primary-600 font-semibold"
-                        : "border-surface-200 dark:border-surface-700"
+                        : "border-surface-200 dark:border-surface-700 text-[#1F2937] dark:text-surface-200"
                     }`}
                   >
                     Both (Duplex)
@@ -495,7 +495,7 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
 
                 {pageSelection === "both-duplex" && (
                   <div className="p-2 rounded-lg bg-surface-100 dark:bg-surface-800/80 border border-surface-200 dark:border-surface-700 flex items-center justify-between">
-                    <span className="text-[11px] font-medium text-surface-600 dark:text-surface-300">
+                    <span className="text-[11px] font-medium text-[#334155] dark:text-surface-300">
                       Flip Edge:
                     </span>
                     <div className="flex gap-1.5">
@@ -505,7 +505,7 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
                         className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
                           duplexFlipEdge === "long-edge"
                             ? "bg-primary-600 text-white"
-                            : "bg-surface-200 dark:bg-surface-700 text-surface-700 dark:text-surface-300"
+                            : "bg-surface-200 dark:bg-surface-700 text-[#1F2937] dark:text-surface-300"
                         }`}
                       >
                         Long Edge (Standard)
@@ -516,7 +516,7 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
                         className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
                           duplexFlipEdge === "short-edge"
                             ? "bg-primary-600 text-white"
-                            : "bg-surface-200 dark:bg-surface-700 text-surface-700 dark:text-surface-300"
+                            : "bg-surface-200 dark:bg-surface-700 text-[#1F2937] dark:text-surface-300"
                         }`}
                       >
                         Short Edge
@@ -530,7 +530,7 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
               <div className="pt-2 border-t border-surface-200 dark:border-surface-800 space-y-2">
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-[11px] font-medium text-surface-600 dark:text-surface-400 mb-0.5">
+                    <label className="block text-[11px] font-medium text-[#c4fff7] dark:text-surface-300 mb-0.5">
                       Card Gap Spacing (mm)
                     </label>
                     <input
@@ -543,12 +543,12 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
                         setSpacingH(val);
                         setSpacingV(val);
                       }}
-                      className="w-full px-2 py-1 rounded border border-surface-200 dark:border-surface-700 bg-surface-0 dark:bg-surface-800"
+                      className="w-full px-2 py-1 rounded border border-surface-200 dark:border-surface-700 bg-surface-0 dark:bg-surface-800 text-[#0F172A] dark:text-surface-100 font-semibold"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-medium text-surface-600 dark:text-surface-400 mb-0.5">
+                    <label className="block text-[11px] font-medium text-[#d4ffd1] dark:text-surface-300 mb-0.5">
                       Page Margin (mm)
                     </label>
                     <input
@@ -563,14 +563,14 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
                         setMarginTop(val);
                         setMarginBottom(val);
                       }}
-                      className="w-full px-2 py-1 rounded border border-surface-200 dark:border-surface-700 bg-surface-0 dark:bg-surface-800"
+                      className="w-full px-2 py-1 rounded border border-surface-200 dark:border-surface-700 bg-surface-0 dark:bg-surface-800 text-[#0F172A] dark:text-surface-100 font-semibold"
                     />
                   </div>
                 </div>
 
                 {/* Cut Guide Selector */}
                 <div className="flex items-center justify-between pt-1">
-                  <label className="flex items-center gap-1.5 cursor-pointer font-medium text-surface-700 dark:text-surface-300">
+                  <label className="flex items-center gap-1.5 cursor-pointer font-medium text-[#fe8484] dark:text-surface-200">
                     <input
                       type="checkbox"
                       checked={cutGuidesEnabled}
@@ -584,7 +584,7 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
                     <select
                       value={cutGuideStyle}
                       onChange={(e) => setCutGuideStyle(e.target.value as CutGuideStyle)}
-                      className="px-2 py-0.5 text-[11px] rounded border border-surface-200 dark:border-surface-700 bg-surface-0 dark:bg-surface-800"
+                      className="px-2 py-0.5 text-[11px] rounded border border-surface-200 dark:border-surface-700 bg-surface-0 dark:bg-surface-800 text-[#0F172A] dark:text-surface-100 font-medium"
                     >
                       <option value="corners">Corner Ticks</option>
                       <option value="border">Full Grid Lines</option>
@@ -607,7 +607,7 @@ export const MultiCopyPrintSheetModal: React.FC<MultiCopyPrintSheetModalProps> =
                 type="button"
                 onClick={onClose}
                 disabled={isExporting}
-                className="px-3.5 py-1.5 rounded-xl font-medium text-surface-600 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
+                className="px-3.5 py-1.5 rounded-xl font-medium text-[#475569] hover:text-[#0F172A] dark:text-surface-300 dark:hover:text-surface-100 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
               >
                 Cancel
               </button>

@@ -90,6 +90,13 @@ describe("SEO Breadcrumb Navigation & BreadcrumbList Structured Data", () => {
       expectedCategoryPath: "/tools?category=utilities",
       expectedToolPath: "/tools/raw-image-to-pdf",
     },
+    {
+      toolId: "design-studio",
+      expectedCategory: "Design Studio",
+      expectedToolName: "Design Studio",
+      expectedCategoryPath: "/tools?category=design-studio",
+      expectedToolPath: "/tools/design-studio",
+    },
   ];
 
   test("contains all verified tools in TOOLS registry", () => {

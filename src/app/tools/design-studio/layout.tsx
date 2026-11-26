@@ -1,10 +1,7 @@
 import type { Metadata } from "next";
+import { generateToolMetadata } from "@/constants/tool-seo";
 
-export const metadata: Metadata = {
-  title: "Design Studio — Free Online Card & Cover Designer | OpenConsept Bharat",
-  description:
-    "Design visiting cards, wedding invitations, school/college project covers, and ID cards with our client-side, private, interactive canvas studio. Export to high-res PNG, JPG, and vector print-ready PDF.",
-};
+export const metadata: Metadata = generateToolMetadata("design-studio");
 
 export default function DesignStudioLayout({
   children,

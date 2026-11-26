@@ -26,6 +26,13 @@ export interface RelatedToolLink {
   description: string;
 }
 
+export interface ToolCategoryHighlight {
+  title: string;
+  subtitle: string;
+  dimensions: string;
+  description: string;
+}
+
 export interface ToolSeoData {
   toolId: string;
   h1: string;
@@ -37,6 +44,7 @@ export interface ToolSeoData {
   howToUse: HowToUseStep[];
   faqs: ToolFaq[];
   relatedTools: RelatedToolLink[];
+  categoryHighlights?: ToolCategoryHighlight[];
 }
 
 export const TOOL_SEO_MAP: Record<string, ToolSeoData> = {
@@ -974,6 +982,238 @@ export const TOOL_SEO_MAP: Record<string, ToolSeoData> = {
         title: "Free Document Straightener",
         href: "/tools/document-straightener",
         description: "Straighten tilted smartphone document photos with 4-corner perspective correction.",
+      },
+    ],
+  },
+  "raw-image-to-pdf": {
+    toolId: "raw-image-to-pdf",
+    h1: "Free Online Raw Image to Clean PDF Converter – Multi-Photo Document Maker",
+    seoTitle:
+      "Free Raw Image to Clean PDF Converter – Multi-Photo to A4 PDF | Print Ready Designs",
+    metaDescription:
+      "Convert multiple photos of paper documents, receipts, and notes into clean, straightened A4 PDFs online. Reorder pages, enhance contrast, crop perspective, and export 100% in-browser with zero uploads.",
+    primaryKeyword: "image to PDF converter",
+    keywords: [
+      "image to PDF converter",
+      "convert photos to PDF",
+      "multiple images to PDF",
+      "JPG to PDF converter free",
+      "PNG to PDF online",
+      "scan documents to PDF",
+      "clean image to PDF",
+      "photo to PDF converter",
+      "camera photo to clean PDF",
+      "multi page document PDF maker",
+    ],
+    intro:
+      "Transform smartphone photos of paper documents, receipts, contracts, and study notes into crisp, multi-page A4 PDFs directly in your browser. Correct 4-corner perspective distortion, optimize contrast for printer clarity, arrange page sequences, and generate professional documents with 100% client-side privacy.",
+    howToUse: [
+      {
+        step: 1,
+        title: "Upload Up to 10 Document Photos",
+        description:
+          "Select up to 10 photos (JPG, PNG, or WebP) of physical paperwork, bills, receipts, or notes taken with your phone or camera.",
+      },
+      {
+        step: 2,
+        title: "Crop Perspective & Straighten",
+        description:
+          "Use the interactive 4-point corner handles to eliminate skew and perspective distortion, producing flat, scanner-like rectangular pages.",
+      },
+      {
+        step: 3,
+        title: "Enhance Contrast & Adjust Readability",
+        description:
+          "Apply calibrated black-and-white or high-contrast filters to remove shadows, background noise, and brighten document text for clear printing.",
+      },
+      {
+        step: 4,
+        title: "Reorder Pages & Export Clean A4 PDF",
+        description:
+          "Drag to rearrange page sequences, verify thumbnail previews, and compile a standardized multi-page 300 DPI A4 PDF ready to download or print.",
+      },
+    ],
+    faqs: [
+      {
+        question: "How does client-side image to PDF conversion work?",
+        answer:
+          "Images are processed directly within your browser's local memory using HTML5 Canvas and client-side PDF synthesis libraries. No image bytes or personal documents are uploaded to external cloud servers.",
+      },
+      {
+        question: "Can I combine multiple JPG, PNG, and WebP images into one PDF?",
+        answer:
+          "Yes. You can upload up to 10 mixed JPG, PNG, and WebP photos. The tool compiles them into a single, cohesive multi-page A4 document with consistent margins and orientation.",
+      },
+      {
+        question: "How does perspective cropping correct tilted smartphone photos?",
+        answer:
+          "The 4-corner perspective unwarping algorithm maps angled quadrilateral document corners into true right-angled rectangles, straightening keystoned phone photos into scanner-quality pages.",
+      },
+      {
+        question: "Are my uploaded receipts or personal documents stored anywhere?",
+        answer:
+          "No. Zero server transmission or retention takes place. All images, perspective adjustments, and generated PDF pages exist only ephemerally in browser RAM and vanish when you close the tab.",
+      },
+    ],
+    relatedTools: [
+      {
+        toolId: "document-straightener",
+        title: "Free Document Straightener",
+        href: "/tools/document-straightener",
+        description:
+          "Straighten tilted smartphone document photos with 4-corner perspective correction.",
+      },
+      {
+        toolId: "document-studio",
+        title: "Free Document Studio",
+        href: "/tools/document-studio",
+        description:
+          "All-in-one studio to crop Aadhaar, PAN, Voter ID, Ration cards, and custom certificates.",
+      },
+      {
+        toolId: "photo-studio",
+        title: "Free Passport Photo Studio",
+        href: "/tools/photo-studio",
+        description:
+          "Generate compliant passport and visa photos with standard dimensions and custom backdrops.",
+      },
+      {
+        toolId: "multiple-photo-maker",
+        title: "Free Multiple Photo Maker",
+        href: "/tools/multiple-photo-maker",
+        description:
+          "Tile multiple passport photos across standard A4 and 4×6 photo print sheets.",
+      },
+    ],
+  },
+  "design-studio": {
+    toolId: "design-studio",
+    h1: "Free Online Design Studio – Printable Cards, Invitations & Covers",
+    seoTitle:
+      "Free Online Design Studio – Visiting Cards, Wedding Cards & Covers | Print Ready Designs",
+    metaDescription:
+      "Design professional visiting cards, wedding invitations, school/college project covers, and ID cards online. Customizable templates, editable canvas, and print-ready PDF export with zero uploads.",
+    primaryKeyword: "online design studio",
+    keywords: [
+      "online design studio",
+      "visiting card maker",
+      "business card maker free",
+      "wedding card maker online",
+      "invitation card maker",
+      "id card maker online",
+      "project cover page maker",
+      "online card design tool",
+      "printable card designer",
+      "free printable card maker",
+    ],
+    intro:
+      "Create high-resolution, print-ready visiting cards, traditional and modern wedding invitations, academic project covers, and identity badges right inside your browser. Enjoy full creative control with a vector-backed canvas, customizable shapes, rich typography, photo uploads, cutting bleed guides, and multi-copy A4 print sheet generation—all completely private with zero server uploads.",
+    howToUse: [
+      {
+        step: 1,
+        title: "Choose a Template or Blank Canvas",
+        description:
+          "Pick from pre-formatted templates across Visiting Cards, Wedding Invitations, Project Covers, and ID Cards, or start with custom millimeter dimensions.",
+      },
+      {
+        step: 2,
+        title: "Customize Typography, Shapes & Colors",
+        description:
+          "Edit text headings, contact details, fonts, color palettes, and decorative borders using intuitive canvas controls with live alignment guides.",
+      },
+      {
+        step: 3,
+        title: "Insert Logos, Photos & Adjust Bleed",
+        description:
+          "Add personal logos or portrait photos locally, and review print bleed margins to guarantee critical text stays safely inside trimming boundaries.",
+      },
+      {
+        step: 4,
+        title: "Export Vector PDF or Multi-Card Print Sheet",
+        description:
+          "Download crisp 300 DPI vector PDFs, standalone PNGs, or generate multi-copy A4 layout sheets complete with cut marks for commercial or desktop printing.",
+      },
+    ],
+    faqs: [
+      {
+        question: "What design categories and dimensions are supported in the Design Studio?",
+        answer:
+          "Design Studio supports 4 main categories: Standard Visiting Cards (3.5 × 2.0 in / 88.9 × 50.8 mm), Wedding & Ceremony Invitations (5.0 × 7.0 in / 127 × 177.8 mm), Academic Project Covers (A4 / 210 × 297 mm), and CR80 ID Badges (85.6 × 54.0 mm).",
+      },
+      {
+        question: "Can I design double-sided cards with front and back layouts?",
+        answer:
+          "Yes. The studio enables seamless switching between front and back canvas surfaces, allowing you to design matching reverse sides for visiting cards and identity badges with aligned margins.",
+      },
+      {
+        question: "How does multi-copy A4 print sheet generation work?",
+        answer:
+          "The export engine automatically tiles multiple copies of your finished card design across standard A4 paper with calibrated spacing and precision crop marks for easy guillotine trimming.",
+      },
+      {
+        question: "Are my company logos, photos, or client details stored on a server?",
+        answer:
+          "No. The Design Studio operates 100% locally in your browser memory via Konva and Canvas APIs. No graphics, personal text, or template configurations are ever transmitted to any backend server.",
+      },
+    ],
+    relatedTools: [
+      {
+        toolId: "document-studio",
+        title: "Free Document Studio",
+        href: "/tools/document-studio",
+        description:
+          "Crop Voter ID, PAN, Aadhaar, Ration cards, and custom certificates for PVC printing.",
+      },
+      {
+        toolId: "photo-studio",
+        title: "Free Passport Photo Studio",
+        href: "/tools/photo-studio",
+        description:
+          "Generate compliant biometric passport and visa photos for identity applications.",
+      },
+      {
+        toolId: "resume-maker",
+        title: "Free ATS-Friendly Resume Maker",
+        href: "/tools/resume-maker",
+        description:
+          "Build clean, machine-readable resumes and CVs with instant PDF export.",
+      },
+      {
+        toolId: "multiple-photo-maker",
+        title: "Free Multiple Photo Maker",
+        href: "/tools/multiple-photo-maker",
+        description:
+          "Print multiple passport photos tiled across standard A4 and 4×6 photo sheets.",
+      },
+    ],
+    categoryHighlights: [
+      {
+        title: "Visiting & Business Cards",
+        subtitle: "Professional Networking & Brand Identity",
+        dimensions: "3.5 × 2.0 in (88.9 × 50.8 mm)",
+        description:
+          "Craft modern corporate or entrepreneurial business cards with double-sided layouts, QR code placement, logo embedding, and multi-up A4 sheet printing.",
+      },
+      {
+        title: "Wedding & Event Invitations",
+        subtitle: "Traditional & Contemporary Celebration Stationery",
+        dimensions: "5.0 × 7.0 in (127 × 177.8 mm)",
+        description:
+          "Design elegant wedding invites, engagement cards, and party stationery with ornamental borders, refined serif typography, and rich cultural color palettes.",
+      },
+      {
+        title: "Academic & Project Front Covers",
+        subtitle: "School, College & University Assignment Presentations",
+        dimensions: "Standard A4 (210 × 297 mm)",
+        description:
+          "Format clean front covers for college practical files, dissertations, project reports, and school submissions with institutional seals and student details.",
+      },
+      {
+        title: "Identity & Membership Cards",
+        subtitle: "Standard CR80 Badges & Access Passes",
+        dimensions: "ISO CR80 (85.6 × 54.0 mm)",
+        description:
+          "Produce crisp student IDs, corporate employee badges, and event entry passes featuring portrait photo placeholders, role badges, and barcode zones.",
       },
     ],
   },

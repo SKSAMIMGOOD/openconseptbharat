@@ -32,6 +32,14 @@ export const TOOL_TO_GUIDE_MAP: Record<string, { slug: string; title: string }> 
     slug: "crop-aadhaar-card-pvc-printing",
     title: "How to Crop ID Cards for PVC Printing (Step-by-Step)",
   },
+  "raw-image-to-pdf": {
+    slug: "straighten-crooked-document-photo",
+    title: "How to Straighten and Convert Document Photos to Clean PDF",
+  },
+  "design-studio": {
+    slug: "crop-aadhaar-card-pvc-printing",
+    title: "How to Design and Print Custom Cards on A4 Sheets",
+  },
 };
 
 export interface ToolSeoSectionProps {
@@ -45,7 +53,7 @@ export const ToolSeoSection: React.FC<ToolSeoSectionProps> = ({ toolId }) => {
     return null;
   }
 
-  const { howToUse, faqs, relatedTools, primaryKeyword } = seoData;
+  const { howToUse, faqs, relatedTools, primaryKeyword, categoryHighlights } = seoData;
   const companionGuide = TOOL_TO_GUIDE_MAP[toolId];
 
   return (
@@ -121,6 +129,51 @@ export const ToolSeoSection: React.FC<ToolSeoSectionProps> = ({ toolId }) => {
             <span>Read Step-by-Step Guide</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
+        </div>
+      )}
+
+      {/* Category Highlights (Design Studio & Specialty Formats) */}
+      {categoryHighlights && categoryHighlights.length > 0 && (
+        <div className="space-y-6">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-950/60 flex items-center justify-center text-purple-600 dark:text-purple-400 border border-purple-200/60 dark:border-purple-800/60">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold text-surface-900 dark:text-surface-100 tracking-tight">
+                Design Categories & Print Specifications
+              </h2>
+              <p className="text-xs sm:text-sm text-surface-500 dark:text-surface-400 mt-0.5">
+                Standard physical dimensions, bleed zones, and recommended print uses.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {categoryHighlights.map((cat, idx) => (
+              <div
+                key={idx}
+                className="bg-white dark:bg-surface-900 border border-surface-200/80 dark:border-surface-800 rounded-2xl p-5 shadow-xs flex flex-col justify-between"
+              >
+                <div>
+                  <div className="mb-2">
+                    <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded-md bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300">
+                      {cat.dimensions}
+                    </span>
+                  </div>
+                  <h3 className="text-sm font-bold text-surface-900 dark:text-surface-100 mb-1">
+                    {cat.title}
+                  </h3>
+                  <p className="text-[11px] font-medium text-brand-600 dark:text-brand-400 mb-2">
+                    {cat.subtitle}
+                  </p>
+                  <p className="text-xs text-surface-600 dark:text-surface-400 leading-relaxed">
+                    {cat.description}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

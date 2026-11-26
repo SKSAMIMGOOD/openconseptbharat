@@ -83,6 +83,22 @@ describe("Phase 2: Individual Tool-Page SEO Optimization Test Suite", () => {
         "Free Document Studio Online – Crop Voter ID, PAN, Aadhaar & Custom Docs | Print Ready Designs",
       primaryKeyword: "document studio crop id cards online",
     },
+    {
+      id: "raw-image-to-pdf",
+      expectedH1:
+        "Free Online Raw Image to Clean PDF Converter – Multi-Photo Document Maker",
+      expectedTitle:
+        "Free Raw Image to Clean PDF Converter – Multi-Photo to A4 PDF | Print Ready Designs",
+      primaryKeyword: "image to PDF converter",
+    },
+    {
+      id: "design-studio",
+      expectedH1:
+        "Free Online Design Studio – Printable Cards, Invitations & Covers",
+      expectedTitle:
+        "Free Online Design Studio – Visiting Cards, Wedding Cards & Covers | Print Ready Designs",
+      primaryKeyword: "online design studio",
+    },
   ];
 
   describe("1. Target Tool SEO Configuration Integrity", () => {

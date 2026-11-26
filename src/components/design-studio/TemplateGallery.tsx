@@ -147,9 +147,9 @@ export const TemplateGallery: React.FC<TemplateGalleryProps> = ({
               <Sparkles className="w-3.5 h-3.5" />
               <span>Design Studio Template Catalog</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-surface-900 dark:text-white">
+            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-surface-900 dark:text-white">
               Choose a Template or Blank Canvas
-            </h1>
+            </h2>
             <p className="text-xs sm:text-sm text-surface-500 dark:text-surface-400 mt-1">
               Every template is 100% editable with vector shapes, live text reflow, and high-DPI print precision.
             </p>
