@@ -22,6 +22,7 @@ import {
   HardDrive,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
+import { getSettingsBreadcrumbSchema } from "@/lib/seo/breadcrumbs";
 import { Card } from "@/components/common/Card";
 import { Button } from "@/components/common/Button";
 import { Badge } from "@/components/common/Badge";
@@ -116,6 +117,7 @@ export default function SettingsPage() {
           subtitle="Loading your personalized browser preferences..."
           badge="Global Preferences"
           breadcrumbs={[{ label: "Settings" }]}
+          breadcrumbSchema={getSettingsBreadcrumbSchema()}
         />
         <div className="max-w-5xl mx-auto px-4 py-12 text-center text-surface-500">
           <div className="animate-spin w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full mx-auto mb-3" />
@@ -136,6 +138,7 @@ export default function SettingsPage() {
         subtitle="Customize global defaults for photo cropping, DPI calculations, print sheets, preview modes, and appearance. All preferences are preserved strictly in your browser's localStorage."
         badge="Phase 07: Global Settings"
         breadcrumbs={[{ label: "Settings" }]}
+        breadcrumbSchema={getSettingsBreadcrumbSchema()}
         actions={
           <div className="flex items-center gap-3">
             <Button

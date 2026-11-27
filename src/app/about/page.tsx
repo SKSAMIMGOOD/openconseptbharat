@@ -11,8 +11,11 @@ import {
   Zap,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
+import { getAboutBreadcrumbSchema } from "@/lib/seo/breadcrumbs";
 
 export default function AboutPage() {
+  const breadcrumbSchema = getAboutBreadcrumbSchema();
+
   return (
     <div className="min-h-screen bg-surface-50 dark:bg-surface-950 flex flex-col transition-colors duration-150">
       <PageHeader
@@ -20,6 +23,7 @@ export default function AboutPage() {
         subtitle="An independent, client-side utility platform engineered for high-performance document cropping, photo editing, and PDF creation with absolute data privacy."
         badge="Independent Utility Architecture"
         breadcrumbs={[{ label: "About" }]}
+        breadcrumbSchema={breadcrumbSchema}
       />
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 flex-1 w-full space-y-8">

@@ -183,6 +183,96 @@ export function getBreadcrumbListSchema(
 }
 
 /**
+ * BreadcrumbList schema for /tools (All Tools directory).
+ */
+export function getToolsIndexBreadcrumbSchema(baseUrl: string = SITE_URL): BreadcrumbListSchema {
+  return getBreadcrumbListSchema(
+    [
+      {
+        name: "All Tools",
+        path: "/tools",
+      },
+    ],
+    baseUrl
+  );
+}
+
+/**
+ * BreadcrumbList schema for /about page.
+ */
+export function getAboutBreadcrumbSchema(baseUrl: string = SITE_URL): BreadcrumbListSchema {
+  return getBreadcrumbListSchema(
+    [
+      {
+        name: "About",
+        path: "/about",
+      },
+    ],
+    baseUrl
+  );
+}
+
+/**
+ * BreadcrumbList schema for /contact page.
+ */
+export function getContactBreadcrumbSchema(baseUrl: string = SITE_URL): BreadcrumbListSchema {
+  return getBreadcrumbListSchema(
+    [
+      {
+        name: "Contact",
+        path: "/contact",
+      },
+    ],
+    baseUrl
+  );
+}
+
+/**
+ * BreadcrumbList schema for /privacy page.
+ */
+export function getPrivacyBreadcrumbSchema(baseUrl: string = SITE_URL): BreadcrumbListSchema {
+  return getBreadcrumbListSchema(
+    [
+      {
+        name: "Privacy Policy",
+        path: "/privacy",
+      },
+    ],
+    baseUrl
+  );
+}
+
+/**
+ * BreadcrumbList schema for /terms page.
+ */
+export function getTermsBreadcrumbSchema(baseUrl: string = SITE_URL): BreadcrumbListSchema {
+  return getBreadcrumbListSchema(
+    [
+      {
+        name: "Terms of Use",
+        path: "/terms",
+      },
+    ],
+    baseUrl
+  );
+}
+
+/**
+ * BreadcrumbList schema for /settings page.
+ */
+export function getSettingsBreadcrumbSchema(baseUrl: string = SITE_URL): BreadcrumbListSchema {
+  return getBreadcrumbListSchema(
+    [
+      {
+        name: "Settings",
+        path: "/settings",
+      },
+    ],
+    baseUrl
+  );
+}
+
+/**
  * Safely serializes structured JSON-LD into a script string, escaping HTML control characters
  * to eliminate XSS risks inside JSON-LD script tags.
  */

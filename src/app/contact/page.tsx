@@ -2,8 +2,11 @@ import React from "react";
 import Link from "next/link";
 import { Mail, MessageSquare, ShieldCheck, Code, ArrowLeft, ArrowRight, FileCheck } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
+import { getContactBreadcrumbSchema } from "@/lib/seo/breadcrumbs";
 
 export default function ContactPage() {
+  const breadcrumbSchema = getContactBreadcrumbSchema();
+
   return (
     <div className="min-h-screen bg-surface-50 dark:bg-surface-950 flex flex-col transition-colors duration-150">
       <PageHeader
@@ -11,6 +14,7 @@ export default function ContactPage() {
         subtitle="Have feedback, questions about our privacy architecture, or want to report a technical bug?"
         badge="Community & Support"
         breadcrumbs={[{ label: "Contact" }]}
+        breadcrumbSchema={breadcrumbSchema}
       />
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 flex-1 w-full space-y-8">

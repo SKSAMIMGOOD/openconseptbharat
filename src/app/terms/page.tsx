@@ -2,8 +2,11 @@ import React from "react";
 import Link from "next/link";
 import { ShieldCheck, FileText, CheckCircle2, AlertTriangle, ArrowRight } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
+import { getTermsBreadcrumbSchema } from "@/lib/seo/breadcrumbs";
 
 export default function TermsPage() {
+  const breadcrumbSchema = getTermsBreadcrumbSchema();
+
   return (
     <div className="min-h-screen bg-surface-50 dark:bg-surface-950 flex flex-col transition-colors duration-150">
       <PageHeader
@@ -11,6 +14,7 @@ export default function TermsPage() {
         subtitle="Transparent terms for using Print Ready Designs' browser-only processing utilities."
         badge="Legal & Usage Terms"
         breadcrumbs={[{ label: "Terms of Use" }]}
+        breadcrumbSchema={breadcrumbSchema}
       />
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 flex-1 w-full">

@@ -2,12 +2,15 @@ import React from "react";
 import { Breadcrumb, BreadcrumbItem } from "./Breadcrumb";
 import { Badge } from "./Badge";
 import { cn } from "@/lib/utils/cn";
+import { BreadcrumbListSchema } from "@/lib/seo/breadcrumbs";
+import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 
 export interface PageHeaderProps {
   title: string;
   subtitle?: string;
   badge?: string;
   breadcrumbs?: BreadcrumbItem[];
+  breadcrumbSchema?: BreadcrumbListSchema;
   actions?: React.ReactNode;
   className?: string;
 }
@@ -17,11 +20,13 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   subtitle,
   badge,
   breadcrumbs,
+  breadcrumbSchema,
   actions,
   className,
 }) => {
   return (
     <div className={cn("bg-white dark:bg-surface-900 border-b border-surface-200/80 dark:border-surface-800 py-8 mb-8 transition-colors duration-150", className)}>
+      {breadcrumbSchema && <BreadcrumbJsonLd schema={breadcrumbSchema} />}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {breadcrumbs && breadcrumbs.length > 0 && (
           <div className="mb-4">

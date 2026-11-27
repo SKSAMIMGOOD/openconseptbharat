@@ -21,8 +21,11 @@ import {
   THIRD_PARTY_DISCLOSURES,
 } from "@/constants/privacy";
 import { PageHeader } from "@/components/common/PageHeader";
+import { getPrivacyBreadcrumbSchema } from "@/lib/seo/breadcrumbs";
 
 export default function PrivacyPage() {
+  const breadcrumbSchema = getPrivacyBreadcrumbSchema();
+
   return (
     <div className="min-h-screen bg-surface-50 dark:bg-surface-950 flex flex-col transition-colors duration-150">
       <PageHeader
@@ -30,6 +33,7 @@ export default function PrivacyPage() {
         subtitle="Engineered with strict client-side data isolation. Discover how Print Ready Designs mathematically prevents document transmission."
         badge="100% In-Browser Execution"
         breadcrumbs={[{ label: "Privacy Guarantee" }]}
+        breadcrumbSchema={breadcrumbSchema}
       />
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 flex-1 w-full space-y-10">

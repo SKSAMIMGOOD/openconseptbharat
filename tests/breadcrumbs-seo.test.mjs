@@ -7,6 +7,12 @@ import {
   getToolVisualBreadcrumbs,
   getToolBreadcrumbListSchema,
   getBreadcrumbListSchema,
+  getToolsIndexBreadcrumbSchema,
+  getAboutBreadcrumbSchema,
+  getContactBreadcrumbSchema,
+  getPrivacyBreadcrumbSchema,
+  getTermsBreadcrumbSchema,
+  getSettingsBreadcrumbSchema,
   safeJsonLdStringify,
   SITE_URL,
 } from "../src/lib/seo/breadcrumbs.ts";
@@ -194,5 +200,71 @@ describe("SEO Breadcrumb Navigation & BreadcrumbList Structured Data", () => {
     assert.equal(generic.itemListElement[1].item, "https://www.printreadydesigns.in/docs");
     assert.equal(generic.itemListElement[2].name, "Getting Started");
     assert.equal(generic.itemListElement[2].item, "https://www.printreadydesigns.in/docs/getting-started");
+  });
+
+  describe("Core Site Pages BreadcrumbList Structured Data", () => {
+    const CORE_PAGE_SPECS = [
+      {
+        name: "Tools Index (/tools)",
+        fn: getToolsIndexBreadcrumbSchema,
+        expectedName: "All Tools",
+        expectedPath: "/tools",
+      },
+      {
+        name: "About Page (/about)",
+        fn: getAboutBreadcrumbSchema,
+        expectedName: "About",
+        expectedPath: "/about",
+      },
+      {
+        name: "Contact Page (/contact)",
+        fn: getContactBreadcrumbSchema,
+        expectedName: "Contact",
+        expectedPath: "/contact",
+      },
+      {
+        name: "Privacy Page (/privacy)",
+        fn: getPrivacyBreadcrumbSchema,
+        expectedName: "Privacy Policy",
+        expectedPath: "/privacy",
+      },
+      {
+        name: "Terms Page (/terms)",
+        fn: getTermsBreadcrumbSchema,
+        expectedName: "Terms of Use",
+        expectedPath: "/terms",
+      },
+      {
+        name: "Settings Page (/settings)",
+        fn: getSettingsBreadcrumbSchema,
+        expectedName: "Settings",
+        expectedPath: "/settings",
+      },
+    ];
+
+    for (const spec of CORE_PAGE_SPECS) {
+      test(`${spec.name} generates Google-compliant BreadcrumbList`, () => {
+        const schema = spec.fn();
+        assert.equal(schema["@context"], "https://schema.org");
+        assert.equal(schema["@type"], "BreadcrumbList");
+        assert.equal(schema.itemListElement.length, 2);
+
+        // Position 1: Home
+        assert.deepEqual(schema.itemListElement[0], {
+          "@type": "ListItem",
+          position: 1,
+          name: "Home",
+          item: "https://www.printreadydesigns.in",
+        });
+
+        // Position 2: Core Page
+        assert.deepEqual(schema.itemListElement[1], {
+          "@type": "ListItem",
+          position: 2,
+          name: spec.expectedName,
+          item: `https://www.printreadydesigns.in${spec.expectedPath}`,
+        });
+      });
+    }
   });
 });

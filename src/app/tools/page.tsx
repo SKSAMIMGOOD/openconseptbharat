@@ -18,6 +18,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { PageHeader } from "@/components/common/PageHeader";
 import { PrivacyNotice } from "@/components/common/PrivacyNotice";
 import { RecentlyUsedSection } from "@/components/dashboard/RecentlyUsedSection";
+import { getToolsIndexBreadcrumbSchema } from "@/lib/seo/breadcrumbs";
 
 const CATEGORY_TABS: { id: "all" | ToolCategory; label: string; icon: React.ElementType }[] = [
   { id: "all", label: "All Utilities", icon: Grid3x3 },
@@ -114,16 +115,16 @@ function ToolsContent() {
     handleCategorySelect("all");
   };
 
+  const breadcrumbSchema = useMemo(() => getToolsIndexBreadcrumbSchema(), []);
+
   return (
     <div className="min-h-screen bg-surface-50 flex flex-col">
       <PageHeader
         title="All Browser Utilities"
         subtitle="Explore our complete suite of browser-native photo, document, and printing tools. Zero server uploads."
         badge={`${TOOLS.length} Client-Side Utilities`}
-        breadcrumbs={[
-          { label: "Dashboard", href: "/" },
-          { label: "All Tools" },
-        ]}
+        breadcrumbs={[{ label: "All Tools" }]}
+        breadcrumbSchema={breadcrumbSchema}
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 flex-1 w-full">
