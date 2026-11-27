@@ -26,6 +26,9 @@ export interface PersonalInfo {
   showPhoto?: boolean;
   photoShape?: PhotoCropShape;
   photoSize?: PhotoSizePreset;
+  dob?: string;
+  nationality?: string;
+  maritalStatus?: string;
 }
 
 export interface WorkExperience {

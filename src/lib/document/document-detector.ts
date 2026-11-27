@@ -25,8 +25,11 @@ import type {
 import { classifyFrontBackCrops } from "./document-content-classifier.ts";
 import {
   PAN_CARD_MEASUREMENTS,
+  PAN_CARD_CAPTURE_SPEC,
   AADHAAR_CARD_MEASUREMENTS,
+  AADHAAR_CARD_CAPTURE_SPEC,
   RATION_CARD_MEASUREMENTS,
+  RATION_CARD_CAPTURE_SPEC,
   VOTER_ID_MEASUREMENTS,
   CR80_STANDARD_SPEC,
 } from "../../constants/document-studio.ts";
@@ -50,6 +53,7 @@ export interface DualDetectionOptions extends DocumentDetectionOptions {
   forceLayout?: "auto" | "bottom-dual" | "horizontal" | "vertical" | "manual"; // layout mode
   docTypeId?: string;
   vectorInfo?: VectorPdfInspectionResult | null;
+  expandCaptureArea?: boolean; // When true, expands Ration Card capture area from core 1640x1034 to full 1925x1214
 }
 
 /**
@@ -1142,6 +1146,14 @@ export function detectPanCardInPixelBuffer(
     swapped = true;
   }
 
+  // If capture area expansion was explicitly requested
+  if (options.expandCaptureArea) {
+    finalFront = expandPanCardCaptureArea(finalFront, swapped ? "back" : "front", foldX, W, H);
+    if (finalBack) {
+      finalBack = expandPanCardCaptureArea(finalBack, swapped ? "front" : "back", foldX, W, H);
+    }
+  }
+
   // Validate aspect ratio
   const frontAspect = finalFront.width / finalFront.height;
   const backAspect = finalBack.width / finalBack.height;
@@ -1167,6 +1179,98 @@ export function detectPanCardInPixelBuffer(
       detectedCount === 2
         ? "PAN Card dashed cut box, central vertical fold, and card boundaries detected successfully."
         : "PAN Card detected using lower cut box reference measurements and content classification.",
+  };
+}
+
+/**
+ * Expands the PAN Card capture area from the detected inner core (~1792 × 1130 px)
+ * to the full card capturing area (1881 × 1186 px), preserving the ISO CR80 aspect ratio (~1.5860),
+ * properly framing the bottom signature box, DOB text, central fold divider, and top header.
+ *
+ * NOTE: Does NOT alter the auto-detection position calculation or detection method.
+ * Only expands the captured crop rectangle around the detected fold and card position.
+ */
+export function expandPanCardCaptureArea(
+  crop: CropCoordinates,
+  side: "front" | "back",
+  foldX: number,
+  containerW: number,
+  containerH: number
+): CropCoordinates {
+  const TARGET_W = PAN_CARD_CAPTURE_SPEC.widthPx; // 1881
+  const TARGET_H = PAN_CARD_CAPTURE_SPEC.heightPx; // 1186
+  const BASE_W = PAN_CARD_CAPTURE_SPEC.baseWidthPx; // 1792
+  const BASE_H = PAN_CARD_CAPTURE_SPEC.baseHeightPx; // 1130
+
+  // Check if resolution is standard (near 600 DPI rendering ~4500-5200 px wide)
+  const isStandardRes = Math.abs(crop.width - BASE_W) <= 120;
+  const newW = isStandardRes ? TARGET_W : Math.round(crop.width * (TARGET_W / BASE_W));
+  const newH = isStandardRes ? TARGET_H : Math.round(crop.height * (TARGET_H / BASE_H));
+
+  const deltaH = newH - crop.height;
+  // Shift Y: ~25% upward and ~75% downward to capture bottom signature box and DOB
+  const newY = Math.max(0, crop.y - Math.round(deltaH * 0.25));
+
+  let newX: number;
+  if (side === "front") {
+    // Front card extends right up to the central fold/divider line (foldX)
+    newX = Math.max(0, foldX - newW);
+  } else {
+    // Back card starts from the central fold/divider line (foldX)
+    newX = foldX;
+  }
+
+  return {
+    x: newX,
+    y: newY,
+    width: Math.min(containerW - newX, newW),
+    height: Math.min(containerH - newY, newH),
+  };
+}
+
+/**
+ * Expands the Aadhaar Card capture area from the detected inner core (~1913 × 1206 px)
+ * to the full card capturing area (2072 × 1307 px), preserving the ISO CR80 aspect ratio (~1.5853),
+ * properly framing the bottom slogan "मेरा आधार, मेरी पहचान", central fold divider, and top emblem/header.
+ *
+ * NOTE: Does NOT alter the auto-detection position calculation or detection method.
+ * Only expands the captured crop rectangle around the detected fold and card position.
+ */
+export function expandAadhaarCardCaptureArea(
+  crop: CropCoordinates,
+  side: "front" | "back",
+  foldX: number,
+  containerW: number,
+  containerH: number
+): CropCoordinates {
+  const TARGET_W = AADHAAR_CARD_CAPTURE_SPEC.widthPx; // 2072
+  const TARGET_H = AADHAAR_CARD_CAPTURE_SPEC.heightPx; // 1307
+  const BASE_W = AADHAAR_CARD_CAPTURE_SPEC.baseWidthPx; // 1913
+  const BASE_H = AADHAAR_CARD_CAPTURE_SPEC.baseHeightPx; // 1206
+
+  // Check if resolution is standard (near 600 DPI rendering ~4500-5200 px wide)
+  const isStandardRes = Math.abs(crop.width - BASE_W) <= 120;
+  const newW = isStandardRes ? TARGET_W : Math.round(crop.width * (TARGET_W / BASE_W));
+  const newH = isStandardRes ? TARGET_H : Math.round(crop.height * (TARGET_H / BASE_H));
+
+  const deltaH = newH - crop.height;
+  // Shift Y: ~22% upward and ~78% downward to capture bottom slogan "मेरा आधार, मेरी पहचान" and red bar
+  const newY = Math.max(0, crop.y - Math.round(deltaH * 0.22));
+
+  let newX: number;
+  if (side === "front") {
+    // Front card extends right up to the central fold/divider line (foldX)
+    newX = Math.max(0, foldX - newW);
+  } else {
+    // Back card starts from the central fold/divider line (foldX)
+    newX = foldX;
+  }
+
+  return {
+    x: newX,
+    y: newY,
+    width: Math.min(containerW - newX, newW),
+    height: Math.min(containerH - newY, newH),
   };
 }
 
@@ -1319,6 +1423,14 @@ export function detectAadhaarCardInPixelBuffer(
     finalFront = backCandidate;
     finalBack = frontCandidate;
     swapped = true;
+  }
+
+  // If capture area expansion was explicitly requested
+  if (options.expandCaptureArea) {
+    finalFront = expandAadhaarCardCaptureArea(finalFront, swapped ? "back" : "front", foldX, W, H);
+    if (finalBack) {
+      finalBack = expandAadhaarCardCaptureArea(finalBack, swapped ? "front" : "back", foldX, W, H);
+    }
   }
 
   return {
@@ -1547,6 +1659,52 @@ function trimCardWhiteSpace(
     y: startY,
     width: Math.max(10, endX - startX),
     height: Math.max(10, endY - startY),
+  };
+}
+
+/**
+ * Expands the Ration Card capture area from the detected inner core (~1640 × 1034 px)
+ * to the full card capturing area (1925 × 1214 px), preserving the ISO CR80 aspect ratio (~1.5857),
+ * properly framing the bottom-right QR code, central fold, top header, and bottom notice.
+ *
+ * NOTE: Does NOT alter the auto-detection position calculation or detection method.
+ * Only expands the captured crop rectangle around the detected fold and card position.
+ */
+export function expandRationCardCaptureArea(
+  crop: CropCoordinates,
+  side: "front" | "back",
+  foldX: number,
+  containerW: number,
+  containerH: number
+): CropCoordinates {
+  const TARGET_W = RATION_CARD_CAPTURE_SPEC.widthPx; // 1925
+  const TARGET_H = RATION_CARD_CAPTURE_SPEC.heightPx; // 1214
+  const BASE_W = RATION_CARD_CAPTURE_SPEC.baseWidthPx; // 1640
+  const BASE_H = RATION_CARD_CAPTURE_SPEC.baseHeightPx; // 1034
+
+  // Check if resolution is standard (near 600 DPI rendering ~4500-5200 px wide)
+  const isStandardRes = Math.abs(crop.width - BASE_W) <= 120;
+  const newW = isStandardRes ? TARGET_W : Math.round(crop.width * (TARGET_W / BASE_W));
+  const newH = isStandardRes ? TARGET_H : Math.round(crop.height * (TARGET_H / BASE_H));
+
+  const deltaH = newH - crop.height;
+  // Shift Y: ~42% upward and ~58% downward to capture top Bengali header and bottom notice
+  const newY = Math.max(0, crop.y - Math.round(deltaH * 0.42));
+
+  let newX: number;
+  if (side === "front") {
+    // Front card extends right up to the central fold line (foldX)
+    newX = Math.max(0, foldX - newW);
+  } else {
+    // Back card starts from the central fold line (foldX)
+    newX = foldX;
+  }
+
+  return {
+    x: newX,
+    y: newY,
+    width: Math.min(containerW - newX, newW),
+    height: Math.min(containerH - newY, newH),
   };
 }
 
@@ -1802,6 +1960,14 @@ export function detectRationCardInPixelBuffer(
     finalFront = backCandidate;
     finalBack = frontCandidate;
     swapped = true;
+  }
+
+  // If capture area expansion was explicitly requested
+  if (options.expandCaptureArea) {
+    finalFront = expandRationCardCaptureArea(finalFront, swapped ? "back" : "front", foldX, W, H);
+    if (finalBack) {
+      finalBack = expandRationCardCaptureArea(finalBack, swapped ? "front" : "back", foldX, W, H);
+    }
   }
 
   const confidence = isLowConfidence ? 0.55 : (detectedCount === 2 ? 0.98 : 0.92);
@@ -2583,9 +2749,39 @@ export async function detectDualDocumentBoundaries(
     return { x, y, width, height };
   };
 
+  let frontCrop = scaleCrop(result.frontCrop);
+  let backCrop = result.backCrop ? scaleCrop(result.backCrop) : null;
+
+  const isPan = normType === "pan";
+  if (isPan && frontCrop) {
+    const foldX = backCrop ? backCrop.x : Math.round(frontCrop.x + frontCrop.width);
+    frontCrop = expandPanCardCaptureArea(frontCrop, "front", foldX, nativeWidth, nativeHeight);
+    if (backCrop) {
+      backCrop = expandPanCardCaptureArea(backCrop, "back", foldX, nativeWidth, nativeHeight);
+    }
+  }
+
+  const isRation = normType === "ration-card" || normType === "ration";
+  if (isRation && frontCrop) {
+    const foldX = backCrop ? backCrop.x : Math.round(frontCrop.x + frontCrop.width);
+    frontCrop = expandRationCardCaptureArea(frontCrop, "front", foldX, nativeWidth, nativeHeight);
+    if (backCrop) {
+      backCrop = expandRationCardCaptureArea(backCrop, "back", foldX, nativeWidth, nativeHeight);
+    }
+  }
+
+  const isAadhaar = normType === "aadhaar";
+  if (isAadhaar && frontCrop) {
+    const foldX = backCrop ? backCrop.x : Math.round(frontCrop.x + frontCrop.width);
+    frontCrop = expandAadhaarCardCaptureArea(frontCrop, "front", foldX, nativeWidth, nativeHeight);
+    if (backCrop) {
+      backCrop = expandAadhaarCardCaptureArea(backCrop, "back", foldX, nativeWidth, nativeHeight);
+    }
+  }
+
   return {
     ...result,
-    frontCrop: scaleCrop(result.frontCrop),
-    backCrop: result.backCrop ? scaleCrop(result.backCrop) : null,
+    frontCrop,
+    backCrop,
   };
 }

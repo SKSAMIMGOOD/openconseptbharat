@@ -79,6 +79,22 @@ export const PAN_CARD_MEASUREMENTS: DocumentReferenceMeasurement = {
 };
 
 /**
+ * Standard Capture Area Specifications for PAN Card in Document Studio:
+ * - Base auto-detected core region: ~1792 × 1130 px (aspect ratio ~1.5858)
+ * - Expanded capturing area: 1881 × 1186 px (aspect ratio ~1.5860 ISO/IEC 7810 ID-1 CR80)
+ * - Captures the full card including bottom signature box, DOB text, central fold divider, and top header
+ */
+export const PAN_CARD_CAPTURE_SPEC = {
+  widthPx: 1881,
+  heightPx: 1186,
+  baseWidthPx: 1792,
+  baseHeightPx: 1130,
+  aspectRatio: 1881 / 1186, // ~1.5860 (CR80 standard: 85.60 mm x 53.98 mm)
+  scaleWidth: 1881 / 1792, // ~1.049665
+  scaleHeight: 1186 / 1130, // ~1.049557
+} as const;
+
+/**
  * Exact Measured Normalized Coordinates for Aadhaar Card (US Letter 2550 x 3300 px at 300 DPI)
  * Reference measurements:
  * - Horizontal dashed cut line: Y ~ 2382–2383 (normalized ~0.722)
@@ -104,6 +120,22 @@ export const AADHAAR_CARD_MEASUREMENTS: DocumentReferenceMeasurement = {
   aspectRatio: 1052 / 672, // ~1.565
   description: "Aadhaar Card lower PVC card section with dashed cut line Y~0.722 and solid card borders",
 };
+
+/**
+ * Standard Capture Area Specifications for Aadhaar Card in Document Studio:
+ * - Base auto-detected core region: ~1913 × 1206 px (aspect ratio ~1.5862)
+ * - Expanded capturing area: 2072 × 1307 px (aspect ratio ~1.5853 ISO/IEC 7810 ID-1 CR80)
+ * - Captures the full card including bottom slogan "मेरा आधार, मेरी पहचान", central fold divider, and top emblem/header
+ */
+export const AADHAAR_CARD_CAPTURE_SPEC = {
+  widthPx: 2072,
+  heightPx: 1307,
+  baseWidthPx: 1913,
+  baseHeightPx: 1206,
+  aspectRatio: 2072 / 1307, // ~1.5853 (CR80 standard: 85.60 mm x 53.98 mm)
+  scaleWidth: 2072 / 1913, // ~1.0831155
+  scaleHeight: 1307 / 1206, // ~1.0837479
+} as const;
 
 /**
  * Exact Measured Normalized Coordinates for Ration Card (US Letter 2550 x 3300 px at 300 DPI)
@@ -154,6 +186,22 @@ export const RATION_CARD_MEASUREMENTS: DocumentReferenceMeasurement = {
     },
   },
 };
+
+/**
+ * Standard Capture Area Specifications for Ration Card in Document Studio:
+ * - Base auto-detected core region: ~1640 × 1034 px (aspect ratio ~1.586)
+ * - Expanded capturing area: 1925 × 1214 px (aspect ratio ~1.5857 ISO/IEC 7810 ID-1 CR80)
+ * - Captures the full card including bottom-right QR code, central fold margin, top header & bottom notice
+ */
+export const RATION_CARD_CAPTURE_SPEC = {
+  widthPx: 1925,
+  heightPx: 1214,
+  baseWidthPx: 1640,
+  baseHeightPx: 1034,
+  aspectRatio: 1925 / 1214, // ~1.58567 (CR80 standard: 85.60 mm x 53.98 mm)
+  scaleWidth: 1925 / 1640, // ~1.17378
+  scaleHeight: 1214 / 1034, // ~1.17408
+} as const;
 
 /**
  * Exact Measured Coordinates for Voter ID Card (e-EPIC Vector PDF A4 ~595 x 842 pt)

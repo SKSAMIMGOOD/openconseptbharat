@@ -36,6 +36,9 @@ export function sanitizeResumeData(input: unknown): ResumeData {
     raw.personalInfo?.photoSize === "large"
       ? raw.personalInfo.photoSize
       : "standard") as PhotoSizePreset,
+    dob: typeof raw.personalInfo?.dob === "string" ? raw.personalInfo.dob : "",
+    nationality: typeof raw.personalInfo?.nationality === "string" ? raw.personalInfo.nationality : "",
+    maritalStatus: typeof raw.personalInfo?.maritalStatus === "string" ? raw.personalInfo.maritalStatus : "",
   };
 
   const summary = typeof raw.summary === "string" ? raw.summary : "";

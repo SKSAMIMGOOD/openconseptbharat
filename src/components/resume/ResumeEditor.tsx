@@ -27,6 +27,9 @@ import {
   RESUME_COLOR_PRESETS,
   getTemplateDefaultColors,
   isValidHexColor,
+  CAREER_OBJECTIVE_CATEGORIES,
+  QUICK_TECHNICAL_SKILLS,
+  QUICK_SOFT_SKILLS,
 } from "@/constants/resume-defaults";
 import { PhotoCropModal } from "./PhotoCropModal";
 import {
@@ -172,6 +175,37 @@ export const ResumeEditor: React.FC<ResumeEditorProps> = ({
   const [isColorsOpen, setIsColorsOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
+
+  // Local raw text state for skills textareas to allow natural typing (spaces, commas, editing)
+  const [technicalSkillsInput, setTechnicalSkillsInput] = useState(() =>
+    (data.skills?.technical || []).join(", ")
+  );
+  const [softSkillsInput, setSoftSkillsInput] = useState(() =>
+    (data.skills?.soft || []).join(", ")
+  );
+
+  // Synchronize local input state only when external data.skills changes (e.g. Load Sample, Reset, Template change)
+  useEffect(() => {
+    const parsedTech = technicalSkillsInput
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const currentTech = data.skills?.technical || [];
+    if (JSON.stringify(parsedTech) !== JSON.stringify(currentTech)) {
+      setTechnicalSkillsInput(currentTech.join(", "));
+    }
+  }, [data.skills?.technical]);
+
+  useEffect(() => {
+    const parsedSoft = softSkillsInput
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const currentSoft = data.skills?.soft || [];
+    if (JSON.stringify(parsedSoft) !== JSON.stringify(currentSoft)) {
+      setSoftSkillsInput(currentSoft.join(", "));
+    }
+  }, [data.skills?.soft]);
 
   // Helper for updating nested personal info
   const handlePersonalChange = <K extends keyof ResumeData["personalInfo"]>(
@@ -428,15 +462,52 @@ export const ResumeEditor: React.FC<ResumeEditorProps> = ({
   // SKILLS OPERATIONS
   // ==========================================
   const handleSkillsChange = (type: "technical" | "soft", commaSeparated: string) => {
+    if (type === "technical") {
+      setTechnicalSkillsInput(commaSeparated);
+    } else {
+      setSoftSkillsInput(commaSeparated);
+    }
+
     const list = commaSeparated
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
+
     onChange({
       ...data,
       skills: {
         ...data.skills,
         [type]: list,
+      },
+    });
+  };
+
+  const handleToggleQuickSkill = (type: "technical" | "soft", skill: string) => {
+    const currentList = data.skills?.[type] || [];
+    const lowerSkill = skill.toLowerCase();
+    const exists = currentList.some((s) => s.trim().toLowerCase() === lowerSkill);
+
+    let updatedList: string[];
+    if (exists) {
+      // Remove only this preset skill, preserving other manual entries
+      updatedList = currentList.filter((s) => s.trim().toLowerCase() !== lowerSkill);
+    } else {
+      // Add preset skill without duplicate
+      updatedList = [...currentList, skill];
+    }
+
+    const updatedText = updatedList.join(", ");
+    if (type === "technical") {
+      setTechnicalSkillsInput(updatedText);
+    } else {
+      setSoftSkillsInput(updatedText);
+    }
+
+    onChange({
+      ...data,
+      skills: {
+        ...data.skills,
+        [type]: updatedList,
       },
     });
   };
@@ -739,11 +810,22 @@ export const ResumeEditor: React.FC<ResumeEditorProps> = ({
                       </div>
                     ) : tmpl.id === "elegant-minimal" ? (
                       <div className="flex flex-col h-full justify-between p-0.5">
-                        <div className="h-1 w-2/5 bg-stone-800 dark:bg-stone-300 rounded-xs" />
-                        <div className="h-px w-full bg-stone-200 dark:bg-stone-700 my-0.5" />
-                        <div className="h-0.5 w-1/4 bg-stone-400 rounded-xs" />
-                        <div className="h-1 w-full bg-stone-100 dark:bg-stone-800 rounded-xs" />
-                        <div className="h-1 w-3/4 bg-stone-100 dark:bg-stone-800 rounded-xs" />
+                        <div className="h-2 w-full bg-[#94B0D5] flex items-center px-1 rounded-2xs">
+                          <div className="h-1.5 w-1/3 bg-white rounded-2xs" />
+                        </div>
+                        <div className="h-px w-full bg-slate-200 dark:bg-slate-700 my-0.5" />
+                        <div className="flex gap-1 flex-1">
+                          <div className="w-[38%] flex flex-col gap-0.5">
+                            <div className="h-2.5 w-full bg-[#EBF2FA] dark:bg-slate-800 rounded-2xs border border-[#94B0D5]/30" />
+                            <div className="h-0.5 w-3/4 bg-slate-400 rounded-2xs" />
+                            <div className="h-0.5 w-1/2 bg-slate-300 rounded-2xs" />
+                          </div>
+                          <div className="w-[62%] flex flex-col gap-0.5 pl-0.5 border-l border-slate-200 dark:border-slate-700">
+                            <div className="h-1 w-full bg-slate-400 rounded-2xs" />
+                            <div className="h-0.5 w-4/5 bg-slate-300 rounded-2xs" />
+                            <div className="h-0.5 w-full bg-slate-200 dark:bg-slate-700 rounded-2xs" />
+                          </div>
+                        </div>
                       </div>
                     ) : tmpl.id === "minimal-ats" ? (
                       <div className="flex flex-col h-full justify-between">
@@ -1626,12 +1708,90 @@ export const ResumeEditor: React.FC<ResumeEditorProps> = ({
               />
             </div>
           </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+            <div>
+              <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300 mb-1">
+                <span>Date of Birth (Optional)</span>
+              </label>
+              <input
+                type="text"
+                value={data.personalInfo.dob || ""}
+                onChange={(e) => handlePersonalChange("dob", e.target.value)}
+                placeholder="e.g. 18 April 2004"
+                className="w-full px-3.5 py-2 text-xs bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-xl text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300 mb-1">
+                <span>Nationality (Optional)</span>
+              </label>
+              <input
+                type="text"
+                value={data.personalInfo.nationality || ""}
+                onChange={(e) => handlePersonalChange("nationality", e.target.value)}
+                placeholder="e.g. Indian"
+                className="w-full px-3.5 py-2 text-xs bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-xl text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300 mb-1">
+                <span>Marital Status (Optional)</span>
+              </label>
+              <input
+                type="text"
+                value={data.personalInfo.maritalStatus || ""}
+                onChange={(e) => handlePersonalChange("maritalStatus", e.target.value)}
+                placeholder="e.g. Single"
+                className="w-full px-3.5 py-2 text-xs bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-xl text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+          </div>
         </div>
       )}
 
       {/* SECTION B: SUMMARY */}
       {activeSection === "summary" && (
-        <div className="space-y-3">
+        <div className="space-y-3.5">
+          {/* Quick Objective Preset Dropdown */}
+          <div>
+            <label
+              htmlFor="quick-objective-select"
+              className="block text-xs font-semibold text-surface-700 dark:text-surface-300 mb-1"
+            >
+              Quick Objective – Select a sample
+            </label>
+            <select
+              id="quick-objective-select"
+              value={
+                CAREER_OBJECTIVE_CATEGORIES.some((cat) =>
+                  cat.options.some((opt) => opt.text === data.summary)
+                )
+                  ? data.summary
+                  : ""
+              }
+              onChange={(e) => {
+                if (e.target.value) {
+                  handleSummaryChange(e.target.value);
+                }
+              }}
+              className="w-full px-3 py-2 text-xs bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-xl text-surface-900 dark:text-surface-100 focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer"
+            >
+              <option value="">Select a career objective sample...</option>
+              {CAREER_OBJECTIVE_CATEGORIES.map((cat) => (
+                <optgroup key={cat.category} label={cat.category}>
+                  {cat.options.map((opt) => (
+                    <option key={opt.id} value={opt.text}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+
           <div className="flex items-center justify-between">
             <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300">
               Professional Summary (Optional)
@@ -1968,13 +2128,89 @@ export const ResumeEditor: React.FC<ResumeEditorProps> = ({
       {/* SECTION E: SKILLS */}
       {activeSection === "skills" && (
         <div className="space-y-5">
+          {/* Quick Skills – Predefined Checkbox Selector */}
+          <div className="p-3.5 bg-surface-50 dark:bg-surface-800/60 rounded-xl border border-surface-200 dark:border-surface-700/80 space-y-3.5">
+            <div>
+              <h3 className="text-xs font-bold text-surface-800 dark:text-surface-200">
+                Quick Skills – Select skills to add
+              </h3>
+              <p className="text-[11px] text-surface-500 mt-0.5">
+                Check any suggested skill to quickly add it to your skills list, or uncheck to remove it.
+              </p>
+            </div>
+
+            {/* Technical / Computer Skills Group */}
+            <div>
+              <span className="block text-[11px] font-semibold text-surface-600 dark:text-surface-400 mb-1.5">
+                Technical / Computer Skills
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {QUICK_TECHNICAL_SKILLS.map((skill) => {
+                  const isChecked = (data.skills?.technical || []).some(
+                    (s) => s.trim().toLowerCase() === skill.toLowerCase()
+                  );
+                  return (
+                    <label
+                      key={skill}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium cursor-pointer transition-all border select-none ${
+                        isChecked
+                          ? "bg-brand-50 border-brand-300 text-brand-700 dark:bg-brand-950/50 dark:border-brand-700 dark:text-brand-300 font-semibold shadow-2xs"
+                          : "bg-white border-surface-200 text-surface-700 hover:bg-surface-100 hover:text-surface-900 dark:bg-surface-800 dark:border-surface-700 dark:text-surface-300 dark:hover:bg-surface-700"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => handleToggleQuickSkill("technical", skill)}
+                        className="w-3.5 h-3.5 rounded text-brand-600 focus:ring-brand-500 border-surface-300 dark:border-surface-600 cursor-pointer"
+                      />
+                      <span>{skill}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Soft Skills Group */}
+            <div>
+              <span className="block text-[11px] font-semibold text-surface-600 dark:text-surface-400 mb-1.5">
+                Soft Skills
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {QUICK_SOFT_SKILLS.map((skill) => {
+                  const isChecked = (data.skills?.soft || []).some(
+                    (s) => s.trim().toLowerCase() === skill.toLowerCase()
+                  );
+                  return (
+                    <label
+                      key={skill}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium cursor-pointer transition-all border select-none ${
+                        isChecked
+                          ? "bg-brand-50 border-brand-300 text-brand-700 dark:bg-brand-950/50 dark:border-brand-700 dark:text-brand-300 font-semibold shadow-2xs"
+                          : "bg-white border-surface-200 text-surface-700 hover:bg-surface-100 hover:text-surface-900 dark:bg-surface-800 dark:border-surface-700 dark:text-surface-300 dark:hover:bg-surface-700"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => handleToggleQuickSkill("soft", skill)}
+                        className="w-3.5 h-3.5 rounded text-brand-600 focus:ring-brand-500 border-surface-300 dark:border-surface-600 cursor-pointer"
+                      />
+                      <span>{skill}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
           <div>
             <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300 mb-1">
               Technical Skills (Comma-separated)
             </label>
             <textarea
               rows={3}
-              value={data.skills.technical.join(", ")}
+              value={technicalSkillsInput}
               onChange={(e) => handleSkillsChange("technical", e.target.value)}
               placeholder="e.g. TypeScript, React, Next.js, Node.js, PostgreSQL, Docker, AWS"
               className="w-full px-3.5 py-2 text-xs bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-xl text-surface-900 dark:text-surface-100 font-mono"
@@ -1999,7 +2235,7 @@ export const ResumeEditor: React.FC<ResumeEditorProps> = ({
             </label>
             <textarea
               rows={2}
-              value={data.skills.soft.join(", ")}
+              value={softSkillsInput}
               onChange={(e) => handleSkillsChange("soft", e.target.value)}
               placeholder="e.g. Team Leadership, Agile Methodology, System Architecture, Cross-functional Collaboration"
               className="w-full px-3.5 py-2 text-xs bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-xl text-surface-900 dark:text-surface-100 font-mono"

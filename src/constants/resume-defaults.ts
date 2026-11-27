@@ -188,13 +188,13 @@ export const TEMPLATE_DEFAULT_COLORS: Record<ResumeTemplateId, ResumeThemeColors
     dividerColor: "#0D9488",
   },
   "elegant-minimal": {
-    primaryAccent: "#292524",
-    nameColor: "#1C1917",
-    titleColor: "#57534E",
-    headingColor: "#292524",
-    bodyColor: "#3D3A38",
-    secondaryColor: "#7A7570",
-    dividerColor: "#D6D3D1",
+    primaryAccent: "#94B0D5",
+    nameColor: "#1A202C",
+    titleColor: "#4A5568",
+    headingColor: "#2D3748",
+    bodyColor: "#334155",
+    secondaryColor: "#64748B",
+    dividerColor: "#CBD5E1",
   },
 };
 
@@ -331,12 +331,12 @@ export const RESUME_TEMPLATES: ResumeTemplateMeta[] = [
     id: "elegant-minimal",
     name: "Elegant Minimal",
     description:
-      "Understated Swiss-inspired minimalism with generous whitespace, delicate dividers, and editorial typography.",
+      "Two-column layout featuring a muted-blue header band, soft-blue contact card, and structured education timeline.",
     badge: "Editorial",
     features: [
-      "Refined micro-typography",
-      "Generous breathing room",
-      "Subtle hairline rules",
+      "Muted-blue header band",
+      "Soft-blue contact card",
+      "Dynamic education timeline",
     ],
   },
 ];
@@ -357,6 +357,9 @@ export const EMPTY_RESUME_DATA: ResumeData = {
     showPhoto: false,
     photoShape: "rectangle",
     photoSize: "standard",
+    dob: "",
+    nationality: "",
+    maritalStatus: "",
   },
   summary: "",
   experiences: [],
@@ -391,6 +394,9 @@ export const SAMPLE_RESUME_DATA: ResumeData = {
     showPhoto: false,
     photoShape: "rectangle",
     photoSize: "standard",
+    dob: "18 April 2004",
+    nationality: "Indian",
+    maritalStatus: "Single",
   },
   summary:
     "Dynamic and results-driven Software Engineer with 7+ years of experience designing, architecting, and deploying high-concurrency cloud applications and client-side web tools. Proven track record in TypeScript, React, Next.js, and Node.js microservices serving millions of active users with 99.99% uptime.",
@@ -547,3 +553,218 @@ export const SAMPLE_RESUME_DATA: ResumeData = {
   typography: { ...DEFAULT_TYPOGRAPHY },
   colors: { ...DEFAULT_RESUME_COLORS },
 };
+
+// =========================================================================
+// QUICK PRESETS: CAREER OBJECTIVE / PROFESSIONAL SUMMARY SAMPLES
+// =========================================================================
+export interface CareerObjectiveOption {
+  id: string;
+  label: string;
+  text: string;
+}
+
+export interface CareerObjectiveCategory {
+  category: string;
+  options: CareerObjectiveOption[];
+}
+
+export const CAREER_OBJECTIVE_CATEGORIES: CareerObjectiveCategory[] = [
+  {
+    category: "A. Fresher",
+    options: [
+      {
+        id: "fresher-general",
+        label: "Fresher — General Job",
+        text: "Motivated and quick-learning graduate seeking an entry-level position where I can apply my skills, grow professionally, and contribute to the organization's success. Known for a strong work ethic, adaptability, and a positive attitude toward new challenges.",
+      },
+      {
+        id: "fresher-back-office",
+        label: "Fresher — Office / Back Office",
+        text: "Detail-oriented and organized fresher looking for a Back Office role to support daily operations with accuracy and efficiency. Proficient in MS Office and data entry, with a commitment to meeting deadlines and maintaining confidentiality.",
+      },
+      {
+        id: "fresher-sales-customer-service",
+        label: "Fresher — Sales / Customer Service",
+        text: "Enthusiastic and communicative fresher aspiring to build a career in Sales and Customer Service. Skilled in active listening, problem-solving, and building rapport, with a genuine drive to deliver great customer experiences and help achieve sales targets.",
+      },
+      {
+        id: "fresher-tech-it-support",
+        label: "Fresher — Technical / IT Support",
+        text: "Tech-savvy fresher with a solid foundation in computer hardware, software troubleshooting, and networking basics. Eager to join an IT Support team where I can resolve technical issues quickly and keep learning new technologies.",
+      },
+    ],
+  },
+  {
+    category: "B. Experienced",
+    options: [
+      {
+        id: "exp-general",
+        label: "Experienced — General",
+        text: "Results-driven professional with a proven track record of delivering quality work, meeting deadlines, and collaborating effectively with teams. Seeking a challenging role to leverage my experience, leadership qualities, and problem-solving skills for organizational growth.",
+      },
+      {
+        id: "exp-admin-office",
+        label: "Experienced — Admin / Office",
+        text: "Reliable Administrative professional experienced in managing office operations, documentation, scheduling, and vendor coordination. Strong in MS Office, record keeping, and multitasking, with a focus on improving workflow efficiency and supporting management.",
+      },
+      {
+        id: "exp-sales-customer-service",
+        label: "Experienced — Sales / Customer Service",
+        text: "Dynamic Sales and Customer Service professional with experience in lead generation, client relationship management, and consistently achieving targets. Excellent communicator committed to boosting customer satisfaction, retention, and revenue growth.",
+      },
+      {
+        id: "exp-tech",
+        label: "Experienced — Technical",
+        text: "Skilled technical professional with hands-on experience in troubleshooting, system maintenance, and delivering reliable technical solutions. Passionate about continuous improvement, minimizing downtime, and supporting teams with efficient, well-documented fixes.",
+      },
+    ],
+  },
+  {
+    category: "C. Software / Web Development",
+    options: [
+      {
+        id: "swe-fresher",
+        label: "Fresher",
+        text: "Passionate computer science graduate with hands-on knowledge of HTML, CSS, JavaScript, and modern frameworks. Eager to build clean, responsive applications and grow as a developer through real-world projects.",
+      },
+      {
+        id: "swe-exp",
+        label: "Experienced",
+        text: "Skilled Software Developer with experience in building scalable web applications, writing clean code, and collaborating in agile teams. Focused on delivering high-performance, user-friendly solutions.",
+      },
+    ],
+  },
+  {
+    category: "D. Graphic / UI-UX Design",
+    options: [
+      {
+        id: "design-fresher",
+        label: "Fresher",
+        text: "Creative design graduate with a strong eye for color, layout, and typography. Proficient in Photoshop, Illustrator, and Figma, and eager to turn ideas into visually engaging designs.",
+      },
+      {
+        id: "design-exp",
+        label: "Experienced",
+        text: "Creative Designer with proven experience in branding, social media creatives, and user-centered interface design. Skilled at translating client briefs into polished, impactful visuals.",
+      },
+    ],
+  },
+  {
+    category: "E. Digital Marketing",
+    options: [
+      {
+        id: "marketing-fresher",
+        label: "Fresher",
+        text: "Energetic marketing enthusiast with knowledge of SEO, social media, and content creation. Looking to start a career in Digital Marketing and help brands grow their online presence.",
+      },
+      {
+        id: "marketing-exp",
+        label: "Experienced",
+        text: "Results-oriented Digital Marketer experienced in SEO, paid campaigns, and social media strategy. Proven ability to increase traffic, engagement, and conversions through data-driven decisions.",
+      },
+    ],
+  },
+  {
+    category: "F. Teaching / Education",
+    options: [
+      {
+        id: "teaching-fresher",
+        label: "Fresher",
+        text: "Dedicated and patient graduate aspiring to become a teacher who inspires curiosity. Strong communication skills and a passion for making learning simple and enjoyable.",
+      },
+      {
+        id: "teaching-exp",
+        label: "Experienced",
+        text: "Committed Educator with experience in lesson planning, classroom management, and student mentoring. Passionate about creating an engaging learning environment and improving student outcomes.",
+      },
+    ],
+  },
+  {
+    category: "G. Banking / Finance",
+    options: [
+      {
+        id: "banking-fresher",
+        label: "Fresher",
+        text: "Numerically strong and disciplined graduate seeking a role in Banking and Finance. Eager to learn financial operations while delivering accuracy, integrity, and excellent customer service.",
+      },
+      {
+        id: "banking-exp",
+        label: "Experienced",
+        text: "Reliable Banking professional with experience in customer account handling, transactions, and compliance. Known for accuracy, trustworthiness, and building long-term client relationships.",
+      },
+    ],
+  },
+  {
+    category: "I. Healthcare / Nursing",
+    options: [
+      {
+        id: "health-fresher",
+        label: "Fresher",
+        text: "Compassionate and responsible healthcare graduate committed to patient care and safety. Eager to apply my clinical training in a professional medical environment.",
+      },
+      {
+        id: "health-exp",
+        label: "Experienced",
+        text: "Caring healthcare professional with hands-on experience in patient care, record keeping, and working with medical teams. Dedicated to delivering safe, empathetic, and quality service.",
+      },
+    ],
+  },
+  {
+    category: "J. Human Resources (HR)",
+    options: [
+      {
+        id: "hr-fresher",
+        label: "Fresher",
+        text: "People-focused graduate with strong communication and organizational skills, seeking an HR role in recruitment and employee engagement while building a career in people management.",
+      },
+      {
+        id: "hr-exp",
+        label: "Experienced",
+        text: "HR professional experienced in recruitment, onboarding, and employee relations. Skilled at building positive workplace culture and aligning talent with business goals.",
+      },
+    ],
+  },
+  {
+    category: "M. Hospitality / Hotel",
+    options: [
+      {
+        id: "hosp-fresher",
+        label: "Fresher",
+        text: "Courteous and well-groomed candidate with strong interpersonal skills, seeking a role in Hospitality to provide warm, memorable guest experiences.",
+      },
+      {
+        id: "hosp-exp",
+        label: "Experienced",
+        text: "Hospitality professional with experience in front desk, guest relations, and service operations. Committed to exceptional service and guest satisfaction.",
+      },
+    ],
+  },
+];
+
+// =========================================================================
+// QUICK PRESETS: SUGGESTED SKILLS
+// =========================================================================
+export const QUICK_TECHNICAL_SKILLS: string[] = [
+  "Computer Basics",
+  "MS Word",
+  "MS Excel",
+  "MS PowerPoint",
+  "Internet & Email",
+  "Data Entry",
+  "Typing",
+  "Tally / Accounting Basics",
+  "Basic Hardware / Technical Support",
+];
+
+export const QUICK_SOFT_SKILLS: string[] = [
+  "Communication",
+  "Teamwork",
+  "Time Management",
+  "Problem Solving",
+  "Quick Learner",
+  "Leadership",
+  "Multitasking",
+  "Customer Service",
+  "Sales & Marketing",
+  "Office Administration",
+];

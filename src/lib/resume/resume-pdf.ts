@@ -175,13 +175,13 @@ const THEMES: Record<ResumeTemplateId, TemplateTheme> = {
     primaryFontName: StandardFonts.Helvetica,
     boldFontName: StandardFonts.HelveticaBold,
     italicFontName: StandardFonts.HelveticaOblique,
-    primaryColor: rgb(0.16, 0.15, 0.14), // Stone 900
-    headingColor: rgb(0.16, 0.15, 0.14),
-    bodyColor: rgb(0.24, 0.23, 0.22),
-    mutedColor: rgb(0.48, 0.46, 0.44),
-    accentLineColor: rgb(0.82, 0.82, 0.8), // Stone 300
-    lineSpacing: 1.26,
-    sectionGap: 15,
+    primaryColor: rgb(0.58, 0.69, 0.84), // Muted Blue #94B0D5
+    headingColor: rgb(0.18, 0.22, 0.28), // Slate 800 #2D3748
+    bodyColor: rgb(0.25, 0.28, 0.35),    // Slate 700 #334155
+    mutedColor: rgb(0.42, 0.48, 0.55),   // Slate 500 #64748B
+    accentLineColor: rgb(0.80, 0.83, 0.88), // Light-grey divider #CBD5E1
+    lineSpacing: 1.25,
+    sectionGap: 14,
     itemGap: 7,
     centerHeader: false,
     uppercaseSectionTitles: true,
@@ -447,51 +447,98 @@ function buildContactList(
   templateId?: ResumeTemplateId
 ): ContactItem[] {
   const contactList: ContactItem[] = [];
-  if (info.email) {
-    contactList.push({ icon: "email", label: info.email, url: `mailto:${info.email}` });
+
+  // In classic-corporate, minimal-ats, executive preview, phone comes before email
+  const isPhoneFirst =
+    templateId === "classic-corporate" ||
+    templateId === "minimal-ats" ||
+    templateId === "executive";
+
+  const addPhone = () => {
+    if (info.phone && info.phone.trim()) {
+      contactList.push({
+        icon: "phone",
+        label: info.phone.trim(),
+        url: `tel:${info.phone.replace(/\s+/g, "")}`,
+      });
+    }
+  };
+
+  const addEmail = () => {
+    if (info.email && info.email.trim()) {
+      contactList.push({
+        icon: "email",
+        label: info.email.trim(),
+        url: `mailto:${info.email.trim()}`,
+      });
+    }
+  };
+
+  if (isPhoneFirst) {
+    addPhone();
+    addEmail();
+  } else {
+    addEmail();
+    addPhone();
   }
-  if (info.phone) {
-    contactList.push({ icon: "phone", label: info.phone, url: `tel:${info.phone.replace(/\s+/g, "")}` });
+
+  if (info.location && info.location.trim()) {
+    contactList.push({ icon: "location", label: info.location.trim() });
   }
-  if (info.location) {
-    contactList.push({ icon: "location", label: info.location });
-  }
-  if (info.linkedIn) {
-    const handle = info.linkedIn.replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//, "").replace(/\/$/, "");
-    const label = templateId === "modern-two-column" && handle ? `LinkedIn: ${handle}` : "LinkedIn";
+
+  if (info.linkedIn && info.linkedIn.trim()) {
+    const raw = info.linkedIn.trim();
+    const handle = raw.replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//i, "").replace(/\/$/, "");
+    const label = templateId === "elegant-minimal" && handle
+      ? `linkedin.com/in/${handle}`
+      : handle
+        ? (handle.toLowerCase().startsWith("linkedin:") ? handle : `LinkedIn: ${handle}`)
+        : raw;
     contactList.push({
       icon: "linkedin",
       label,
-      url: info.linkedIn,
+      url: raw,
     });
   }
-  if (info.github) {
-    const handle = info.github.replace(/^https?:\/\/(www\.)?github\.com\//, "").replace(/\/$/, "");
-    const label = templateId === "modern-two-column" && handle ? `GitHub: ${handle}` : "GitHub";
+
+  if (info.github && info.github.trim()) {
+    const raw = info.github.trim();
+    const handle = raw.replace(/^https?:\/\/(www\.)?github\.com\//i, "").replace(/\/$/, "");
+    const label = handle
+      ? (handle.toLowerCase().startsWith("github:") ? handle : `GitHub: ${handle}`)
+      : raw;
     contactList.push({
       icon: "github",
       label,
-      url: info.github,
+      url: raw,
     });
   }
-  if (info.portfolio) {
-    const cleanUrl = info.portfolio.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
-    const label = templateId === "modern-two-column" && cleanUrl ? cleanUrl : "Portfolio";
+
+  if (info.portfolio && info.portfolio.trim()) {
+    const raw = info.portfolio.trim();
+    const cleanUrl = raw.replace(/^https?:\/\/(www\.)?/i, "").replace(/\/$/, "");
+    const label = cleanUrl || raw;
     contactList.push({
       icon: "portfolio",
       label,
-      url: info.portfolio,
+      url: raw,
     });
   }
-  if (info.twitter) {
-    const handle = info.twitter.replace(/^https?:\/\/(www\.)?(twitter|x)\.com\//, "@").replace(/\/$/, "");
-    const label = templateId === "modern-two-column" && handle ? handle : "Twitter";
+
+  if (info.twitter && info.twitter.trim()) {
+    const raw = info.twitter.trim();
+    const handle = raw.replace(/^https?:\/\/(www\.)?(twitter|x)\.com\//i, "").replace(/\/$/, "");
+    let label = handle;
+    if (label && !label.startsWith("@") && !label.toLowerCase().startsWith("twitter:")) {
+      label = `@${label}`;
+    }
     contactList.push({
       icon: "twitter",
-      label,
-      url: info.twitter,
+      label: label || raw,
+      url: raw,
     });
   }
+
   return contactList;
 }
 
@@ -577,11 +624,15 @@ function renderCommonHeader(
       ctx.drawTextLine(restName, ctx.marginLeft + firstW + spaceW, ctx.currentY - ctx.nameFontSize, fontRegular, ctx.nameFontSize, theme.mutedColor || rgb(0.35, 0.33, 0.32));
     }
   } else {
-    const nameW = fontBold.widthOfTextAtSize(fullName, ctx.nameFontSize);
-    const nameX = isCentered ? ctx.marginLeft + (textAvailableWidth - nameW) / 2 : ctx.marginLeft;
-    ctx.drawTextLine(fullName, nameX, ctx.currentY - ctx.nameFontSize, fontBold, ctx.nameFontSize, theme.nameColor || theme.headingColor);
+    const nameLines = wrapText(fullName, textAvailableWidth, fontBold, ctx.nameFontSize);
+    for (const nl of nameLines) {
+      const nameW = fontBold.widthOfTextAtSize(nl, ctx.nameFontSize);
+      const nameX = isCentered ? Math.max(ctx.marginLeft, ctx.marginLeft + (textAvailableWidth - nameW) / 2) : ctx.marginLeft;
+      ctx.drawTextLine(nl, nameX, ctx.currentY - ctx.nameFontSize, fontBold, ctx.nameFontSize, theme.nameColor || theme.headingColor);
+      ctx.currentY -= ctx.nameFontSize * 1.15;
+    }
+    ctx.currentY -= 4;
   }
-  ctx.currentY -= ctx.nameFontSize + 4;
 
   // Job Title
   if (jobTitle) {
@@ -589,10 +640,14 @@ function renderCommonHeader(
       ? fontItalic
       : fontBold;
     const titleColor = options?.customTitleColor || theme.titleColor || theme.primaryColor;
-    const titleW = titleFont.widthOfTextAtSize(jobTitle, ctx.titleFontSize);
-    const titleX = isCentered ? ctx.marginLeft + (textAvailableWidth - titleW) / 2 : ctx.marginLeft;
-    ctx.drawTextLine(jobTitle, titleX, ctx.currentY - ctx.titleFontSize, titleFont, ctx.titleFontSize, titleColor);
-    ctx.currentY -= ctx.titleFontSize + 4;
+    const titleLines = wrapText(jobTitle, textAvailableWidth, titleFont, ctx.titleFontSize);
+    for (const tl of titleLines) {
+      const titleW = titleFont.widthOfTextAtSize(tl, ctx.titleFontSize);
+      const titleX = isCentered ? Math.max(ctx.marginLeft, ctx.marginLeft + (textAvailableWidth - titleW) / 2) : ctx.marginLeft;
+      ctx.drawTextLine(tl, titleX, ctx.currentY - ctx.titleFontSize, titleFont, ctx.titleFontSize, titleColor);
+      ctx.currentY -= ctx.titleFontSize * 1.15;
+    }
+    ctx.currentY -= 4;
   }
 
   // Contact list strictly bounded to textAvailableWidth (can be skipped for templates with dedicated sidebar contacts)
@@ -682,12 +737,12 @@ function renderClassicCorporate(ctx: PdfRenderContext, data: ResumeData): void {
     isCentered: !ctx.hasPhoto,
   });
 
-  renderSummarySection(ctx, data.summary);
-  renderExperienceSection(ctx, data.experiences);
+  renderSummarySection(ctx, data.summary, undefined, undefined, "Executive Profile");
+  renderExperienceSection(ctx, data.experiences, undefined, undefined, "Professional Experience");
   renderEducationSection(ctx, data.education);
-  renderSkillsSection(ctx, data.skills);
-  renderProjectsSection(ctx, data.projects);
-  renderCertificationsSection(ctx, data.certifications);
+  renderSkillsSection(ctx, data.skills, undefined, undefined, "Areas of Expertise");
+  renderProjectsSection(ctx, data.projects, undefined, undefined, "Key Initiatives & Projects");
+  renderCertificationsSection(ctx, data.certifications, undefined, undefined, "Certifications & Credentials");
   renderLanguagesSection(ctx, data.languages);
   renderAwardsAchievementsSection(ctx, data.awards, data.achievements);
 }
@@ -1148,11 +1203,11 @@ function renderExecutive(ctx: PdfRenderContext, data: ResumeData): void {
   }
 
   // Other sections with solid slate underline (Executive layout: Core Competencies above Experience)
-  renderSkillsSection(ctx, data.skills, navy);
-  renderExperienceSection(ctx, data.experiences, navy);
-  renderEducationSection(ctx, data.education, navy);
-  renderProjectsSection(ctx, data.projects, navy);
-  renderCertificationsSection(ctx, data.certifications, navy);
+  renderSkillsSection(ctx, data.skills, navy, undefined, "Core Competencies & Leadership Capabilities");
+  renderExperienceSection(ctx, data.experiences, navy, undefined, "Executive & Professional Experience");
+  renderEducationSection(ctx, data.education, navy, undefined, "Education & Academic Credentials");
+  renderProjectsSection(ctx, data.projects, navy, undefined, "Strategic Initiatives & Key Projects");
+  renderCertificationsSection(ctx, data.certifications, navy, undefined, "Certifications & Credentials");
   renderLanguagesSection(ctx, data.languages, navy);
   renderAwardsAchievementsSection(ctx, data.awards, data.achievements);
 }
@@ -1288,26 +1343,621 @@ function renderStudentFresher(ctx: PdfRenderContext, data: ResumeData): void {
 }
 
 // =========================================================================
-// TEMPLATE 8: ELEGANT MINIMAL (EDITORIAL SPLIT-NAME & SPACED RULES)
+// TEMPLATE 8: ELEGANT MINIMAL (MUTED-BLUE HEADER BAND & TWO-COLUMN TIMELINE)
 // =========================================================================
 function renderElegantMinimal(ctx: PdfRenderContext, data: ResumeData): void {
-  const stone900 = ctx.theme.headingColor;
-  const stone300 = ctx.theme.accentLineColor;
+  const mutedBlue = ctx.theme.primaryColor; // rgb(0.58, 0.69, 0.84)
+  const softBlueBg = rgb(0.92, 0.95, 0.98); // #EBF2FA
+  const lineGrey = ctx.theme.accentLineColor; // rgb(0.80, 0.83, 0.88)
+  const headingColor = ctx.theme.headingColor;
+  const bodyColor = ctx.theme.bodyColor;
+  const fullName = (data.personalInfo.fullName.trim() || "YOUR FULL NAME").toUpperCase();
+  const jobTitle = (data.personalInfo.jobTitle?.trim() || "").toUpperCase();
 
-  renderCommonHeader(ctx, data, {
-    isSplitName: true,
-    customRuleThickness: 0.5,
-    customRuleColor: stone300,
+  const hasPhoto = ctx.hasPhoto && Boolean(ctx.profileImage);
+  const photoSize = ctx.photoSize;
+
+  // 1. HEADER: FULL-WIDTH HORIZONTAL MUTED-BLUE BAND
+  const bannerH = jobTitle ? 48 : 38;
+  ctx.ensureVerticalSpace(bannerH + 20);
+
+  // Profile photo if enabled
+  if (hasPhoto && ctx.profileImage) {
+    const photoX = ctx.marginLeft + ctx.contentWidth - photoSize.w;
+    const photoY = ctx.pageHeight - ctx.marginTop - photoSize.h;
+    ctx.currentPage.drawImage(ctx.profileImage, {
+      x: photoX,
+      y: photoY,
+      width: photoSize.w,
+      height: photoSize.h,
+    });
+  }
+
+  const bannerW = hasPhoto ? ctx.contentWidth - photoSize.w - 12 : ctx.contentWidth;
+
+  // Blue background band
+  ctx.currentPage.drawRectangle({
+    x: ctx.marginLeft,
+    y: ctx.currentY - bannerH,
+    width: bannerW,
+    height: bannerH,
+    color: mutedBlue,
   });
 
-  renderSummarySection(ctx, data.summary, stone900, stone300);
-  renderExperienceSection(ctx, data.experiences, stone900, stone300);
-  renderEducationSection(ctx, data.education, stone900, stone300);
-  renderSkillsSection(ctx, data.skills, stone900, stone300);
-  renderProjectsSection(ctx, data.projects, stone900, stone300);
-  renderCertificationsSection(ctx, data.certifications, stone900, stone300);
-  renderLanguagesSection(ctx, data.languages, stone900, stone300);
-  renderAwardsAchievementsSection(ctx, data.awards, data.achievements);
+  // White rectangular candidate name & title block on the left
+  const tabOffset = 18;
+  const nameFontSize = Math.min(13.5, ctx.nameFontSize);
+  const nameTextW = ctx.fontBold.widthOfTextAtSize(fullName, nameFontSize);
+  const titleFontSize = 7.5;
+  const titleTextW = jobTitle ? ctx.fontBold.widthOfTextAtSize(jobTitle, titleFontSize) : 0;
+
+  // Box width must accommodate the maximum of candidate name width and professional title width
+  const boxPaddingX = 14;
+  const maxContentW = Math.max(nameTextW, titleTextW);
+  const maxAllowedBoxW = bannerW - tabOffset - 10;
+  const boxW = Math.min(maxAllowedBoxW, maxContentW + (boxPaddingX * 2));
+  const boxH = bannerH - 8;
+  const boxX = ctx.marginLeft + tabOffset;
+  const boxY = ctx.currentY - bannerH + 4;
+
+  ctx.currentPage.drawRectangle({
+    x: boxX,
+    y: boxY,
+    width: boxW,
+    height: boxH,
+    color: rgb(1, 1, 1),
+  });
+
+  if (jobTitle) {
+    // If title is wider than box inner width, scale down slightly so it never overflows
+    const innerW = boxW - (boxPaddingX * 2);
+    let effectiveTitleSize = titleFontSize;
+    if (titleTextW > innerW && innerW > 50) {
+      effectiveTitleSize = Math.max(6, (innerW / titleTextW) * titleFontSize);
+    }
+
+    const totalTextH = nameFontSize + 3.5 + effectiveTitleSize;
+    const bottomPad = Math.max(6, (boxH - totalTextH) / 2);
+    const titleY = boxY + bottomPad + 1;
+    const nameY = titleY + effectiveTitleSize + 3.5;
+
+    ctx.drawTextLine(fullName, boxX + boxPaddingX, nameY, ctx.fontBold, nameFontSize, headingColor);
+    ctx.drawTextLine(jobTitle, boxX + boxPaddingX, titleY, ctx.fontBold, effectiveTitleSize, rgb(0.45, 0.5, 0.55));
+  } else {
+    const bottomPad = (boxH - nameFontSize) / 2 + 1.5;
+    ctx.drawTextLine(fullName, boxX + boxPaddingX, boxY + bottomPad, ctx.fontBold, nameFontSize, headingColor);
+  }
+
+  const bannerBottom = ctx.currentY - bannerH;
+  const photoBottom = hasPhoto ? ctx.pageHeight - ctx.marginTop - photoSize.h : bannerBottom;
+  ctx.currentY = Math.min(bannerBottom, photoBottom) - 14;
+
+  // 2. FULL-WIDTH SUMMARY DIRECTLY BELOW HEADER
+  if (data.summary && data.summary.trim()) {
+    ctx.ensureVerticalSpace(30);
+    ctx.drawTextLine("SUMMARY", ctx.marginLeft, ctx.currentY - 10, ctx.fontBold, 10, headingColor);
+    ctx.currentPage.drawLine({
+      start: { x: ctx.marginLeft, y: ctx.currentY - 13 },
+      end: { x: ctx.marginLeft + ctx.contentWidth, y: ctx.currentY - 13 },
+      thickness: 0.5,
+      color: lineGrey,
+    });
+    ctx.currentY -= 21;
+
+    const sumLines = wrapText(data.summary.trim(), ctx.contentWidth, ctx.fontRegular, 8.5);
+    for (const line of sumLines) {
+      ctx.ensureVerticalSpace(12);
+      ctx.drawTextLine(line, ctx.marginLeft, ctx.currentY - 8.5, ctx.fontRegular, 8.5, bodyColor);
+      ctx.currentY -= 11.5;
+    }
+
+    // Subtle horizontal divider separating summary from two-column content
+    ctx.currentY -= 4;
+    ctx.currentPage.drawLine({
+      start: { x: ctx.marginLeft, y: ctx.currentY },
+      end: { x: ctx.marginLeft + ctx.contentWidth, y: ctx.currentY },
+      thickness: 0.5,
+      color: rgb(0.88, 0.9, 0.93),
+    });
+    ctx.currentY -= 14;
+  }
+
+  // 3. TWO-COLUMN LAYOUT: LEFT (~38%) & RIGHT (~62%)
+  const leftColWidth = Math.round(ctx.contentWidth * 0.38) - 8;
+  const gutter = 16;
+  const rightColWidth = ctx.contentWidth - leftColWidth - gutter;
+  const leftColX = ctx.marginLeft;
+  const rightColX = leftColX + leftColWidth + gutter;
+  const topColY = ctx.currentY;
+
+  // Independent Column Writers
+  let leftPageIndex = 0;
+  let leftY = topColY;
+  let rightPageIndex = 0;
+  let rightY = topColY;
+
+  function ensureLeftSpace(needed: number): PDFPage {
+    if (leftY - needed < ctx.marginBottom) {
+      leftPageIndex++;
+      while (ctx.pages.length <= leftPageIndex) {
+        ctx.pages.push(ctx.doc.addPage(PageSizes.A4));
+      }
+      leftY = ctx.pageHeight - ctx.marginTop;
+    }
+    return ctx.pages[leftPageIndex];
+  }
+
+  function drawLeftText(text: string, x: number, y: number, font: PDFFont, size: number, color: RGB): void {
+    const clean = sanitizePdfText(text);
+    if (!clean) return;
+    const page = ctx.pages[leftPageIndex];
+    page.drawText(clean, { x, y, font, size, color });
+  }
+
+  function drawLeftHeading(title: string): void {
+    ensureLeftSpace(24);
+    const page = ctx.pages[leftPageIndex];
+    drawLeftText(title, leftColX, leftY - 10, ctx.fontBold, 10, headingColor);
+    page.drawLine({
+      start: { x: leftColX, y: leftY - 13 },
+      end: { x: leftColX + leftColWidth, y: leftY - 13 },
+      thickness: 0.5,
+      color: lineGrey,
+    });
+    leftY -= 20;
+  }
+
+  function ensureRightSpace(needed: number): PDFPage {
+    if (rightY - needed < ctx.marginBottom) {
+      rightPageIndex++;
+      while (ctx.pages.length <= rightPageIndex) {
+        ctx.pages.push(ctx.doc.addPage(PageSizes.A4));
+      }
+      rightY = ctx.pageHeight - ctx.marginTop;
+    }
+    return ctx.pages[rightPageIndex];
+  }
+
+  function drawRightText(text: string, x: number, y: number, font: PDFFont, size: number, color: RGB): void {
+    const clean = sanitizePdfText(text);
+    if (!clean) return;
+    const page = ctx.pages[rightPageIndex];
+    page.drawText(clean, { x, y, font, size, color });
+  }
+
+  function drawRightHeading(title: string): void {
+    ensureRightSpace(24);
+    const page = ctx.pages[rightPageIndex];
+    drawRightText(title, rightColX, rightY - 10, ctx.fontBold, 10, headingColor);
+    page.drawLine({
+      start: { x: rightColX, y: rightY - 13 },
+      end: { x: rightColX + rightColWidth, y: rightY - 13 },
+      thickness: 0.5,
+      color: lineGrey,
+    });
+    rightY -= 20;
+  }
+
+  // --- 1. POPULATE LEFT COLUMN ---
+  // A. Contact Card (Soft Blue Rounded Box with White Icons in Muted Blue Squares)
+  if (ctx.contactList.length > 0) {
+    const itemH = 15;
+    const cardPadding = 8;
+    const cardH = (ctx.contactList.length * itemH) + (cardPadding * 2) - 2;
+
+    ensureLeftSpace(cardH + 8);
+    const page = ctx.pages[leftPageIndex];
+
+    // Card background
+    page.drawRectangle({
+      x: leftColX,
+      y: leftY - cardH,
+      width: leftColWidth,
+      height: cardH,
+      color: softBlueBg,
+      borderColor: rgb(0.85, 0.89, 0.94),
+      borderWidth: 0.5,
+    });
+
+    const sqSize = 12;
+    const iconScale = 0.22;
+    let itemY = leftY - cardPadding - sqSize;
+
+    for (const item of ctx.contactList) {
+      const sqX = leftColX + 8;
+      // Muted blue square background for icon
+      page.drawRectangle({
+        x: sqX,
+        y: itemY,
+        width: sqSize,
+        height: sqSize,
+        color: mutedBlue,
+      });
+
+      // White vector icon inside
+      if (item.icon && CONTACT_ICONS[item.icon]) {
+        const paths = CONTACT_ICONS[item.icon];
+        const iconY = itemY + 10.5;
+        for (const p of paths) {
+          page.drawSvgPath(p, {
+            x: sqX + 1.5,
+            y: iconY,
+            scale: iconScale,
+            borderColor: rgb(1, 1, 1),
+            borderWidth: 1.1,
+          });
+        }
+      }
+
+      // Label text
+      const textX = sqX + sqSize + 6;
+      const textY = itemY + 2.5;
+      const cleanLabel = sanitizePdfText(item.label);
+      drawLeftText(cleanLabel, textX, textY, ctx.fontRegular, 8, rgb(0.2, 0.24, 0.3));
+
+      if (item.url) {
+        const textW = ctx.fontRegular.widthOfTextAtSize(cleanLabel, 8);
+        addHyperlink(ctx.doc, page, textX, textY - 2, textW, 10, item.url);
+      }
+
+      itemY -= itemH;
+    }
+
+    leftY -= cardH + 14;
+  }
+
+  // B. Skills: Clean vertical bullet list
+  const techSkills = data.skills?.technical || [];
+  const softSkills = data.skills?.soft || [];
+  const allSkills = [...techSkills, ...softSkills].filter(Boolean);
+
+  if (allSkills.length > 0) {
+    drawLeftHeading("SKILLS");
+    for (const skill of allSkills) {
+      ensureLeftSpace(13);
+      drawLeftText("*", leftColX + 4, leftY - 8.5, ctx.fontBold, 8, mutedBlue);
+      drawLeftText(skill, leftColX + 12, leftY - 8.5, ctx.fontRegular, 8.5, bodyColor);
+      leftY -= 12.5;
+    }
+    leftY -= 6;
+  }
+
+  // C. Languages: Clean vertical bullet list
+  if (data.languages && data.languages.length > 0) {
+    drawLeftHeading("LANGUAGE");
+    for (const lang of data.languages) {
+      ensureLeftSpace(13);
+      const langText = lang.proficiency ? `${lang.language} (${lang.proficiency})` : lang.language;
+      drawLeftText("*", leftColX + 4, leftY - 8.5, ctx.fontBold, 8, mutedBlue);
+      drawLeftText(langText, leftColX + 12, leftY - 8.5, ctx.fontRegular, 8.5, bodyColor);
+      leftY -= 12.5;
+    }
+    leftY -= 6;
+  }
+
+  // D. Certifications: Title & description underneath
+  if (data.certifications && data.certifications.length > 0) {
+    drawLeftHeading("CERTIFICATIONS");
+    for (const cert of data.certifications) {
+      ensureLeftSpace(24);
+      drawLeftText(cert.name, leftColX, leftY - 9, ctx.fontBold, 8.5, headingColor);
+      if (cert.url) {
+        const tw = ctx.fontBold.widthOfTextAtSize(sanitizePdfText(cert.name), 8.5);
+        addHyperlink(ctx.doc, ctx.pages[leftPageIndex], leftColX, leftY - 9 - 2, tw, 11, cert.url);
+      }
+      leftY -= 11.5;
+
+      const desc = cert.issuer ? `${cert.issuer}${cert.date ? ` - ${cert.date}` : ""}` : (cert.date || "");
+      if (desc) {
+        const descLines = wrapText(desc, leftColWidth, ctx.fontRegular, 8);
+        for (const dl of descLines) {
+          ensureLeftSpace(11);
+          drawLeftText(dl, leftColX, leftY - 8, ctx.fontRegular, 8, ctx.theme.mutedColor);
+          leftY -= 10.5;
+        }
+      }
+      leftY -= 4;
+    }
+    leftY -= 6;
+  }
+
+  // E. Awards & Honors (if present)
+  if (data.awards && data.awards.length > 0) {
+    drawLeftHeading("AWARDS & HONORS");
+    for (const aw of data.awards) {
+      ensureLeftSpace(20);
+      drawLeftText(aw.title, leftColX, leftY - 8.5, ctx.fontBold, 8.5, headingColor);
+      leftY -= 11;
+      if (aw.issuer) {
+        drawLeftText(`${aw.issuer}${aw.date ? ` • ${aw.date}` : ""}`, leftColX, leftY - 8, ctx.fontRegular, 8, ctx.theme.mutedColor);
+        leftY -= 10.5;
+      }
+      leftY -= 3;
+    }
+  }
+
+  // --- 2. POPULATE RIGHT COLUMN ---
+  // A. Education: Vertical Timeline Design
+  if (data.education && data.education.length > 0) {
+    drawRightHeading("EDUCATION");
+    const timelineIndent = 14;
+    const markerColX = rightColX + 3;
+
+    for (let eIdx = 0; eIdx < data.education.length; eIdx++) {
+      const edu = data.education[eIdx];
+      ensureRightSpace(34);
+      const page = ctx.pages[rightPageIndex];
+
+      // Hollow timeline circle marker
+      const markerY = rightY - 5;
+      page.drawCircle({
+        x: markerColX,
+        y: markerY,
+        size: 2.2,
+        color: rgb(1, 1, 1),
+        borderColor: mutedBlue,
+        borderWidth: 1.2,
+      });
+
+      const contentX = rightColX + timelineIndent;
+      const contentW = rightColWidth - timelineIndent;
+
+      // Row 1: Institution in bold uppercase, Year on right
+      const instName = (edu.institution || "INSTITUTION").toUpperCase();
+      const yearText = edu.graduationYear ? edu.graduationYear.trim() : "";
+      const yw = yearText ? ctx.fontBold.widthOfTextAtSize(yearText, 8.5) : 0;
+      const instFirstLineW = yearText ? contentW - yw - 8 : contentW;
+      const instLines = wrapText(instName, instFirstLineW, ctx.fontBold, 9);
+
+      for (let i = 0; i < instLines.length; i++) {
+        ensureRightSpace(12);
+        drawRightText(instLines[i], contentX, rightY - 9, ctx.fontBold, 9, headingColor);
+        if (i === 0 && yearText) {
+          drawRightText(yearText, rightColX + rightColWidth - yw, rightY - 8.5, ctx.fontBold, 8.5, rgb(0.4, 0.45, 0.52));
+        }
+        rightY -= 12;
+      }
+
+      // Row 2: Degree on left, Location on right
+      const degText = (edu.degree ? `${edu.degree}${edu.fieldOfStudy ? ` - ${edu.fieldOfStudy}` : ""}` : edu.fieldOfStudy || "").toUpperCase();
+
+      // Check if location is present in additionalDetails (short string with comma e.g. "City, State")
+      const firstLine = edu.additionalDetails ? edu.additionalDetails.split("\n")[0].trim() : "";
+      const hasLoc = Boolean(
+        firstLine &&
+        firstLine.includes(",") &&
+        firstLine.length <= 40 &&
+        !firstLine.toLowerCase().includes("cgpa") &&
+        !firstLine.toLowerCase().includes("class") &&
+        !firstLine.toLowerCase().includes("president") &&
+        !firstLine.toLowerCase().includes("society")
+      );
+      const loc = hasLoc ? firstLine : "";
+      const lw = loc ? ctx.fontItalic.widthOfTextAtSize(sanitizePdfText(loc), 8) : 0;
+      const degFirstLineW = (hasLoc && loc) ? contentW - lw - 8 : contentW;
+
+      // Wrap degree text across available width so it shifts to line 2 instead of cutting off!
+      const degLines = wrapText(degText, degFirstLineW, ctx.fontBold, 8.5);
+
+      for (let i = 0; i < degLines.length; i++) {
+        ensureRightSpace(11.5);
+        drawRightText(degLines[i], contentX, rightY - 8.5, ctx.fontBold, 8.5, rgb(0.3, 0.35, 0.42));
+        if (i === 0 && hasLoc && loc) {
+          drawRightText(loc, rightColX + rightColWidth - lw, rightY - 8, ctx.fontItalic, 8, ctx.theme.mutedColor);
+        }
+        rightY -= 11.5;
+      }
+
+      // Coursework / details
+      if (edu.additionalDetails) {
+        const detailsLines = edu.additionalDetails.split("\n").slice(hasLoc ? 1 : 0);
+        for (const dl of detailsLines) {
+          if (!dl.trim()) continue;
+          const wrapped = wrapText(dl.trim(), contentW, ctx.fontRegular, 8);
+          for (const wl of wrapped) {
+            ensureRightSpace(10.5);
+            drawRightText(wl, contentX, rightY - 8, ctx.fontRegular, 8, bodyColor);
+            rightY -= 10.5;
+          }
+        }
+      }
+
+      // Dynamic timeline connecting line extending across the full entry height
+      if (eIdx < data.education.length - 1) {
+        page.drawLine({
+          start: { x: markerColX, y: markerY - 2.5 },
+          end: { x: markerColX, y: rightY - 4 },
+          thickness: 0.75,
+          color: rgb(0.8, 0.84, 0.9),
+        });
+      }
+
+      rightY -= 6;
+    }
+    rightY -= 6;
+  }
+
+  // B. Experience: Vertical Timeline Design
+  if (data.experiences && data.experiences.length > 0) {
+    drawRightHeading("EXPERIENCE");
+    const timelineIndent = 14;
+    const markerColX = rightColX + 3;
+
+    for (let xIdx = 0; xIdx < data.experiences.length; xIdx++) {
+      const exp = data.experiences[xIdx];
+      ensureRightSpace(34);
+      const page = ctx.pages[rightPageIndex];
+
+      const markerY = rightY - 5;
+      page.drawCircle({
+        x: markerColX,
+        y: markerY,
+        size: 2.2,
+        color: rgb(1, 1, 1),
+        borderColor: mutedBlue,
+        borderWidth: 1.2,
+      });
+
+      const contentX = rightColX + timelineIndent;
+      const contentW = rightColWidth - timelineIndent;
+
+      // Row 1: Job Title in bold uppercase, Dates on right
+      const titleName = (exp.jobTitle || "ROLE").toUpperCase();
+      const dateText = `${exp.startDate || ""} ${exp.startDate && (exp.endDate || exp.current) ? "-" : ""} ${exp.current ? "Present" : exp.endDate || ""}`.trim();
+      const dw = (dateText && dateText !== "-") ? ctx.fontBold.widthOfTextAtSize(dateText, 8.5) : 0;
+      const titleFirstLineW = dw ? contentW - dw - 8 : contentW;
+      const titleLines = wrapText(titleName, titleFirstLineW, ctx.fontBold, 9);
+
+      for (let i = 0; i < titleLines.length; i++) {
+        ensureRightSpace(12);
+        drawRightText(titleLines[i], contentX, rightY - 9, ctx.fontBold, 9, headingColor);
+        if (i === 0 && dw) {
+          drawRightText(dateText, rightColX + rightColWidth - dw, rightY - 8.5, ctx.fontBold, 8.5, rgb(0.4, 0.45, 0.52));
+        }
+        rightY -= 12;
+      }
+
+      // Row 2: Company on left, Location on right
+      const compName = exp.company ? exp.company.toUpperCase() : "";
+      const locText = exp.location || "";
+      const lw = locText ? ctx.fontItalic.widthOfTextAtSize(sanitizePdfText(locText), 8) : 0;
+      const compFirstLineW = lw ? contentW - lw - 8 : contentW;
+      const compLines = compName ? wrapText(compName, compFirstLineW, ctx.fontBold, 8.5) : [];
+
+      for (let i = 0; i < compLines.length; i++) {
+        ensureRightSpace(11.5);
+        drawRightText(compLines[i], contentX, rightY - 8.5, ctx.fontBold, 8.5, rgb(0.3, 0.35, 0.42));
+        if (i === 0 && lw) {
+          drawRightText(locText, rightColX + rightColWidth - lw, rightY - 8, ctx.fontItalic, 8, ctx.theme.mutedColor);
+        }
+        rightY -= 11.5;
+      }
+
+      // Responsibilities Bullets
+      if (exp.responsibilities) {
+        const lines = exp.responsibilities.split("\n");
+        for (const l of lines) {
+          const cleanL = l.trim().replace(/^[-•*]\s*/, "");
+          if (!cleanL) continue;
+          const bLines = wrapText(cleanL, contentW - 10, ctx.fontRegular, 8.5);
+          for (let bIdx = 0; bIdx < bLines.length; bIdx++) {
+            ensureRightSpace(11.5);
+            if (bIdx === 0) {
+              drawRightText("*", contentX + 2, rightY - 8.5, ctx.fontBold, 8, mutedBlue);
+            }
+            drawRightText(bLines[bIdx], contentX + 10, rightY - 8.5, ctx.fontRegular, 8.5, bodyColor);
+            rightY -= 11.5;
+          }
+        }
+      }
+
+      if (exp.achievements) {
+        const aLines = wrapText(`Key Achievement: ${exp.achievements}`, contentW - 10, ctx.fontItalic, 8);
+        for (const al of aLines) {
+          ensureRightSpace(11);
+          drawRightText(al, contentX + 10, rightY - 8, ctx.fontItalic, 8, ctx.theme.mutedColor);
+          rightY -= 11;
+        }
+      }
+
+      // Dynamic timeline connecting line extending across the full entry height
+      if (xIdx < data.experiences.length - 1) {
+        page.drawLine({
+          start: { x: markerColX, y: markerY - 2.5 },
+          end: { x: markerColX, y: rightY - 4 },
+          thickness: 0.75,
+          color: rgb(0.8, 0.84, 0.9),
+        });
+      }
+
+      rightY -= 6;
+    }
+    rightY -= 6;
+  }
+
+  // C. Key Projects (if present)
+  if (data.projects && data.projects.length > 0) {
+    drawRightHeading("KEY PROJECTS");
+    for (const proj of data.projects) {
+      ensureRightSpace(24);
+      drawRightText(proj.title, rightColX, rightY - 9, ctx.fontBold, 9, headingColor);
+      if (proj.projectUrl) {
+        const cleanUrl = proj.projectUrl.replace(/^https?:\/\/(www\.)?/, "");
+        const uw = ctx.fontRegular.widthOfTextAtSize(cleanUrl, 8);
+        drawRightText(cleanUrl, rightColX + rightColWidth - uw, rightY - 8, ctx.fontRegular, 8, mutedBlue);
+        addHyperlink(ctx.doc, ctx.pages[rightPageIndex], rightColX + rightColWidth - uw, rightY - 8 - 2, uw, 10, proj.projectUrl);
+      }
+      rightY -= 11.5;
+
+      if (proj.technologies) {
+        drawRightText(`Technologies: ${proj.technologies}`, rightColX, rightY - 8, ctx.fontItalic, 8, ctx.theme.mutedColor);
+        rightY -= 10.5;
+      }
+
+      if (proj.description) {
+        const dLines = wrapText(proj.description, rightColWidth, ctx.fontRegular, 8.5);
+        for (const dl of dLines) {
+          ensureRightSpace(11);
+          drawRightText(dl, rightColX, rightY - 8.5, ctx.fontRegular, 8.5, bodyColor);
+          rightY -= 11;
+        }
+      }
+      rightY -= 6;
+    }
+    rightY -= 6;
+  }
+
+  // D. Personal Information (Clean Label-Value Structure)
+  const info = data.personalInfo;
+  const hasPersonalDetails = Boolean(
+    info.dob?.trim() ||
+    info.nationality?.trim() ||
+    info.maritalStatus?.trim()
+  );
+
+  if (hasPersonalDetails) {
+    drawRightHeading("PERSONAL INFORMATION");
+    if (info.dob && info.dob.trim()) {
+      ensureRightSpace(22);
+      drawRightText("Date of Birth", rightColX, rightY - 8.5, ctx.fontItalic, 8.5, headingColor);
+      rightY -= 10.5;
+      drawRightText(info.dob.trim(), rightColX, rightY - 8.5, ctx.fontRegular, 8.5, bodyColor);
+      rightY -= 13;
+    }
+    if (info.nationality && info.nationality.trim()) {
+      ensureRightSpace(22);
+      drawRightText("Nationality", rightColX, rightY - 8.5, ctx.fontItalic, 8.5, headingColor);
+      rightY -= 10.5;
+      drawRightText(info.nationality.trim(), rightColX, rightY - 8.5, ctx.fontRegular, 8.5, bodyColor);
+      rightY -= 13;
+    }
+    if (info.maritalStatus && info.maritalStatus.trim()) {
+      ensureRightSpace(22);
+      drawRightText("Marital Status", rightColX, rightY - 8.5, ctx.fontItalic, 8.5, headingColor);
+      rightY -= 10.5;
+      drawRightText(info.maritalStatus.trim(), rightColX, rightY - 8.5, ctx.fontRegular, 8.5, bodyColor);
+      rightY -= 13;
+    }
+  }
+
+  // E. Achievements (if present)
+  if (data.achievements && data.achievements.length > 0) {
+    drawRightHeading("ACHIEVEMENTS");
+    for (const ach of data.achievements) {
+      ensureRightSpace(18);
+      drawRightText(ach.title, rightColX, rightY - 8.5, ctx.fontBold, 8.5, headingColor);
+      rightY -= 11;
+      if (ach.description) {
+        const dLines = wrapText(ach.description, rightColWidth, ctx.fontRegular, 8);
+        for (const dl of dLines) {
+          ensureRightSpace(10.5);
+          drawRightText(dl, rightColX, rightY - 8, ctx.fontRegular, 8, bodyColor);
+          rightY -= 10.5;
+        }
+      }
+      rightY -= 4;
+    }
+  }
 }
 
 // =========================================================================
@@ -1367,7 +2017,7 @@ function renderInlineContactList(
       }
     });
 
-    let curX = centered ? ctx.marginLeft + (maxWidth - lineTotalW) / 2 : ctx.marginLeft;
+    let curX = centered ? Math.max(ctx.marginLeft, ctx.marginLeft + (maxWidth - lineTotalW) / 2) : ctx.marginLeft;
     const baseLineY = ctx.currentY - ctx.contactFontSize;
     const iconY = baseLineY + 7.2;
 
@@ -1445,9 +2095,9 @@ function drawSectionHeader(ctx: PdfRenderContext, title: string, customAccent?: 
   ctx.currentY = lineY - 8;
 }
 
-function renderSummarySection(ctx: PdfRenderContext, summary?: string, accent?: RGB, subLineCol?: RGB): void {
+function renderSummarySection(ctx: PdfRenderContext, summary?: string, accent?: RGB, subLineCol?: RGB, customTitle = "Professional Summary"): void {
   if (!summary || !summary.trim()) return;
-  drawSectionHeader(ctx, "Professional Summary", accent, subLineCol);
+  drawSectionHeader(ctx, customTitle, accent, subLineCol);
   const sFontSize = ctx.bodyFontSize + 0.5;
   const sLineH = sFontSize * ctx.lineSpacingMult;
   const lines = wrapText(summary.trim(), ctx.contentWidth, ctx.fontRegular, sFontSize);
@@ -1460,9 +2110,9 @@ function renderSummarySection(ctx: PdfRenderContext, summary?: string, accent?: 
   ctx.currentY -= ctx.sectionGap;
 }
 
-function renderExperienceSection(ctx: PdfRenderContext, experiences?: ResumeData["experiences"], accent?: RGB, subLineCol?: RGB): void {
+function renderExperienceSection(ctx: PdfRenderContext, experiences?: ResumeData["experiences"], accent?: RGB, subLineCol?: RGB, customTitle = "Work Experience"): void {
   if (!experiences || experiences.length === 0) return;
-  drawSectionHeader(ctx, "Work Experience", accent, subLineCol);
+  drawSectionHeader(ctx, customTitle, accent, subLineCol);
 
   for (const exp of experiences) {
     const titleText = exp.jobTitle || "Job Title";
@@ -1538,9 +2188,9 @@ function renderExperienceSection(ctx: PdfRenderContext, experiences?: ResumeData
   ctx.currentY -= Math.max(4, ctx.sectionGap - ctx.itemGap);
 }
 
-function renderEducationSection(ctx: PdfRenderContext, education?: ResumeData["education"], accent?: RGB, subLineCol?: RGB): void {
+function renderEducationSection(ctx: PdfRenderContext, education?: ResumeData["education"], accent?: RGB, subLineCol?: RGB, customTitle = "Education"): void {
   if (!education || education.length === 0) return;
-  drawSectionHeader(ctx, "Education", accent, subLineCol);
+  drawSectionHeader(ctx, customTitle, accent, subLineCol);
 
   for (const edu of education) {
     const degreeText = edu.degree
@@ -1583,12 +2233,12 @@ function renderEducationSection(ctx: PdfRenderContext, education?: ResumeData["e
   ctx.currentY -= Math.max(4, ctx.sectionGap - ctx.itemGap);
 }
 
-function renderSkillsSection(ctx: PdfRenderContext, skills?: ResumeData["skills"], accent?: RGB, subLineCol?: RGB): void {
+function renderSkillsSection(ctx: PdfRenderContext, skills?: ResumeData["skills"], accent?: RGB, subLineCol?: RGB, customTitle = "Skills"): void {
   const tech = skills?.technical || [];
   const soft = skills?.soft || [];
   if (tech.length === 0 && soft.length === 0) return;
 
-  drawSectionHeader(ctx, "Skills", accent, subLineCol);
+  drawSectionHeader(ctx, customTitle, accent, subLineCol);
   const sSize = ctx.bodyFontSize;
   const sLineH = sSize * ctx.lineSpacingMult;
 
@@ -1615,9 +2265,9 @@ function renderSkillsSection(ctx: PdfRenderContext, skills?: ResumeData["skills"
   ctx.currentY -= ctx.sectionGap;
 }
 
-function renderProjectsSection(ctx: PdfRenderContext, projects?: ResumeData["projects"], accent?: RGB, subLineCol?: RGB): void {
+function renderProjectsSection(ctx: PdfRenderContext, projects?: ResumeData["projects"], accent?: RGB, subLineCol?: RGB, customTitle = "Key Projects"): void {
   if (!projects || projects.length === 0) return;
-  drawSectionHeader(ctx, "Key Projects", accent, subLineCol);
+  drawSectionHeader(ctx, customTitle, accent, subLineCol);
 
   for (const proj of projects) {
     ctx.ensureVerticalSpace(30);
@@ -1656,9 +2306,9 @@ function renderProjectsSection(ctx: PdfRenderContext, projects?: ResumeData["pro
   ctx.currentY -= Math.max(4, ctx.sectionGap - ctx.itemGap);
 }
 
-function renderCertificationsSection(ctx: PdfRenderContext, certs?: ResumeData["certifications"], accent?: RGB, subLineCol?: RGB): void {
+function renderCertificationsSection(ctx: PdfRenderContext, certs?: ResumeData["certifications"], accent?: RGB, subLineCol?: RGB, customTitle = "Certifications"): void {
   if (!certs || certs.length === 0) return;
-  drawSectionHeader(ctx, "Certifications", accent, subLineCol);
+  drawSectionHeader(ctx, customTitle, accent, subLineCol);
 
   for (const cert of certs) {
     ctx.ensureVerticalSpace(16);
@@ -1681,9 +2331,9 @@ function renderCertificationsSection(ctx: PdfRenderContext, certs?: ResumeData["
   ctx.currentY -= ctx.sectionGap;
 }
 
-function renderLanguagesSection(ctx: PdfRenderContext, languages?: ResumeData["languages"], accent?: RGB, subLineCol?: RGB): void {
+function renderLanguagesSection(ctx: PdfRenderContext, languages?: ResumeData["languages"], accent?: RGB, subLineCol?: RGB, customTitle = "Languages"): void {
   if (!languages || languages.length === 0) return;
-  drawSectionHeader(ctx, "Languages", accent, subLineCol);
+  drawSectionHeader(ctx, customTitle, accent, subLineCol);
   ctx.ensureVerticalSpace(16);
 
   const lSize = ctx.bodyFontSize;

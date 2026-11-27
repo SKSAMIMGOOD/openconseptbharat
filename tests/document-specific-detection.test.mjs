@@ -26,6 +26,9 @@ import {
   detectVoterCards,
   detectDocumentByStrategy,
   detectDualDocumentBoundaries,
+  expandPanCardCaptureArea,
+  expandRationCardCaptureArea,
+  expandAadhaarCardCaptureArea,
 } from "../src/lib/document/document-detector.ts";
 
 import {
@@ -44,8 +47,11 @@ import {
 
 import {
   PAN_CARD_MEASUREMENTS,
+  PAN_CARD_CAPTURE_SPEC,
   AADHAAR_CARD_MEASUREMENTS,
+  AADHAAR_CARD_CAPTURE_SPEC,
   RATION_CARD_MEASUREMENTS,
+  RATION_CARD_CAPTURE_SPEC,
   VOTER_ID_MEASUREMENTS,
   CR80_STANDARD_SPEC,
   DOCUMENT_TYPES,
@@ -206,6 +212,50 @@ describe("TEST 1: PAN Card Document-Specific Detection", () => {
     assert.ok(frontAspect >= 1.50 && frontAspect <= 1.70, `Front aspect ratio ${frontAspect} should be ~1.60`);
     assert.ok(backAspect >= 1.50 && backAspect <= 1.70, `Back aspect ratio ${backAspect} should be ~1.60`);
   });
+
+  test("expands capturing area from 1792 x 1130 px to 1881 x 1186 px while preserving exact CR80 aspect ratio and fold line", () => {
+    const nativeW = 5100;
+    const nativeH = 6600;
+    const foldX = 2554; // Central vertical fold line
+
+    // Base auto-detected core region (~1792 x 1130 px)
+    const baseCoreCrop = {
+      x: 762,
+      y: 5160,
+      width: 1792,
+      height: 1130,
+    };
+
+    // Expand front capturing area
+    const expandedFront = expandPanCardCaptureArea(baseCoreCrop, "front", foldX, nativeW, nativeH);
+
+    assert.equal(expandedFront.width, 1881, "Front capture width must expand to 1881 px");
+    assert.equal(expandedFront.height, 1186, "Front capture height must expand to 1186 px");
+    assert.equal(expandedFront.x + expandedFront.width, foldX, "Front crop right edge must touch vertical fold without crossing");
+    assert.ok(expandedFront.y < baseCoreCrop.y, "Top Y must shift upward to accommodate header");
+    assert.ok(
+      expandedFront.y + expandedFront.height > baseCoreCrop.y + baseCoreCrop.height,
+      "Bottom edge must expand downward to capture signature box and DOB"
+    );
+
+    // Expand back capturing area
+    const baseBackCrop = {
+      x: foldX,
+      y: 5160,
+      width: 1792,
+      height: 1130,
+    };
+    const expandedBack = expandPanCardCaptureArea(baseBackCrop, "back", foldX, nativeW, nativeH);
+
+    assert.equal(expandedBack.width, 1881, "Back capture width must expand to 1881 px");
+    assert.equal(expandedBack.height, 1186, "Back capture height must expand to 1186 px");
+    assert.equal(expandedBack.x, foldX, "Back crop left edge must align with vertical fold");
+    assert.equal(expandedBack.y, expandedFront.y, "Front and back vertical coordinates must harmonize");
+
+    // Aspect ratio check for ISO CR80 compliance
+    const aspect = expandedFront.width / expandedFront.height;
+    assert.ok(Math.abs(aspect - PAN_CARD_CAPTURE_SPEC.aspectRatio) < 0.001, "Aspect ratio must match CR80 specification");
+  });
 });
 
 describe("TEST 2: Aadhaar Card Document-Specific Detection", () => {
@@ -269,6 +319,52 @@ describe("TEST 2: Aadhaar Card Document-Specific Detection", () => {
     const hDiff = Math.abs(result.frontCrop.height - result.backCrop.height) / result.frontCrop.height;
     assert.ok(wDiff < 0.05, `Width difference between sides (${wDiff}) should be < 5%`);
     assert.ok(hDiff < 0.05, `Height difference between sides (${hDiff}) should be < 5%`);
+  });
+
+  test("expands Aadhaar Card capturing area from detected core (~1913 x 1206) to full card (2072 x 1307 px) conforming to ISO CR80", () => {
+    // Verified against user reference document:
+    // Native document rendered at high resolution
+    const nativeW = 4961;
+    const nativeH = 7016;
+    const foldX = 2482;
+
+    // Detected core crop (1913 x 1206 px)
+    const baseCoreCrop = {
+      x: 569,
+      y: 5080,
+      width: 1913,
+      height: 1206,
+    };
+
+    // Expand front capturing area
+    const expandedFront = expandAadhaarCardCaptureArea(baseCoreCrop, "front", foldX, nativeW, nativeH);
+
+    assert.equal(expandedFront.width, 2072, "Front capture width must expand to 2072 px");
+    assert.equal(expandedFront.height, 1307, "Front capture height must expand to 1307 px");
+    assert.equal(expandedFront.x + expandedFront.width, foldX, "Front crop right edge must touch vertical fold without crossing");
+    assert.ok(expandedFront.y < baseCoreCrop.y, "Top Y must shift upward to accommodate emblem");
+    assert.ok(
+      expandedFront.y + expandedFront.height > baseCoreCrop.y + baseCoreCrop.height,
+      "Bottom edge must expand downward to capture 'मेरा आधार, मेरी पहचान' slogan"
+    );
+
+    // Expand back capturing area
+    const baseBackCrop = {
+      x: foldX,
+      y: 5080,
+      width: 1913,
+      height: 1206,
+    };
+    const expandedBack = expandAadhaarCardCaptureArea(baseBackCrop, "back", foldX, nativeW, nativeH);
+
+    assert.equal(expandedBack.width, 2072, "Back capture width must expand to 2072 px");
+    assert.equal(expandedBack.height, 1307, "Back capture height must expand to 1307 px");
+    assert.equal(expandedBack.x, foldX, "Back crop left edge must align with vertical fold");
+    assert.equal(expandedBack.y, expandedFront.y, "Front and back vertical coordinates must harmonize");
+
+    // Aspect ratio check for ISO CR80 compliance
+    const aspect = expandedFront.width / expandedFront.height;
+    assert.ok(Math.abs(aspect - AADHAAR_CARD_CAPTURE_SPEC.aspectRatio) < 0.001, "Aspect ratio must match CR80 specification");
   });
 });
 
@@ -556,6 +652,48 @@ describe("TEST 3: Ration Card Document-Specific Detection", () => {
 
     // Zero stretching
     assert.equal(geo.isStretched, false, "Must never stretch card pixels");
+  });
+
+  test("expands Ration Card capturing area from detected core (~1640 x 1034) to full card (1925 x 1214 px) conforming to ISO CR80", () => {
+    // Verified against user reference document:
+    // Native document rendered at high resolution
+    const nativeW = 4961;
+    const nativeH = 7016;
+    const foldX = 2489;
+
+    // Detected core crop (1640 x 1034 px)
+    const baseCoreCrop = {
+      x: 849,
+      y: 4899,
+      width: 1640,
+      height: 1034,
+    };
+
+    // Expand front capturing area
+    const expandedFront = expandRationCardCaptureArea(baseCoreCrop, "front", foldX, nativeW, nativeH);
+
+    assert.equal(expandedFront.width, 1925, "Front capture width must expand to 1925 px");
+    assert.equal(expandedFront.height, 1214, "Front capture height must expand to 1214 px");
+    assert.equal(expandedFront.x + expandedFront.width, foldX, "Front crop right edge must touch vertical fold without crossing");
+    assert.ok(expandedFront.y < baseCoreCrop.y, "Top Y must shift upward to accommodate government header");
+
+    // Expand back capturing area
+    const baseBackCrop = {
+      x: foldX,
+      y: 4899,
+      width: 1640,
+      height: 1034,
+    };
+    const expandedBack = expandRationCardCaptureArea(baseBackCrop, "back", foldX, nativeW, nativeH);
+
+    assert.equal(expandedBack.width, 1925, "Back capture width must expand to 1925 px");
+    assert.equal(expandedBack.height, 1214, "Back capture height must expand to 1214 px");
+    assert.equal(expandedBack.x, foldX, "Back crop left edge must align with vertical fold");
+    assert.equal(expandedBack.y, expandedFront.y, "Front and back vertical coordinates must harmonize");
+
+    // Aspect ratio check for ISO CR80 compliance
+    const aspect = expandedFront.width / expandedFront.height;
+    assert.ok(Math.abs(aspect - RATION_CARD_CAPTURE_SPEC.aspectRatio) < 0.001, "Aspect ratio must match CR80 specification");
   });
 });
 
