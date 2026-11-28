@@ -654,46 +654,93 @@ describe("TEST 3: Ration Card Document-Specific Detection", () => {
     assert.equal(geo.isStretched, false, "Must never stretch card pixels");
   });
 
-  test("expands Ration Card capturing area from detected core (~1640 x 1034) to full card (1925 x 1214 px) conforming to ISO CR80", () => {
-    // Verified against user reference document:
-    // Native document rendered at high resolution
-    const nativeW = 4961;
-    const nativeH = 7016;
-    const foldX = 2489;
+  test("expands Ration Card capturing area by 1.5 mm on each side for A4 reference document at 600 DPI", () => {
+    // Acceptance criteria from Section 10:
+    // Original document: 4959 x 7017 px, Page size A4 (595 x 842 pt), 600 DPI
+    const W = 4959;
+    const H = 7017;
+    const foldX = 2491;
 
-    // Detected core crop (1640 x 1034 px)
-    const baseCoreCrop = {
-      x: 849,
-      y: 4899,
-      width: 1640,
-      height: 1034,
+    // Detected coloured panel boundaries
+    const frontPanel = {
+      x: 446,
+      y: 5559,
+      width: 1961,
+      height: 1179,
     };
 
-    // Expand front capturing area
-    const expandedFront = expandRationCardCaptureArea(baseCoreCrop, "front", foldX, nativeW, nativeH);
-
-    assert.equal(expandedFront.width, 1925, "Front capture width must expand to 1925 px");
-    assert.equal(expandedFront.height, 1214, "Front capture height must expand to 1214 px");
-    assert.equal(expandedFront.x + expandedFront.width, foldX, "Front crop right edge must touch vertical fold without crossing");
-    assert.ok(expandedFront.y < baseCoreCrop.y, "Top Y must shift upward to accommodate government header");
-
-    // Expand back capturing area
-    const baseBackCrop = {
-      x: foldX,
-      y: 4899,
-      width: 1640,
-      height: 1034,
+    const backPanel = {
+      x: 2571,
+      y: 5559,
+      width: 1961,
+      height: 1179,
     };
-    const expandedBack = expandRationCardCaptureArea(baseBackCrop, "back", foldX, nativeW, nativeH);
 
-    assert.equal(expandedBack.width, 1925, "Back capture width must expand to 1925 px");
-    assert.equal(expandedBack.height, 1214, "Back capture height must expand to 1214 px");
-    assert.equal(expandedBack.x, foldX, "Back crop left edge must align with vertical fold");
-    assert.equal(expandedBack.y, expandedFront.y, "Front and back vertical coordinates must harmonize");
+    // Expand front capture
+    const frontCapture = expandRationCardCaptureArea(frontPanel, "front", foldX, W, H, 600);
+    // Expand back capture
+    const backCapture = expandRationCardCaptureArea(backPanel, "back", foldX, W, H, 600);
 
-    // Aspect ratio check for ISO CR80 compliance
-    const aspect = expandedFront.width / expandedFront.height;
-    assert.ok(Math.abs(aspect - RATION_CARD_CAPTURE_SPEC.aspectRatio) < 0.001, "Aspect ratio must match CR80 specification");
+    // Expected Front Side:
+    // x: 411, y: 5524, x1: 2442, y1: 6773, width: 2031, height: 1249
+    assert.equal(frontCapture.x, 411, "Front X start must match 411");
+    assert.equal(frontCapture.y, 5524, "Front Y start must match 5524");
+    assert.equal(frontCapture.x + frontCapture.width, 2442, "Front X end must match 2442");
+    assert.equal(frontCapture.y + frontCapture.height, 6773, "Front Y end must match 6773");
+    assert.equal(frontCapture.width, 2031, "Front capture width must be 2031 px");
+    assert.equal(frontCapture.height, 1249, "Front capture height must be 1249 px");
+
+    // Expected Back Side:
+    // x: 2536, y: 5524, x1: 4567, y1: 6773, width: 2031, height: 1249
+    assert.equal(backCapture.x, 2536, "Back X start must match 2536");
+    assert.equal(backCapture.y, 5524, "Back Y start must match 5524");
+    assert.equal(backCapture.x + backCapture.width, 4567, "Back X end must match 4567");
+    assert.equal(backCapture.y + backCapture.height, 6773, "Back Y end must match 6773");
+    assert.equal(backCapture.width, 2031, "Back capture width must be 2031 px");
+    assert.equal(backCapture.height, 1249, "Back capture height must be 1249 px");
+
+    // Verification of constraints:
+    // 1. Front and Back capture boundaries match expected coordinates within ±3 px (exact match 0 px)
+    // 2. Front capture never crosses the fold (2442 < 2491)
+    assert.ok(frontCapture.x + frontCapture.width <= foldX, "Front capture must never cross fold line");
+    // 3. Back capture never crosses the fold (2536 > 2491)
+    assert.ok(backCapture.x >= foldX, "Back capture must never cross fold line");
+    // 4. Both capture rectangles remain inside dashed cut box (X: 341–4616, Y: 5460–6816)
+    assert.ok(frontCapture.x >= 341 && frontCapture.x + frontCapture.width <= 4616);
+    assert.ok(frontCapture.y >= 5460 && frontCapture.y + frontCapture.height <= 6816);
+    assert.ok(backCapture.x >= 341 && backCapture.x + backCapture.width <= 4616);
+    assert.ok(backCapture.y >= 5460 && backCapture.y + backCapture.height <= 6816);
+    // 5. Each edge maintains ~1.5 mm clearance (35 px at 600 DPI)
+    assert.equal(frontPanel.x - frontCapture.x, 35);
+    assert.equal(frontPanel.y - frontCapture.y, 35);
+    assert.equal((frontCapture.x + frontCapture.width) - (frontPanel.x + frontPanel.width), 35);
+    assert.equal((frontCapture.y + frontCapture.height) - (frontPanel.y + frontPanel.height), 35);
+    // 6. No overlap between front and back captures
+    assert.ok(frontCapture.x + frontCapture.width <= backCapture.x, "Front and back captures must not overlap");
+  });
+
+  test("verifies resolution-independent calculation on A4 reference document at 300 DPI", () => {
+    // A4 sheet at 300 DPI (approx 2480 x 3508 px)
+    const W = 2480;
+    const H = 3508;
+    const foldX = 1245;
+    // Expected margin at 300 DPI: round(1.5 * 300 / 25.4) = 18 px
+    const expectedMargin = Math.round((1.5 * 300) / 25.4);
+    assert.equal(expectedMargin, 18, "300 DPI margin must be approx 18 px");
+
+    const frontPanel = {
+      x: 223,
+      y: 2780,
+      width: 980,
+      height: 590,
+    };
+
+    const frontCapture = expandRationCardCaptureArea(frontPanel, "front", foldX, W, H, 300);
+
+    assert.equal(frontCapture.x, frontPanel.x - expectedMargin);
+    assert.equal(frontCapture.y, frontPanel.y - expectedMargin);
+    assert.equal(frontCapture.width, frontPanel.width + 2 * expectedMargin);
+    assert.equal(frontCapture.height, frontPanel.height + 2 * expectedMargin);
   });
 });
 

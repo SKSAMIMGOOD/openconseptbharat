@@ -1663,48 +1663,53 @@ function trimCardWhiteSpace(
 }
 
 /**
- * Expands the Ration Card capture area from the detected inner core (~1640 × 1034 px)
- * to the full card capturing area (1925 × 1214 px), preserving the ISO CR80 aspect ratio (~1.5857),
- * properly framing the bottom-right QR code, central fold, top header, and bottom notice.
+ * Expands the Ration Card capture area from the detected panel boundaries
+ * by 1.5 mm on each side based on the dynamically calculated rendering DPI.
  *
- * NOTE: Does NOT alter the auto-detection position calculation or detection method.
- * Only expands the captured crop rectangle around the detected fold and card position.
+ * Requirements:
+ * - renderDpi = renderedWidthPx / (pageWidthPt / 72)
+ * - m = Math.round(1.5 * renderDpi / 25.4)
+ * - Exclusive ending coordinates: x1 = panel.x + panel.width + m, y1 = panel.y + panel.height + m
+ * - Prevents front and back capture overlap across foldX.
+ * - Keeps capture inside the source document boundaries [0..W, 0..H].
+ * - Preserves actual detected panel dimensions without forcing an artificial aspect ratio.
  */
 export function expandRationCardCaptureArea(
-  crop: CropCoordinates,
+  panel: CropCoordinates,
   side: "front" | "back",
   foldX: number,
   containerW: number,
-  containerH: number
+  containerH: number,
+  renderDpi?: number
 ): CropCoordinates {
-  const TARGET_W = RATION_CARD_CAPTURE_SPEC.widthPx; // 1925
-  const TARGET_H = RATION_CARD_CAPTURE_SPEC.heightPx; // 1214
-  const BASE_W = RATION_CARD_CAPTURE_SPEC.baseWidthPx; // 1640
-  const BASE_H = RATION_CARD_CAPTURE_SPEC.baseHeightPx; // 1034
+  // A4 standard page width: 595.27559 pt (approx 595 pt)
+  // If renderDpi is not explicitly provided, calculate dynamically from container width (A4 width 595 pt)
+  const dpi = renderDpi ?? (containerW / (595.27559 / 72));
+  const m = Math.round((1.5 * dpi) / 25.4);
 
-  // Check if resolution is standard (near 600 DPI rendering ~4500-5200 px wide)
-  const isStandardRes = Math.abs(crop.width - BASE_W) <= 120;
-  const newW = isStandardRes ? TARGET_W : Math.round(crop.width * (TARGET_W / BASE_W));
-  const newH = isStandardRes ? TARGET_H : Math.round(crop.height * (TARGET_H / BASE_H));
+  let x0 = panel.x - m;
+  let y0 = panel.y - m;
+  let x1 = panel.x + panel.width + m;
+  let y1 = panel.y + panel.height + m;
 
-  const deltaH = newH - crop.height;
-  // Shift Y: ~42% upward and ~58% downward to capture top Bengali header and bottom notice
-  const newY = Math.max(0, crop.y - Math.round(deltaH * 0.42));
-
-  let newX: number;
+  // Prevent front and back capture overlap across the vertical fold line
   if (side === "front") {
-    // Front card extends right up to the central fold line (foldX)
-    newX = Math.max(0, foldX - newW);
+    x1 = Math.min(x1, foldX);
   } else {
-    // Back card starts from the central fold line (foldX)
-    newX = foldX;
+    x0 = Math.max(x0, foldX);
   }
 
+  // Keep capture strictly inside the source document bounds
+  x0 = Math.max(0, x0);
+  y0 = Math.max(0, y0);
+  x1 = Math.min(containerW, x1);
+  y1 = Math.min(containerH, y1);
+
   return {
-    x: newX,
-    y: newY,
-    width: Math.min(containerW - newX, newW),
-    height: Math.min(containerH - newY, newH),
+    x: x0,
+    y: y0,
+    width: x1 - x0,
+    height: y1 - y0,
   };
 }
 
@@ -1828,7 +1833,7 @@ export function detectRationCardInPixelBuffer(
     }
   }
 
-  // 4. Locate vertical dashed fold near center (X ≈ 1280, 0.5020 * W)
+  // 4. Locate vertical dashed fold near center (X ≈ 1280 on Letter or ~0.5020 * W)
   const foldCol = findVerticalFoldColumn(
     buffer,
     Math.round(0.487 * W),
@@ -1840,28 +1845,31 @@ export function detectRationCardInPixelBuffer(
   );
   const foldX = foldCol ?? Math.round(0.502 * W);
 
-  // 5. Divide cut box into left and right candidate regions
+  // 5. Divide cut box into left and right candidate regions using fold-relative search limits:
+  // frontRegion: [max(0.05 * W, foldX - half), foldX]
+  // backRegion:  [foldX, min(0.95 * W, foldX + half)]
+  const half = Math.round(0.47 * W);
   const leftHalf: CropCoordinates = {
-    x: Math.max(0, refCutLeftX - tolX),
+    x: Math.max(Math.round(0.05 * W), foldX - half),
     y: cutBoxTopY,
-    width: Math.max(10, foldX - (refCutLeftX - tolX)),
+    width: Math.max(10, foldX - Math.max(Math.round(0.05 * W), foldX - half)),
     height: Math.max(10, cutBoxBottomY - cutBoxTopY),
   };
 
   const rightHalf: CropCoordinates = {
     x: foldX,
     y: cutBoxTopY,
-    width: Math.max(10, refCutRightX + tolX - foldX),
+    width: Math.max(10, Math.min(Math.round(0.95 * W), foldX + half) - foldX),
     height: Math.max(10, cutBoxBottomY - cutBoxTopY),
   };
 
   // 6. Detect actual card boundaries using:
-  // - PRIMARY: colored card background with saturation >= 45, row >= 25%, col >= 12%
+  // - PRIMARY: colored card background with saturation >= 35 (tuned for A4 blue/cyan & green cards), row >= 25%, col >= 12%
   // - Fallback 1: colored background with saturation >= 18
   // - Fallback 2: edge/foreground bounding box (findCardBoundsInRegion)
   // - Fallback 3: reference coordinates with tolerance
-  let detectedLeft = findRationCardBySaturation(buffer, leftHalf, 45, 0.25, 0.12);
-  let detectedRight = findRationCardBySaturation(buffer, rightHalf, 45, 0.25, 0.12);
+  let detectedLeft = findRationCardBySaturation(buffer, leftHalf, 35, 0.25, 0.12);
+  let detectedRight = findRationCardBySaturation(buffer, rightHalf, 35, 0.25, 0.12);
 
   if (!detectedLeft) {
     detectedLeft = findRationCardBySaturation(buffer, leftHalf, 18, 0.20, 0.10);
@@ -1882,14 +1890,12 @@ export function detectRationCardInPixelBuffer(
   let detectedCount = (detectedLeft ? 1 : 0) + (detectedRight ? 1 : 0);
 
   // 7. Validation Rules:
-  // Expected card dimensions: Width ≈ 923 px, Height ≈ 553 px, Aspect ratio ≈ 1.669 (acceptable: 1.55–1.70).
-  const targetAspect = 923 / 553; // ~1.669
+  // Expected card dimensions: Width ≈ 1961 px, Height ≈ 1179 px on A4 @ 600 DPI (Aspect ratio ~1.66).
+  // Acceptable aspect ratio range: 1.45–1.85.
   let isLowConfidence = false;
 
-  // Check 3% page size edge deviation:
-  // If detected card edge differs from reference coordinates by more than ~3% of page size, mark as low confidence.
-  const maxDevX = W * 0.035;
-  const maxDevY = H * 0.035;
+  const maxDevX = W * 0.05;
+  const maxDevY = H * 0.05;
 
   const refFrontX = Math.round(ref.front.xMin * W);
   const refFrontY = Math.round(ref.front.yMin * H);
@@ -1904,7 +1910,7 @@ export function detectRationCardInPixelBuffer(
   const frontAspect = frontCandidate.width / (frontCandidate.height || 1);
   const backAspect = backCandidate.width / (backCandidate.height || 1);
 
-  if (frontAspect < 1.48 || frontAspect > 1.78 || backAspect < 1.48 || backAspect > 1.78) {
+  if (frontAspect < 1.45 || frontAspect > 1.85 || backAspect < 1.45 || backAspect > 1.85) {
     isLowConfidence = true;
   }
 
@@ -1921,25 +1927,44 @@ export function detectRationCardInPixelBuffer(
     isLowConfidence = true;
   }
 
-  // 8. Front and back dimensions must match within approximately 2%.
-  // Harmonize vertical positioning and enforce dimensions match within 2% with target aspect ratio.
-  const commonY = Math.min(frontCandidate.y, backCandidate.y);
-  const commonH = Math.round((frontCandidate.height + backCandidate.height) / 2);
-  const commonW = Math.round(commonH * targetAspect);
+  // 8. Dimension and baseline preservation:
+  // If both cards were detected by saturation, preserve their actual detected panel dimensions.
+  // Enforce bounds within document edges and prevent fold crossing.
+  if (detectedLeft && detectedRight) {
+    // Preserve detected dimensions, ensure they don't cross fold line
+    frontCandidate = {
+      x: Math.max(0, Math.min(foldX - frontCandidate.width, frontCandidate.x)),
+      y: Math.max(0, Math.min(H - frontCandidate.height, frontCandidate.y)),
+      width: Math.min(foldX - frontCandidate.x, frontCandidate.width),
+      height: Math.min(H - frontCandidate.y, frontCandidate.height),
+    };
+    backCandidate = {
+      x: Math.max(foldX, Math.min(W - backCandidate.width, backCandidate.x)),
+      y: Math.max(0, Math.min(H - backCandidate.height, backCandidate.y)),
+      width: Math.min(W - backCandidate.x, backCandidate.width),
+      height: Math.min(H - backCandidate.y, backCandidate.height),
+    };
+  } else {
+    // Harmonize vertical positioning and apply target aspect ratio when detection is incomplete
+    const commonY = Math.min(frontCandidate.y, backCandidate.y);
+    const commonH = Math.round((frontCandidate.height + backCandidate.height) / 2);
+    const targetAspect = 923 / 553; // ~1.669
+    const commonW = Math.round(commonH * targetAspect);
 
-  frontCandidate = {
-    x: Math.max(0, Math.min(foldX - commonW, frontCandidate.x)),
-    y: Math.max(Math.round(H * 0.75), Math.min(H - commonH, commonY)),
-    width: Math.min(W, commonW),
-    height: Math.min(H, commonH),
-  };
+    frontCandidate = {
+      x: Math.max(0, Math.min(foldX - commonW, frontCandidate.x)),
+      y: Math.max(Math.round(H * 0.75), Math.min(H - commonH, commonY)),
+      width: Math.min(W, commonW),
+      height: Math.min(H, commonH),
+    };
 
-  backCandidate = {
-    x: Math.max(foldX, Math.min(W - commonW, backCandidate.x)),
-    y: Math.max(Math.round(H * 0.75), Math.min(H - commonH, commonY)),
-    width: Math.min(W, commonW),
-    height: Math.min(H, commonH),
-  };
+    backCandidate = {
+      x: Math.max(foldX, Math.min(W - commonW, backCandidate.x)),
+      y: Math.max(Math.round(H * 0.75), Math.min(H - commonH, commonY)),
+      width: Math.min(W, commonW),
+      height: Math.min(H, commonH),
+    };
+  }
 
   // If confidence is low and cards were not detected cleanly, fall back to calibrated reference coordinates
   if (isLowConfidence && detectedCount < 2) {
